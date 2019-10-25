@@ -49,7 +49,7 @@ fn write_varint(mut value: u32) -> ([u8; 10], usize) {
     (result, index)
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct VarInt {
     inner: u32,
 }
@@ -80,5 +80,9 @@ impl VarInt {
     pub(crate) fn size(&self) -> usize {
         let (_, size) = write_varint(self.inner);
         size
+    }
+
+    pub(crate) fn get(&self) -> u32 {
+        self.inner
     }
 }

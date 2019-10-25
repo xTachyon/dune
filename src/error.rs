@@ -5,10 +5,12 @@ use std::fmt::{Debug, Display};
 use std::io;
 
 #[derive(Debug)]
-pub(crate) enum MyError {
+pub enum MyError {
     Io(io::Error),
+    Utf8(std::string::FromUtf8Error),
     ChannelRecv(std::sync::mpsc::RecvError),
     ChannelSend(std::sync::mpsc::SendError<(PacketDirection, Bytes)>),
+    IntegerToEnum,
 }
 
 impl Display for MyError {
@@ -37,4 +39,10 @@ impl From<std::sync::mpsc::SendError<(PacketDirection, Bytes)>> for MyError {
     }
 }
 
-pub(crate) type MyResult<T = ()> = Result<T, MyError>;
+impl From<std::string::FromUtf8Error> for MyError {
+    fn from(error: std::string::FromUtf8Error) -> Self {
+        MyError::Utf8(error)
+    }
+}
+
+pub type MyResult<T = ()> = Result<T, MyError>;
