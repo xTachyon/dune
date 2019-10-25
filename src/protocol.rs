@@ -1,7 +1,7 @@
-use crate::varint::VarInt;
 use crate::de::MinecraftDeserialize;
-use std::io::Read;
+use crate::varint::VarInt;
 use crate::MyResult;
+use std::io::Read;
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
@@ -11,7 +11,7 @@ macro_rules! deserialize_for {
           $(
             result.$field = MinecraftDeserialize::deserialize(reader)?;
           )*
-          Ok(resultx)
+          Ok(result)
         }
       }
     };
@@ -19,8 +19,8 @@ macro_rules! deserialize_for {
 
 #[derive(Default)]
 pub struct PacketHeaderNoCompression {
-  length: VarInt,
-  id: VarInt,
+    length: VarInt,
+    id: VarInt,
 }
 
 deserialize_for!(PacketHeaderNoCompression length id);
