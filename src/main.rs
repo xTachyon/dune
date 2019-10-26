@@ -1,15 +1,13 @@
-mod codec;
 mod de;
 mod error;
 mod protocol;
 mod varint;
 
-use crate::codec::PacketCodec;
 use crate::error::{MyError, MyResult};
 use crate::protocol::Packet;
-use crate::protocol::{ConnectionState, PacketInfo};
+use crate::protocol::{ConnectionState, };
 use bytes::{Bytes, BytesMut};
-use futures_util::future::{join, join3};
+use futures_util::future::{ join3};
 use num_traits::cast::FromPrimitive;
 use std::marker::Unpin;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -143,7 +141,7 @@ impl GameData {
         Ok(())
     }
 
-    fn on_login_success(&mut self, packet: protocol::LoginSuccess) -> MyResult {
+    fn on_login_success(&mut self, _packet: protocol::LoginSuccess) -> MyResult {
         self.connection_state = ConnectionState::Play;
 
         Ok(())
@@ -196,13 +194,12 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
 async fn main() -> MyResult {
     let mut incoming = TcpListener::bind("0.0.0.0:25565").await?;
 
-    while let (client, _) = incoming.accept().await? {
+    loop {
+        let (client, _) = incoming.accept().await?;
         let task = async move {
             let server = TcpStream::connect("playmc.games:25565").await.unwrap();
             println!("{:?}", on_connected(client, server).await);
         };
         tokio::spawn(task);
     }
-
-    Ok(())
 }

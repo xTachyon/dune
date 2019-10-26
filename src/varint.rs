@@ -55,26 +55,18 @@ pub struct VarInt {
 }
 
 impl VarInt {
-    pub(crate) fn new_i32(x: i32) -> VarInt {
-        VarInt::new_u32(x as u32)
-    }
-
-    pub(crate) fn new_u32(x: u32) -> VarInt {
+    pub(crate) fn new(x: u32) -> VarInt {
         VarInt { inner: x }
     }
 
     pub(crate) fn deserialize(input: &[u8]) -> Option<VarInt> {
         let (value, _) = read_varint(input)?;
-        Some(VarInt::new_u32(value))
+        Some(VarInt::new(value))
     }
 
     pub(crate) fn deserialize_read<T: Read>(reader: T) -> MyResult<VarInt> {
         let (value, _) = read_varint_impl(reader)?;
-        Ok(VarInt::new_u32(value))
-    }
-
-    pub(crate) fn serialize(&self) -> ([u8; 10], usize) {
-        write_varint(self.inner)
+        Ok(VarInt::new(value))
     }
 
     pub(crate) fn size(&self) -> usize {

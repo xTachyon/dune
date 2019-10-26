@@ -2,17 +2,20 @@ use crate::de::MinecraftDeserialize;
 use crate::varint::VarInt;
 use crate::{MyResult, PacketDirection};
 use enum_primitive_derive::*;
-use num_traits::{FromPrimitive, ToPrimitive};
 use std::io::{Cursor, Read};
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
       impl MinecraftDeserialize for $type {
-        fn deserialize(reader: &mut dyn Read) -> MyResult<Self> {
-          let mut result = $type::default();
+        fn deserialize(_reader: &mut dyn Read) -> MyResult<Self> {
           $(
-            result.$field = MinecraftDeserialize::deserialize(reader)?;
+            let $field = MinecraftDeserialize::deserialize(_reader)?;
           )*
+          let result = $type {
+            $(
+                $field,
+            )*
+          };
           Ok(result)
         }
       }
@@ -25,21 +28,6 @@ pub enum ConnectionState {
     Status = 1,
     Login = 2,
     Play = 3,
-}
-
-pub struct PacketInfo {
-    pub direction: PacketDirection,
-    pub connection_state: ConnectionState,
-    pub id: u16,
-}
-
-impl PacketInfo {
-    pub fn big_id(&self) -> u64 {
-        let mut result = self.id as u64;
-        result += 1000 * self.connection_state as u64;
-        result += 100000 * self.direction as u64;
-        result
-    }
 }
 
 #[derive(Default)]

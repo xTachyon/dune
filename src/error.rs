@@ -1,5 +1,3 @@
-use crate::PacketDirection;
-use bytes::Bytes;
 use core::fmt;
 use std::fmt::{Debug, Display};
 use std::io;
@@ -8,8 +6,6 @@ use std::io;
 pub enum MyError {
     Io(io::Error),
     Utf8(std::string::FromUtf8Error),
-    ChannelRecv(std::sync::mpsc::RecvError),
-    ChannelSend(std::sync::mpsc::SendError<(PacketDirection, Bytes)>),
     TokioSend(tokio::sync::mpsc::error::SendError),
     IntegerToEnum,
 }
@@ -31,18 +27,6 @@ impl From<tokio::sync::mpsc::error::SendError> for MyError {
 impl From<std::io::Error> for MyError {
     fn from(error: io::Error) -> Self {
         MyError::Io(error)
-    }
-}
-
-impl From<std::sync::mpsc::RecvError> for MyError {
-    fn from(error: std::sync::mpsc::RecvError) -> Self {
-        MyError::ChannelRecv(error)
-    }
-}
-
-impl From<std::sync::mpsc::SendError<(PacketDirection, Bytes)>> for MyError {
-    fn from(error: std::sync::mpsc::SendError<(PacketDirection, Bytes)>) -> Self {
-        MyError::ChannelSend(error)
     }
 }
 
