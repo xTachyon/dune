@@ -63,7 +63,7 @@ impl VarInt {
         VarInt { inner: x }
     }
 
-    pub(crate) fn deserialize(input: &mut [u8]) -> Option<VarInt> {
+    pub(crate) fn deserialize(input: &[u8]) -> Option<VarInt> {
         let (value, _) = read_varint(input)?;
         Some(VarInt::new_u32(value))
     }

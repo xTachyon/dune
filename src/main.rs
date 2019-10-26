@@ -30,7 +30,7 @@ async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
 ) -> MyResult<()> {
     let mut bytes = BytesMut::new();
     loop {
-        if bytes.capacity() == 0 {
+        if bytes.capacity() == 0 || bytes.is_empty() {
             bytes = BytesMut::with_capacity(64 * 1024);
             bytes.resize(bytes.capacity(), 0);
         }
@@ -51,6 +51,7 @@ async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
 struct ClientGame {
     buffer: Vec<u8>,
     buffer_offset: usize,
+    compression: Option<u32>,
 }
 
 impl ClientGame {
@@ -71,6 +72,7 @@ impl ClientGame {
             direction,
             state,
             &self.buffer[self.buffer_offset..],
+            self.compression,
         )? {
             Some((packet, offset)) => {
                 self.buffer_offset += offset;
@@ -114,6 +116,8 @@ impl GameData {
                 println!("{:?} {:?} {:?}", direction, connection_state, packet);
                 match packet {
                     Packet::Handshake(x) => self.on_handshake(x)?,
+                    Packet::SetCompression(x) => self.on_set_compression(x)?,
+                    Packet::LoginSuccess(x) => self.on_login_success(x)?,
                     _ => {}
                 };
             } else {
@@ -128,6 +132,20 @@ impl GameData {
             Some(x) => x,
             None => return Err(MyError::IntegerToEnum),
         };
+        Ok(())
+    }
+
+    fn on_set_compression(&mut self, packet: protocol::SetCompression) -> MyResult {
+        let value = packet.value.get() as i32;
+        let value = if value < 0 { None } else { Some(value as u32) };
+        self.client_state.compression = value;
+        self.server_state.compression = value;
+        Ok(())
+    }
+
+    fn on_login_success(&mut self, packet: protocol::LoginSuccess) -> MyResult {
+        self.connection_state = ConnectionState::Play;
+
         Ok(())
     }
 }
