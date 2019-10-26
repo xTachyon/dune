@@ -2,14 +2,15 @@ use crate::de::MinecraftDeserialize;
 use crate::varint::VarInt;
 use crate::{MyResult, PacketDirection};
 use enum_primitive_derive::*;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
+use flate2::{Decompress, FlushDecompress};
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
       impl MinecraftDeserialize for $type {
-        fn deserialize(_reader: &mut dyn Read) -> MyResult<Self> {
+        fn deserialize<R: Read>(mut _reader: R) -> MyResult<Self> {
           $(
-            let $field = MinecraftDeserialize::deserialize(_reader)?;
+            let $field = MinecraftDeserialize::deserialize(&mut _reader)?;
           )*
           let result = $type {
             $(
@@ -123,55 +124,60 @@ pub fn deserialize_with_header(
     bytes: &[u8],
     compression: Option<u32>,
 ) -> MyResult<Option<(Packet, usize)>> {
-    match compression {
+    if !has_enough_bytes(bytes) {
+        return Ok(None);
+    }
+    println!("{}", bytes.iter().map(|x| *x as char).collect::<String>());
+    let length: VarInt = MinecraftDeserialize::deserialize(bytes)?;
+    let bytes = &bytes[length.size()..length.get() as usize + length.size()];
+
+    let packet = match compression {
         Some(x) => deserialize_compressed(direction, state, bytes, x),
         None => deserialize_uncompressed(direction, state, bytes),
-    }
+    }?;
+    dbg!(&packet);
+    let result = match packet {
+        Some(packet) => Some((packet, length.get() as usize + length.size())),
+        None => None
+    };
+    Ok(result)
 }
 
 fn deserialize_compressed(
     direction: PacketDirection,
     state: ConnectionState,
     bytes: &[u8],
-    compression: u32,
-) -> MyResult<Option<(Packet, usize)>> {
-    if !has_enough_bytes(bytes) {
-        return Ok(None);
-    }
+    _compression: u32,
+) -> MyResult<Option<Packet>> {
     let mut reader = Cursor::new(bytes);
-    let length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
     let data_length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
-    let packet = if length.get() >= compression {
-        let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
-        deserialize(direction, state, id.get(), reader)?
-    } else {
-        let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
-        deserialize(direction, state, id.get(), reader)?
-    };
-    dbg!(packet);
 
-    unimplemented!()
+    let mut bytes = &bytes[data_length.size()..];
+
+    let mut buffer;
+    if data_length.get() != 0 {
+        std::fs::File::create("asfdsafasfsfsds").unwrap().write_all(bytes).unwrap();
+        buffer = vec![0; data_length.get() as usize];
+        let mut decompresser = Decompress::new(true);
+        decompresser.decompress_vec(bytes, &mut buffer, FlushDecompress::Finish).unwrap();
+        bytes = &buffer;
+    };
+    //    let mut decompresser = DeflateDecoder::new(bytes);
+//    decompresser.read_to_end(&mut buffer).unwrap();
+
+    deserialize_uncompressed(direction, state, bytes)
 }
 
 fn deserialize_uncompressed(
     direction: PacketDirection,
     state: ConnectionState,
     bytes: &[u8],
-) -> MyResult<Option<(Packet, usize)>> {
-    if !has_enough_bytes(bytes) {
-        return Ok(None);
-    }
+) -> MyResult<Option<Packet>> {
     let mut reader = Cursor::new(bytes);
-    let header = match PacketHeaderNoCompression::deserialize(&mut reader) {
-        Ok(x) => x,
-        Err(_) => return Ok(None),
-    };
+    let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
 
-    let packet = deserialize(direction, state, header.id.get(), &mut reader)?;
-    dbg!(&packet);
-    let new_position = header.length.get() as usize + header.length.size();
-    let result = (packet, new_position);
-    Ok(Some(result))
+    let packet = deserialize(direction, state, id.get(), &mut reader)?;
+    Ok(Some(packet))
 }
 
 fn has_enough_bytes(bytes: &[u8]) -> bool {
