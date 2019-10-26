@@ -6,8 +6,8 @@ mod varint;
 
 use crate::codec::PacketCodec;
 use crate::error::{MyError, MyResult};
-use crate::protocol::{ConnectionState, PacketInfo};
 use crate::protocol::Packet;
+use crate::protocol::{ConnectionState, PacketInfo};
 use bytes::{Bytes, BytesMut};
 use futures_util::future::join;
 use num_traits::cast::FromPrimitive;
@@ -30,7 +30,7 @@ async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
 ) -> MyResult<()> {
     let mut bytes = BytesMut::new();
     loop {
-        if bytes.capacity() < 1024 {
+        if bytes.capacity() == 0 {
             bytes = BytesMut::with_capacity(64 * 1024);
             bytes.resize(bytes.capacity(), 0);
         }
@@ -55,15 +55,23 @@ struct ClientGame {
 
 impl ClientGame {
     fn on_receive(&mut self, new: &[u8]) {
-//        if self.buffer_offset > self.buffer.len() - self.buffer_offset {
-//            self.buffer.drain(..self.buffer_offset);
-//            self.buffer_offset = 0;
-//        }
+        if self.buffer_offset > self.buffer.len() - self.buffer_offset {
+            self.buffer.drain(..self.buffer_offset);
+            self.buffer_offset = 0;
+        }
         self.buffer.extend_from_slice(new);
     }
 
-    fn get_packet(&mut self, direction: PacketDirection, state: ConnectionState) -> MyResult<Option<Packet>> {
-        match protocol::deserialize_with_header(direction, state, &self.buffer[self.buffer_offset..])? {
+    fn get_packet(
+        &mut self,
+        direction: PacketDirection,
+        state: ConnectionState,
+    ) -> MyResult<Option<Packet>> {
+        match protocol::deserialize_with_header(
+            direction,
+            state,
+            &self.buffer[self.buffer_offset..],
+        )? {
             Some((packet, offset)) => {
                 self.buffer_offset += offset;
                 Ok(Some(packet))

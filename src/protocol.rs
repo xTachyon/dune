@@ -30,7 +30,7 @@ pub enum ConnectionState {
 pub struct PacketInfo {
     pub direction: PacketDirection,
     pub connection_state: ConnectionState,
-    pub id: u16
+    pub id: u16,
 }
 
 impl PacketInfo {
@@ -67,7 +67,7 @@ deserialize_for!(StatusRequest);
 
 #[derive(Debug, Default)]
 pub struct StatusResponse {
-    response: String
+    response: String,
 }
 
 deserialize_for!(StatusResponse response);
@@ -75,7 +75,7 @@ deserialize_for!(StatusResponse response);
 #[derive(Debug, Default)]
 pub struct ChatResponse {
     response: String,
-    position: u8
+    position: u8,
 }
 
 deserialize_for!(ChatResponse response position);
