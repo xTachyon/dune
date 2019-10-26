@@ -10,6 +10,7 @@ pub enum MyError {
     Utf8(std::string::FromUtf8Error),
     ChannelRecv(std::sync::mpsc::RecvError),
     ChannelSend(std::sync::mpsc::SendError<(PacketDirection, Bytes)>),
+    TokioSend(tokio::sync::mpsc::error::SendError),
     IntegerToEnum,
 }
 
@@ -20,6 +21,12 @@ impl Display for MyError {
 }
 
 impl std::error::Error for MyError {}
+
+impl From<tokio::sync::mpsc::error::SendError> for MyError {
+    fn from(error: tokio::sync::mpsc::error::SendError) -> Self {
+        MyError::TokioSend(error)
+    }
+}
 
 impl From<std::io::Error> for MyError {
     fn from(error: io::Error) -> Self {

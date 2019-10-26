@@ -9,12 +9,12 @@ use crate::error::{MyError, MyResult};
 use crate::protocol::Packet;
 use crate::protocol::{ConnectionState, PacketInfo};
 use bytes::{Bytes, BytesMut};
-use futures_util::future::join;
+use futures_util::future::{join, join3};
 use num_traits::cast::FromPrimitive;
 use std::marker::Unpin;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 #[derive(Copy, Clone, Debug)]
 pub enum PacketDirection {
@@ -25,7 +25,7 @@ pub enum PacketDirection {
 async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
     mut reader: R,
     mut writer: W,
-    channel: Sender<(PacketDirection, Bytes)>,
+    mut channel: Sender<(PacketDirection, Bytes)>,
     direction: PacketDirection,
 ) -> MyResult<()> {
     let mut bytes = BytesMut::new();
@@ -40,7 +40,7 @@ async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
         }
 
         let new = bytes.split_to(read).freeze();
-        channel.send((direction, new.clone()))?;
+        channel.send((direction, new.clone())).await?;
         writer.write_all(&new).await?;
     }
 
@@ -150,10 +150,13 @@ impl GameData {
     }
 }
 
-fn process_traffic(receiver: Receiver<(PacketDirection, Bytes)>) -> MyResult {
+async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>) -> MyResult {
     let mut game = GameData::new();
     loop {
-        let (direction, bytes) = receiver.recv()?;
+        let (direction, bytes) = match receiver.recv().await {
+            Some(x) => x,
+            None => break,
+        };
         game.on_receive(direction, &bytes)?;
     }
 
@@ -164,7 +167,7 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
     let (client_read, client_write) = client_socket.split();
     let (server_read, server_write) = server_socket.split();
 
-    let (channel_send, channel_receive) = channel();
+    let (channel_send, channel_receive) = channel(1024);
 
     let first = forward_data(
         client_read,
@@ -179,13 +182,12 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
         PacketDirection::ServerToClient,
     );
 
-    std::thread::spawn(|| {
-        println!("{:?}", process_traffic(channel_receive));
-    });
+    let third = process_traffic(channel_receive);
 
-    let (result1, result2) = join(first, second).await;
+    let (result1, result2, result3) = join3(first, second, third).await;
     result1?;
     result2?;
+    result3?;
 
     Ok(())
 }
