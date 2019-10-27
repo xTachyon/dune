@@ -31,13 +31,13 @@ pub enum ConnectionState {
     Play = 3,
 }
 
-#[derive(Default)]
-pub struct PacketHeaderNoCompression {
-    length: VarInt,
-    id: VarInt,
-}
-
-deserialize_for!(PacketHeaderNoCompression length id);
+//#[derive(Default)]
+//pub struct PacketHeaderNoCompression {
+//    length: VarInt,
+//    id: VarInt,
+//}
+//
+//deserialize_for!(PacketHeaderNoCompression length id);
 
 #[derive(Debug, Default)]
 pub struct Handshake {
@@ -157,7 +157,7 @@ fn deserialize_compressed(
         buffer = Vec::new();
 
         let mut decompresser = ZlibDecoder::new(bytes);
-        decompresser.read_to_end(&mut buffer).unwrap();
+        decompresser.read_to_end(&mut buffer)?;
         bytes = &buffer;
     }
 

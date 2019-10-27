@@ -13,3 +13,6 @@ futures-util-preview = "0.3.0-alpha.18"
 num-traits = "0.2.8"
 tokio = "0.2.0-alpha.6"
 paste = "0.1.6"
+
+[profile.release]
+lto = true
