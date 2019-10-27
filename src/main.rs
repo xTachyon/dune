@@ -4,10 +4,10 @@ mod protocol;
 mod varint;
 
 use crate::error::{MyError, MyResult};
+use crate::protocol::ConnectionState;
 use crate::protocol::Packet;
-use crate::protocol::{ConnectionState, };
 use bytes::{Bytes, BytesMut};
-use futures_util::future::{ join3};
+use futures_util::future::join3;
 use num_traits::cast::FromPrimitive;
 use std::marker::Unpin;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -111,11 +111,12 @@ impl GameData {
             let connection_state = self.connection_state;
             let state = self.get_state(direction);
             if let Some(packet) = state.get_packet(direction, connection_state)? {
-                println!("{:?} {:?} {:?}", direction, connection_state, packet);
+//                println!("{:?} {:?} {:?}", direction, connection_state, packet);
                 match packet {
                     Packet::Handshake(x) => self.on_handshake(x)?,
                     Packet::SetCompression(x) => self.on_set_compression(x)?,
                     Packet::LoginSuccess(x) => self.on_login_success(x)?,
+                    Packet::ChatResponse(x) => self.on_chat_response(x)?,
                     _ => {}
                 };
             } else {
@@ -144,6 +145,11 @@ impl GameData {
     fn on_login_success(&mut self, _packet: protocol::LoginSuccess) -> MyResult {
         self.connection_state = ConnectionState::Play;
 
+        Ok(())
+    }
+
+    fn on_chat_response(&mut self, packet: protocol::ChatResponse) -> MyResult {
+        println!("{}", packet.response);
         Ok(())
     }
 }

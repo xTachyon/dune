@@ -1,6 +1,6 @@
 use crate::varint::VarInt;
 use crate::MyResult;
-use byteorder::{ReadBytesExt, };
+use byteorder::ReadBytesExt;
 use std::io::Read;
 
 pub(crate) trait MinecraftDeserialize {

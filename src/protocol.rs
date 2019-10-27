@@ -2,8 +2,8 @@ use crate::de::MinecraftDeserialize;
 use crate::varint::VarInt;
 use crate::{MyResult, PacketDirection};
 use enum_primitive_derive::*;
-use std::io::{Cursor, Read, Write};
-use flate2::{Decompress, FlushDecompress};
+use flate2::read::ZlibDecoder;
+use std::io::{Cursor, Read};
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
@@ -63,8 +63,8 @@ deserialize_for!(StatusResponse response);
 
 #[derive(Debug, Default)]
 pub struct ChatResponse {
-    response: String,
-    position: u8,
+    pub response: String,
+    pub position: u8,
 }
 
 deserialize_for!(ChatResponse response position);
@@ -127,7 +127,6 @@ pub fn deserialize_with_header(
     if !has_enough_bytes(bytes) {
         return Ok(None);
     }
-    println!("{}", bytes.iter().map(|x| *x as char).collect::<String>());
     let length: VarInt = MinecraftDeserialize::deserialize(bytes)?;
     let bytes = &bytes[length.size()..length.get() as usize + length.size()];
 
@@ -135,10 +134,9 @@ pub fn deserialize_with_header(
         Some(x) => deserialize_compressed(direction, state, bytes, x),
         None => deserialize_uncompressed(direction, state, bytes),
     }?;
-    dbg!(&packet);
     let result = match packet {
         Some(packet) => Some((packet, length.get() as usize + length.size())),
-        None => None
+        None => None,
     };
     Ok(result)
 }
@@ -156,14 +154,12 @@ fn deserialize_compressed(
 
     let mut buffer;
     if data_length.get() != 0 {
-        std::fs::File::create("asfdsafasfsfsds").unwrap().write_all(bytes).unwrap();
-        buffer = vec![0; data_length.get() as usize];
-        let mut decompresser = Decompress::new(true);
-        decompresser.decompress_vec(bytes, &mut buffer, FlushDecompress::Finish).unwrap();
+        buffer = Vec::new();
+
+        let mut decompresser = ZlibDecoder::new(bytes);
+        decompresser.read_to_end(&mut buffer).unwrap();
         bytes = &buffer;
-    };
-    //    let mut decompresser = DeflateDecoder::new(bytes);
-//    decompresser.read_to_end(&mut buffer).unwrap();
+    }
 
     deserialize_uncompressed(direction, state, bytes)
 }
