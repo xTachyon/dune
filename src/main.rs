@@ -2,6 +2,7 @@ mod de;
 mod error;
 mod protocol;
 mod varint;
+mod game;
 
 use crate::error::{MyError, MyResult};
 use crate::protocol::ConnectionState;
@@ -111,7 +112,10 @@ impl GameData {
             let connection_state = self.connection_state;
             let state = self.get_state(direction);
             if let Some(packet) = state.get_packet(direction, connection_state)? {
-//                println!("{:?} {:?} {:?}", direction, connection_state, packet);
+                match packet {
+                    Packet::Unknown(_, _) => {},
+                    _ => println!("{:?} {:?} {:?}", direction, connection_state, packet)
+                };
                 match packet {
                     Packet::Handshake(x) => self.on_handshake(x)?,
                     Packet::SetCompression(x) => self.on_set_compression(x)?,

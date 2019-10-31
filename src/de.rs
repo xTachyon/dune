@@ -2,6 +2,8 @@ use crate::varint::VarInt;
 use crate::MyResult;
 use byteorder::ReadBytesExt;
 use std::io::Read;
+use crate::game::Gamemode;
+use num_traits::cast::FromPrimitive;
 
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> MyResult<Self>
@@ -24,12 +26,24 @@ macro_rules! impl_for_numbers {
     };
 }
 
-impl_for_numbers!(u16 u32 u64 i16 i32 i64);
+impl_for_numbers!(u16 u32 u64 u128 i16 i32 i64);
 
 impl MinecraftDeserialize for u8 {
     fn deserialize<R: Read>(mut reader: R) -> MyResult<Self> {
         let value = reader.read_u8()?;
         Ok(value)
+    }
+}
+
+impl MinecraftDeserialize for bool {
+    fn deserialize<R: Read>(mut reader: R) -> MyResult<Self> where {
+        let value: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let result = if value == 0 {
+            false
+        } else {
+            true
+        };
+        Ok(result)
     }
 }
 
@@ -47,3 +61,58 @@ impl MinecraftDeserialize for String {
         Ok(String::from_utf8(buffer)?)
     }
 }
+
+impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
+    fn deserialize<R: Read>(mut reader: R) -> MyResult<Option<T>> where
+      Self: Sized {
+        let b = MinecraftDeserialize::deserialize(&mut reader)?;
+        let result = if b {
+            Some(MinecraftDeserialize::deserialize(&mut reader)?)
+        } else {
+            None
+        };
+        Ok(result)
+    }
+}
+
+//macro_rules! impl_for_tuples {
+//    ($($template:ident,)*) => {
+//        impl<
+//        $(
+//            $template
+//        )* > MinecraftDeserialize for (
+//        $(
+//            $template
+//        )*
+//        ) {
+//
+//        }
+//    };
+//}
+//
+//impl_for_tuples!(A, B);
+
+impl<A, B, C> MinecraftDeserialize for (A, B, C)
+    where A: MinecraftDeserialize, B: MinecraftDeserialize, C: MinecraftDeserialize {
+    fn deserialize<R: Read>(mut reader: R) -> MyResult<Self> where
+      Self: Sized {
+        let a = MinecraftDeserialize::deserialize(&mut reader)?;
+        let b = MinecraftDeserialize::deserialize(&mut reader)?;
+        let c = MinecraftDeserialize::deserialize(&mut reader)?;
+
+        Ok((a, b, c))
+    }
+}
+
+macro_rules! impl_forward {
+    ($enu:ident, $type:ty) => {
+            impl MinecraftDeserialize for $enu {
+                fn deserialize<R: Read>(reader: R) -> MyResult<Self> {
+                    let value= <$type as MinecraftDeserialize>::deserialize(reader)?;
+                    Ok($enu::from_u32(value.get()).unwrap())
+                }
+            }
+    };
+}
+
+impl_forward!(Gamemode, VarInt);

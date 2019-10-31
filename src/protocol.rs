@@ -4,6 +4,7 @@ use crate::{MyResult, PacketDirection};
 use enum_primitive_derive::*;
 use flate2::read::ZlibDecoder;
 use std::io::{Cursor, Read};
+use crate::game::Gamemode;
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
@@ -84,6 +85,71 @@ pub struct LoginSuccess {
 
 deserialize_for!(LoginSuccess uuid username);
 
+#[derive(Debug)]
+pub enum PlayerInfoTabAction {
+    AddPlayer(String, Vec<(String, String, Option<String>)>, Gamemode, u32, Option<String>),
+    Gamemode(u8),
+    Latency(u32),
+    DisplayName(Option<String>),
+    RemovePlayer
+}
+
+impl PlayerInfoTabAction {
+    fn deserialize<R: Read>(mut reader: R, action: u32) -> MyResult<(u128, Self)> {
+        let uuid = MinecraftDeserialize::deserialize(&mut reader)?;
+        let result = match action {
+            0 => {
+                let name = MinecraftDeserialize::deserialize(&mut reader)?;
+                let number_of_properties = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?.get();
+                let properties: MyResult<_> = (0..number_of_properties)
+                  .map(|_| MinecraftDeserialize::deserialize(&mut reader))
+                  .collect();
+                let properties = properties?;
+                let gamemode = MinecraftDeserialize::deserialize(&mut reader)?;
+                let ping = MinecraftDeserialize::deserialize(&mut reader)?;
+                let display_name = MinecraftDeserialize::deserialize(&mut reader)?;
+
+                PlayerInfoTabAction::AddPlayer(name, properties, gamemode, ping, display_name)
+            }
+            1 => {
+                let gamemode: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
+                PlayerInfoTabAction::Gamemode(gamemode.get() as u8)
+            }
+            2 => {
+                let ping = MinecraftDeserialize::deserialize(&mut reader)?;
+                PlayerInfoTabAction::Latency(ping)
+            }
+            3 => {
+                let name = MinecraftDeserialize::deserialize(&mut reader)?;
+                PlayerInfoTabAction::DisplayName(name)
+            }
+            4 => PlayerInfoTabAction::RemovePlayer,
+            _ => unreachable!()
+        };
+        Ok((uuid, result))
+    }
+}
+
+#[derive(Debug)]
+pub struct PlayerInfoTab {
+    actions: Vec<(u128, PlayerInfoTabAction)>
+}
+
+impl MinecraftDeserialize for PlayerInfoTab {
+    fn deserialize<R: Read>(mut reader: R) -> MyResult<Self> where
+      Self: Sized {
+        let action = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
+        assert!(action.get() <= 4);
+        let action = action.get();
+        let count = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
+
+        let actions: Result<_, _> = (0..count.get())
+          .map(|_| PlayerInfoTabAction::deserialize(&mut reader, action))
+          .collect();
+        Ok(PlayerInfoTab { actions: actions? })
+    }
+}
+
 macro_rules! packet_macro {
     ($($name:ident $state:ident $direction:ident $id:expr)*) => {
       #[derive(Debug)]
@@ -116,6 +182,7 @@ LoginSuccess   Login     ServerToClient 0x02
 SetCompression Login     ServerToClient 0x03
 
 ChatResponse   Play      ServerToClient 0x0E
+PlayerInfoTab  Play      ServerToClient 0x33
 );
 
 pub fn deserialize_with_header(
@@ -172,6 +239,7 @@ fn deserialize_uncompressed(
     let mut reader = Cursor::new(bytes);
     let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
 
+//    dbg!(bytes);
     let packet = deserialize(direction, state, id.get(), &mut reader)?;
     Ok(Some(packet))
 }
