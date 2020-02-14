@@ -1,12 +1,14 @@
 use core::fmt;
 use std::fmt::{Debug, Display};
 use std::io;
+use bytes::Bytes;
+use crate::PacketDirection;
 
 #[derive(Debug)]
 pub enum MyError {
     Io(io::Error),
     Utf8(std::string::FromUtf8Error),
-    TokioSend(tokio::sync::mpsc::error::SendError),
+    TokioSend(tokio::sync::mpsc::error::SendError<(PacketDirection, Bytes)>),
     IntegerToEnum,
 }
 
@@ -18,8 +20,8 @@ impl Display for MyError {
 
 impl std::error::Error for MyError {}
 
-impl From<tokio::sync::mpsc::error::SendError> for MyError {
-    fn from(error: tokio::sync::mpsc::error::SendError) -> Self {
+impl From<tokio::sync::mpsc::error::SendError<(PacketDirection, Bytes)>> for MyError {
+    fn from(error: tokio::sync::mpsc::error::SendError<(PacketDirection, Bytes)>) -> Self {
         MyError::TokioSend(error)
     }
 }

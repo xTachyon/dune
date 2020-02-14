@@ -8,12 +8,12 @@ use crate::error::{MyError, MyResult};
 use crate::protocol::ConnectionState;
 use crate::protocol::Packet;
 use bytes::{Bytes, BytesMut};
-use futures_util::future::join3;
+use futures::future::join3;
 use num_traits::cast::FromPrimitive;
 use std::marker::Unpin;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[derive(Copy, Clone, Debug)]
 pub enum PacketDirection {
@@ -207,7 +207,7 @@ async fn main() -> MyResult {
     loop {
         let (client, _) = incoming.accept().await?;
         let task = async move {
-            let server = TcpStream::connect("playmc.games:25565").await.unwrap();
+            let server = TcpStream::connect("hub.mcs.gg:25565").await.unwrap();
             println!("{:?}", on_connected(client, server).await);
         };
         tokio::spawn(task);

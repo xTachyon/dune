@@ -181,8 +181,8 @@ StatusResponse Status    ServerToClient 0x00
 LoginSuccess   Login     ServerToClient 0x02
 SetCompression Login     ServerToClient 0x03
 
-ChatResponse   Play      ServerToClient 0x0E
-PlayerInfoTab  Play      ServerToClient 0x33
+ChatResponse   Play      ServerToClient 0x0F
+PlayerInfoTab  Play      ServerToClient 0x34
 );
 
 pub fn deserialize_with_header(
