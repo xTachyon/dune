@@ -4,7 +4,7 @@ mod protocol;
 mod varint;
 mod game;
 
-use crate::error::{MyError, MyResult};
+use crate::error::{ MyResult};
 use crate::protocol::ConnectionState;
 use crate::protocol::Packet;
 use bytes::{Bytes, BytesMut};
@@ -14,6 +14,7 @@ use std::marker::Unpin;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use anyhow::anyhow;
 
 #[derive(Copy, Clone, Debug)]
 pub enum PacketDirection {
@@ -133,7 +134,7 @@ impl GameData {
     fn on_handshake(&mut self, packet: protocol::Handshake) -> MyResult {
         self.connection_state = match ConnectionState::from_u32(packet.next_state.get()) {
             Some(x) => x,
-            None => return Err(MyError::IntegerToEnum),
+            None => return Err(anyhow!("can't cast integer to enum")),
         };
         Ok(())
     }
