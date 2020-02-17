@@ -1,6 +1,7 @@
 use crate::MyResult;
 use byteorder::ReadBytesExt;
 use std::io::Read;
+use std::ops::Deref;
 
 pub(crate) fn read_varint(bytes: &[u8]) -> Option<(u32, usize)> {
     match read_varint_impl(bytes) {
@@ -49,9 +50,17 @@ fn write_varint(mut value: u32) -> ([u8; 10], usize) {
     (result, index)
 }
 
-#[derive(Debug, Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct VarInt {
     inner: u32,
+}
+
+impl Deref for VarInt {
+    type Target = u32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 impl VarInt {

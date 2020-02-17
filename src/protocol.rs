@@ -106,7 +106,7 @@ impl PlayerInfoTabAction {
                   .collect();
                 let properties = properties?;
                 let gamemode = MinecraftDeserialize::deserialize(&mut reader)?;
-                let ping = MinecraftDeserialize::deserialize(&mut reader)?;
+                let ping = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?.get();
                 let display_name = MinecraftDeserialize::deserialize(&mut reader)?;
 
                 PlayerInfoTabAction::AddPlayer(name, properties, gamemode, ping, display_name)
@@ -116,8 +116,8 @@ impl PlayerInfoTabAction {
                 PlayerInfoTabAction::Gamemode(gamemode.get() as u8)
             }
             2 => {
-                let ping = MinecraftDeserialize::deserialize(&mut reader)?;
-                PlayerInfoTabAction::Latency(ping)
+                let ping: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
+                PlayerInfoTabAction::Latency(*ping)
             }
             3 => {
                 let name = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -239,7 +239,7 @@ fn deserialize_uncompressed(
     let mut reader = Cursor::new(bytes);
     let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
 
-//    dbg!(bytes);
+//    tokio::task::spawn_blocking( move || dbg!(id) );
     let packet = deserialize(direction, state, id.get(), &mut reader)?;
     Ok(Some(packet))
 }

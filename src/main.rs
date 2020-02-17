@@ -192,7 +192,7 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
 
     let third = process_traffic(channel_receive);
 
-    let (result1, result2, result3) = join3(first, second, third).await;
+    let (result1, result2, result3) = join3(third, first, second).await;
     result1?;
     result2?;
     result3?;
@@ -207,7 +207,7 @@ async fn main() -> MyResult {
     loop {
         let (client, _) = incoming.accept().await?;
         let task = async move {
-            let server = TcpStream::connect("hub.mcs.gg:25565").await.unwrap();
+            let server = TcpStream::connect("127.0.0.1:25566").await.unwrap();
             println!("{:?}", on_connected(client, server).await);
         };
         tokio::spawn(task);

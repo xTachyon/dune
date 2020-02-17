@@ -11,7 +11,7 @@ enum-primitive-derive = "0.1.2"
 flate2 = "1.0.13"
 futures = "^0.3.0"
 num-traits = "0.2.11"
-tokio = { version = "0.2.11", features = ["tcp", "macros", "sync", "rt-core", "io-util", "dns"] }
+tokio = { version = "0.2.11", features = ["tcp", "macros", "sync", "rt-core", "io-util", "dns", "blocking"] }
 paste = "0.1.6"
 
 [profile.release]
