@@ -1,8 +1,12 @@
 use async_trait::async_trait;
+use anyhow::Result;
 
-pub struct ChatEvent {}
+#[derive(Debug)]
+pub struct ChatEvent {
+    pub message: String
+}
 
 #[async_trait]
-pub trait EventSubscriber {
-    async fn on_chat(event: ChatEvent) {}
+pub trait EventSubscriber : Sync {
+    async fn on_chat(&self, _event: ChatEvent) -> Result<()> { Ok(()) }
 }

@@ -26,7 +26,7 @@ macro_rules! impl_for_numbers {
     };
 }
 
-impl_for_numbers!(u16 u32 u64 u128 i16 i32 i64);
+impl_for_numbers!(u16 u32 u64 u128 i16 i32 i64 f32 f64);
 
 impl MinecraftDeserialize for u8 {
     fn deserialize<R: Read>(mut reader: R) -> MyResult<Self> {

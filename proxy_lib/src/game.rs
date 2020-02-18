@@ -6,3 +6,10 @@ pub enum Gamemode {
     Creative = 1,
     Adventure = 2,
 }
+
+#[derive(Debug)]
+pub struct Position {
+    x: f64,
+    y: f64,
+    z: f64
+}

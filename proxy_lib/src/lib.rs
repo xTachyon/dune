@@ -16,6 +16,7 @@ use std::marker::Unpin;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use crate::events::{EventSubscriber, ChatEvent};
 
 #[derive(Copy, Clone, Debug)]
 pub enum PacketDirection {
@@ -88,14 +89,16 @@ struct GameData {
     client_state: ClientGame,
     server_state: ClientGame,
     connection_state: ConnectionState,
+    handler: Box<dyn EventSubscriber + Sync>
 }
 
 impl GameData {
-    fn new() -> GameData {
+    fn new(handler: Box<dyn EventSubscriber + Sync>) -> GameData {
         GameData {
             client_state: Default::default(),
             server_state: Default::default(),
             connection_state: ConnectionState::Handshake,
+            handler
         }
     }
 
@@ -106,7 +109,7 @@ impl GameData {
         }
     }
 
-    fn on_receive(&mut self, direction: PacketDirection, bytes: &[u8]) -> MyResult {
+    async fn on_receive(&mut self, direction: PacketDirection, bytes: &[u8]) -> MyResult {
         let state = self.get_state(direction);
         state.on_receive(bytes);
 
@@ -122,7 +125,8 @@ impl GameData {
                     Packet::Handshake(x) => self.on_handshake(x)?,
                     Packet::SetCompression(x) => self.on_set_compression(x)?,
                     Packet::LoginSuccess(x) => self.on_login_success(x)?,
-                    Packet::ChatResponse(x) => self.on_chat_response(x)?,
+                    Packet::ChatResponse(x) => self.on_chat_response(x).await?,
+                    Packet::SpawnMob(x) => self.on_spawn_mob(x).await?,
                     _ => {}
                 };
             } else {
@@ -154,26 +158,34 @@ impl GameData {
         Ok(())
     }
 
-    fn on_chat_response(&mut self, packet: protocol::ChatResponse) -> MyResult {
-        println!("{}", packet.response);
+    async fn on_chat_response(&mut self, packet: protocol::ChatResponse) -> MyResult {
+        let event = ChatEvent {
+            message: packet.response
+        };
+        self.handler.on_chat(event).await?;
+        Ok(())
+    }
+
+    async fn on_spawn_mob(&mut self, packet: protocol::SpawnMob) -> MyResult {
+        println!("{:?}", packet);
         Ok(())
     }
 }
 
-async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>) -> MyResult {
-    let mut game = GameData::new();
+async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
+    let mut game = GameData::new(handler);
     loop {
         let (direction, bytes) = match receiver.recv().await {
             Some(x) => x,
             None => break,
         };
-        game.on_receive(direction, &bytes)?;
+        game.on_receive(direction, &bytes).await?;
     }
 
     Ok(())
 }
 
-async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream) -> MyResult {
+async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
     let (client_read, client_write) = client_socket.split();
     let (server_read, server_write) = server_socket.split();
 
@@ -192,7 +204,7 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
         PacketDirection::ServerToClient,
     );
 
-    let third = process_traffic(channel_receive);
+    let third = process_traffic(channel_receive, handler);
 
     let (result1, result2, result3) = join3(third, first, second).await;
     result1?;
@@ -202,15 +214,11 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
     Ok(())
 }
 
-pub async fn do_things() -> MyResult {
+pub async fn do_things(handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
     let mut incoming = TcpListener::bind("0.0.0.0:25565").await?;
 
-    loop {
-        let (client, _) = incoming.accept().await?;
-        let task = async move {
-            let server = TcpStream::connect("127.0.0.1:25566").await.unwrap();
-            println!("{:?}", on_connected(client, server).await);
-        };
-        tokio::spawn(task);
-    }
+    let (client, _) = incoming.accept().await?;
+    let server = TcpStream::connect("127.0.0.1:25566").await.unwrap();
+    println!("{:?}", on_connected(client, server, handler).await);
+    Ok(())
 }

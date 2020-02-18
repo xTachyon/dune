@@ -63,6 +63,23 @@ pub struct StatusResponse {
 deserialize_for!(StatusResponse response);
 
 #[derive(Debug, Default)]
+pub struct SpawnMob {
+    entity_id: VarInt,
+    uuid: u128,
+    entity_type: VarInt,
+    x: f64,
+    y: f64,
+    z: f64,
+    yaw: u8,
+    pitch: u8,
+    velocity_x: u16,
+    velocity_y: u16,
+    velocity_z: u16,
+}
+
+deserialize_for!(SpawnMob entity_id uuid entity_type x y z yaw pitch velocity_x velocity_y velocity_z);
+
+#[derive(Debug, Default)]
 pub struct ChatResponse {
     pub response: String,
     pub position: u8,
@@ -190,6 +207,7 @@ StatusResponse Status    ServerToClient 0x00
 LoginSuccess   Login     ServerToClient 0x02
 SetCompression Login     ServerToClient 0x03
 
+SpawnMob       Play      ServerToClient 0x03
 ChatResponse   Play      ServerToClient 0x0F
 PlayerInfoTab  Play      ServerToClient 0x34
 );
