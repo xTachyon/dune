@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 
-pub struct ChatEvent {
-
-}
+pub struct ChatEvent {}
 
 #[async_trait]
 pub trait EventSubscriber {

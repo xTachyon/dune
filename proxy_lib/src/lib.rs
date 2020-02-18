@@ -1,21 +1,21 @@
-pub mod events;
 mod de;
 mod error;
+pub mod events;
+mod game;
 mod protocol;
 mod varint;
-mod game;
 
-use crate::error::{ MyResult};
+use crate::error::MyResult;
 use crate::protocol::ConnectionState;
 use crate::protocol::Packet;
+use anyhow::anyhow;
 use bytes::{Bytes, BytesMut};
 use futures::future::join3;
 use num_traits::cast::FromPrimitive;
 use std::marker::Unpin;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use anyhow::anyhow;
 
 #[derive(Copy, Clone, Debug)]
 pub enum PacketDirection {
@@ -115,8 +115,8 @@ impl GameData {
             let state = self.get_state(direction);
             if let Some(packet) = state.get_packet(direction, connection_state)? {
                 match packet {
-                    Packet::Unknown(_, _) => {},
-                    _ => println!("{:?} {:?} {:?}", direction, connection_state, packet)
+                    Packet::Unknown(_, _) => {}
+                    _ => println!("{:?} {:?} {:?}", direction, connection_state, packet),
                 };
                 match packet {
                     Packet::Handshake(x) => self.on_handshake(x)?,
