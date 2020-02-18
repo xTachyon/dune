@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
-struct ChatEvent {
+pub struct ChatEvent {
 
 }
 
 #[async_trait]
-trait EventHandler {
+pub trait EventSubscriber {
     async fn on_chat(event: ChatEvent) {}
 }

@@ -1,5 +1,5 @@
 [package]
-name = "dune"
+name = "proxy_lib"
 version = "0.1.0"
 authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2018"
@@ -16,5 +16,4 @@ num-traits = "0.2.11"
 tokio = { version = "0.2.11", features = ["tcp", "macros", "sync", "rt-core", "io-util", "dns", "blocking"] }
 paste = "0.1.6"
 
-[profile.release]
-lto = true
+[lib]

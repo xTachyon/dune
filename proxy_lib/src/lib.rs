@@ -1,4 +1,4 @@
-mod events;
+pub mod events;
 mod de;
 mod error;
 mod protocol;
@@ -202,8 +202,7 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> MyResult {
+pub async fn do_things() -> MyResult {
     let mut incoming = TcpListener::bind("0.0.0.0:25565").await?;
 
     loop {
