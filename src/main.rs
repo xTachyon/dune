@@ -1,3 +1,4 @@
+mod events;
 mod de;
 mod error;
 mod protocol;
