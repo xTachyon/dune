@@ -17,6 +17,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use crate::events::{EventSubscriber, ChatEvent};
+use tokio::fs::File;
 
 #[derive(Copy, Clone, Debug)]
 pub enum PacketDirection {
@@ -89,17 +90,20 @@ struct GameData {
     client_state: ClientGame,
     server_state: ClientGame,
     connection_state: ConnectionState,
-    handler: Box<dyn EventSubscriber + Sync>
+    handler: Box<dyn EventSubscriber + Sync>,
+    packet_file: File
 }
 
 impl GameData {
-    fn new(handler: Box<dyn EventSubscriber + Sync>) -> GameData {
-        GameData {
+    async fn new(handler: Box<dyn EventSubscriber + Sync>) -> MyResult<GameData> {
+        let packet_file = File::create("packet_file.txt").await?;
+        Ok(GameData {
             client_state: Default::default(),
             server_state: Default::default(),
             connection_state: ConnectionState::Handshake,
-            handler
-        }
+            handler,
+            packet_file
+        })
     }
 
     fn get_state(&mut self, direction: PacketDirection) -> &mut ClientGame {
@@ -119,7 +123,10 @@ impl GameData {
             if let Some(packet) = state.get_packet(direction, connection_state)? {
                 match packet {
                     Packet::Unknown(_, _) => {}
-                    _ => println!("{:?} {:?} {:?}", direction, connection_state, packet),
+                    _ => {
+                        let string = format!("{:?} {:?} {:?}\n", direction, connection_state, packet);
+                        self.packet_file.write_all(string.as_bytes()).await?;
+                    },
                 };
                 match packet {
                     Packet::Handshake(x) => self.on_handshake(x)?,
@@ -167,13 +174,13 @@ impl GameData {
     }
 
     async fn on_spawn_mob(&mut self, packet: protocol::SpawnMob) -> MyResult {
-        println!("{:?}", packet);
+        // println!("{:?}", packet);
         Ok(())
     }
 }
 
 async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
-    let mut game = GameData::new(handler);
+    let mut game = GameData::new(handler).await?;
     loop {
         let (direction, bytes) = match receiver.recv().await {
             Some(x) => x,
@@ -214,11 +221,11 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
     Ok(())
 }
 
-pub async fn do_things(handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
+pub async fn do_things(server_address: &str, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
     let mut incoming = TcpListener::bind("0.0.0.0:25565").await?;
 
     let (client, _) = incoming.accept().await?;
-    let server = TcpStream::connect("127.0.0.1:25566").await.unwrap();
+    let server = TcpStream::connect(server_address).await.unwrap();
     println!("{:?}", on_connected(client, server, handler).await);
     Ok(())
 }

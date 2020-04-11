@@ -5,15 +5,12 @@ authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.26"
-async-trait = "0.1.24"
-bytes = "0.4.12"
+anyhow = "1.0.28"
+async-trait = "0.1.30"
+bytes = "0.5.4"
 byteorder = "1.3.4"
 enum-primitive-derive = "0.1.2"
 flate2 = "1.0.13"
 futures = "^0.3.0"
 num-traits = "0.2.11"
-tokio = { version = "0.2.11", features = ["tcp", "macros", "sync", "rt-core", "io-util", "dns", "blocking"] }
-paste = "0.1.6"
-
-[lib]
+tokio = { version = "0.2.17", features = ["fs", "tcp", "macros", "sync", "rt-core", "io-std", "io-util", "dns", "blocking"] }
