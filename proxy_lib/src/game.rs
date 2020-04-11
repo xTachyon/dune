@@ -1,6 +1,7 @@
-use enum_primitive_derive::*;
+use num_enum::TryFromPrimitive;
 
-#[derive(Debug, Primitive)]
+#[repr(u8)]
+#[derive(Debug, TryFromPrimitive)]
 pub enum Gamemode {
     Survival = 0,
     Creative = 1,

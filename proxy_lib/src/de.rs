@@ -2,8 +2,8 @@ use crate::game::Gamemode;
 use crate::varint::VarInt;
 use crate::MyResult;
 use byteorder::ReadBytesExt;
-use num_traits::cast::FromPrimitive;
 use std::io::Read;
+use std::convert::TryFrom;
 
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> MyResult<Self>
@@ -113,7 +113,7 @@ macro_rules! impl_forward {
         impl MinecraftDeserialize for $enu {
             fn deserialize<R: Read>(reader: R) -> MyResult<Self> {
                 let value = <$type as MinecraftDeserialize>::deserialize(reader)?;
-                Ok($enu::from_u32(value.get()).unwrap())
+                Ok($enu::try_from(value.get() as u8)?)
             }
         }
     };

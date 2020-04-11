@@ -2,9 +2,9 @@ use crate::de::MinecraftDeserialize;
 use crate::game::Gamemode;
 use crate::varint::VarInt;
 use crate::{MyResult, PacketDirection};
-use enum_primitive_derive::*;
 use flate2::read::ZlibDecoder;
 use std::io::{Cursor, Read};
+use num_enum::TryFromPrimitive;
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
@@ -24,7 +24,8 @@ macro_rules! deserialize_for {
     };
 }
 
-#[derive(Copy, Clone, Debug, Primitive)]
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, TryFromPrimitive)]
 pub enum ConnectionState {
     Handshake = 0,
     Status = 1,
