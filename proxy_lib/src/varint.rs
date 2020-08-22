@@ -1,7 +1,7 @@
-use crate::MyResult;
 use byteorder::ReadBytesExt;
 use std::io::Read;
 use std::ops::Deref;
+use anyhow::Result;
 
 pub(crate) fn read_varint(bytes: &[u8]) -> Option<(u32, usize)> {
     match read_varint_impl(bytes) {
@@ -10,7 +10,7 @@ pub(crate) fn read_varint(bytes: &[u8]) -> Option<(u32, usize)> {
     }
 }
 
-fn read_varint_impl<R: Read>(mut reader: R) -> MyResult<(u32, usize)> {
+fn read_varint_impl<R: Read>(mut reader: R) -> Result<(u32, usize)> {
     let mut result = 0;
     let mut bytes_read = 0;
     loop {
@@ -73,7 +73,7 @@ impl VarInt {
         Some(VarInt::new(value))
     }
 
-    pub(crate) fn deserialize_read<T: Read>(reader: T) -> MyResult<VarInt> {
+    pub(crate) fn deserialize_read<T: Read>(reader: T) -> Result<VarInt> {
         let (value, _) = read_varint_impl(reader)?;
         Ok(VarInt::new(value))
     }

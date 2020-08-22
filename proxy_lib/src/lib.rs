@@ -1,11 +1,10 @@
 mod de;
-mod error;
 pub mod events;
 mod game;
 mod protocol;
 mod varint;
 
-use crate::error::MyResult;
+use anyhow::Result;
 use crate::protocol::ConnectionState;
 use crate::protocol::Packet;
 use bytes::{Bytes, BytesMut};
@@ -29,7 +28,7 @@ async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
     mut writer: W,
     mut channel: Sender<(PacketDirection, Bytes)>,
     direction: PacketDirection,
-) -> MyResult<()> {
+) -> Result<()> {
     let mut bytes = BytesMut::new();
     loop {
         if bytes.capacity() == 0 || bytes.is_empty() {
@@ -69,7 +68,7 @@ impl ClientGame {
         &mut self,
         direction: PacketDirection,
         state: ConnectionState,
-    ) -> MyResult<Option<Packet>> {
+    ) -> Result<Option<Packet>> {
         match protocol::deserialize_with_header(
             direction,
             state,
@@ -94,7 +93,7 @@ struct GameData {
 }
 
 impl GameData {
-    async fn new(handler: Box<dyn EventSubscriber + Sync>) -> MyResult<GameData> {
+    async fn new(handler: Box<dyn EventSubscriber + Sync>) -> Result<GameData> {
         let packet_file = File::create("packet_file.txt").await?;
         Ok(GameData {
             client_state: Default::default(),
@@ -112,7 +111,7 @@ impl GameData {
         }
     }
 
-    async fn on_receive(&mut self, direction: PacketDirection, bytes: &[u8]) -> MyResult {
+    async fn on_receive(&mut self, direction: PacketDirection, bytes: &[u8]) -> Result<()> {
         let state = self.get_state(direction);
         state.on_receive(bytes);
 
@@ -142,12 +141,12 @@ impl GameData {
         Ok(())
     }
 
-    fn on_handshake(&mut self, packet: protocol::Handshake) -> MyResult {
+    fn on_handshake(&mut self, packet: protocol::Handshake) -> Result<()> {
         self.connection_state = ConnectionState::try_from(packet.next_state.get() as u8)?;
         Ok(())
     }
 
-    fn on_set_compression(&mut self, packet: protocol::SetCompression) -> MyResult {
+    fn on_set_compression(&mut self, packet: protocol::SetCompression) -> Result<()> {
         let value = packet.value.get() as i32;
         let value = if value < 0 { None } else { Some(value as u32) };
         self.client_state.compression = value;
@@ -155,13 +154,13 @@ impl GameData {
         Ok(())
     }
 
-    fn on_login_success(&mut self, _packet: protocol::LoginSuccess) -> MyResult {
+    fn on_login_success(&mut self, _packet: protocol::LoginSuccess) -> Result<()> {
         self.connection_state = ConnectionState::Play;
 
         Ok(())
     }
 
-    async fn on_chat_response(&mut self, packet: protocol::ChatResponse) -> MyResult {
+    async fn on_chat_response(&mut self, packet: protocol::ChatResponse) -> Result<()> {
         let event = ChatEvent {
             message: packet.response
         };
@@ -169,13 +168,13 @@ impl GameData {
         Ok(())
     }
 
-    async fn on_spawn_mob(&mut self, packet: protocol::SpawnMob) -> MyResult {
+    async fn on_spawn_mob(&mut self, packet: protocol::SpawnMob) -> Result<()> {
         // println!("{:?}", packet);
         Ok(())
     }
 }
 
-async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
+async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
     let mut game = GameData::new(handler).await?;
     loop {
         let (direction, bytes) = match receiver.recv().await {
@@ -188,7 +187,7 @@ async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>, handl
     Ok(())
 }
 
-async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
+async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
     let (client_read, client_write) = client_socket.split();
     let (server_read, server_write) = server_socket.split();
 
@@ -217,7 +216,7 @@ async fn on_connected(mut client_socket: TcpStream, mut server_socket: TcpStream
     Ok(())
 }
 
-pub async fn do_things(server_address: &str, handler: Box<dyn EventSubscriber + Sync>) -> MyResult {
+pub async fn do_things(server_address: &str, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
     let mut incoming = TcpListener::bind("0.0.0.0:25565").await?;
 
     let (client, _) = incoming.accept().await?;

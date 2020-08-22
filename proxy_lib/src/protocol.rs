@@ -1,7 +1,8 @@
 use crate::de::MinecraftDeserialize;
 use crate::game::Gamemode;
 use crate::varint::VarInt;
-use crate::{MyResult, PacketDirection};
+use crate::{PacketDirection};
+use anyhow::Result;
 use flate2::read::ZlibDecoder;
 use std::io::{Cursor, Read};
 use num_enum::TryFromPrimitive;
@@ -9,7 +10,7 @@ use num_enum::TryFromPrimitive;
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
       impl MinecraftDeserialize for $type {
-        fn deserialize<R: Read>(mut _reader: R) -> MyResult<Self> {
+        fn deserialize<R: Read>(mut _reader: R) -> Result<Self> {
           $(
             let $field = MinecraftDeserialize::deserialize(&mut _reader)?;
           )*
@@ -119,14 +120,14 @@ pub enum PlayerInfoTabAction {
 }
 
 impl PlayerInfoTabAction {
-    fn deserialize<R: Read>(mut reader: R, action: u32) -> MyResult<(u128, Self)> {
+    fn deserialize<R: Read>(mut reader: R, action: u32) -> Result<(u128, Self)> {
         let uuid = MinecraftDeserialize::deserialize(&mut reader)?;
         let result = match action {
             0 => {
                 let name = MinecraftDeserialize::deserialize(&mut reader)?;
                 let number_of_properties =
                     <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?.get();
-                let properties: MyResult<_> = (0..number_of_properties)
+                let properties: Result<_> = (0..number_of_properties)
                     .map(|_| MinecraftDeserialize::deserialize(&mut reader))
                     .collect();
                 let properties = properties?;
@@ -161,7 +162,7 @@ pub struct PlayerInfoTab {
 }
 
 impl MinecraftDeserialize for PlayerInfoTab {
-    fn deserialize<R: Read>(mut reader: R) -> MyResult<Self>
+    fn deserialize<R: Read>(mut reader: R) -> Result<Self>
     where
         Self: Sized,
     {
@@ -187,7 +188,7 @@ macro_rules! packet_macro {
         Unknown(ConnectionState, u32)
       }
 
-      fn deserialize<R: Read>(direction: PacketDirection, state: ConnectionState, id: u32, mut reader: R) -> MyResult<Packet> {
+      fn deserialize<R: Read>(direction: PacketDirection, state: ConnectionState, id: u32, mut reader: R) -> Result<Packet> {
         let result = match (direction, state, id) {
           $(
             (PacketDirection::$direction, ConnectionState::$state, $id) => Packet::$name($name::deserialize(&mut reader)?),
@@ -218,7 +219,7 @@ pub fn deserialize_with_header(
     state: ConnectionState,
     bytes: &[u8],
     compression: Option<u32>,
-) -> MyResult<Option<(Packet, usize)>> {
+) -> Result<Option<(Packet, usize)>> {
     if !has_enough_bytes(bytes) {
         return Ok(None);
     }
@@ -241,7 +242,7 @@ fn deserialize_compressed(
     state: ConnectionState,
     bytes: &[u8],
     _compression: u32,
-) -> MyResult<Option<Packet>> {
+) -> Result<Option<Packet>> {
     let mut reader = Cursor::new(bytes);
     let data_length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
 
@@ -263,7 +264,7 @@ fn deserialize_uncompressed(
     direction: PacketDirection,
     state: ConnectionState,
     bytes: &[u8],
-) -> MyResult<Option<Packet>> {
+) -> Result<Option<Packet>> {
     let mut reader = Cursor::new(bytes);
     let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
 
