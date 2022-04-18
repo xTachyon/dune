@@ -1,0 +1,67 @@
+https://github.com/Thinkofname/steven
+- see https://github.com/Thinkofname/steven
+
+https://github.com/iceiix/stevenarella
+- fork of https://github.com/Thinkofname/steven
+- graphic client
+- mojang auth
+- packets with rust macros
+- 1.7.10-1.17.1
+
+https://github.com/Lea-fish/Leafish
+- fork of https://github.com/iceiix/stevenarella
+
+https://github.com/willemml/rust-mc
+- server/terminal client
+- mojang auth
+- 1.16.3 from mcproto_rs
+
+https://github.com/PistonDevelopers/hematite
+- graphic client
+- 1.8.pre2
+
+https://github.com/PistonDevelopers/hematite_server
+- server
+- 1.8.9
+
+https://gitlab.com/macmv/bamboo
+- server with translator proxy
+- 1.8, 1.12, and 1.14+
+- active
+
+https://github.com/feather-rs/feather
+- server, proxy for printing packets
+- 1.16.5
+- active
+- protocol with macro generated from prismarine?
+
+https://github.com/MCHPR/MCHPRS
+- active
+- big brain redstone compiler that generates native code for processing
+- unknown version
+
+https://github.com/minenode/minenode
+- active
+- it's basically all typescript with 3 files of rust?? is this what we consider rust now
+
+https://github.com/garentyler/composition
+- server
+- 1.8.9
+- manually written protocol
+
+https://github.com/Techern/Netherrack
+- server
+- last commit 2016 :cry:
+- manually written protocol
+
+https://github.com/Twister915/mcproto-rs
+- protocol base functions, packets with rust macros
+- already written for 1.15.2 and 1.16.3
+
+https://github.com/C4K3/Ozelot
+- protocol lib
+- mojang
+- 1.15.2
+
+https://github.com/Trivernis/minecraft-data-rs
+- generated data from https://github.com/PrismarineJS/minecraft-data
