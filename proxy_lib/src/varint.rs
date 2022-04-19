@@ -1,7 +1,7 @@
+use anyhow::Result;
 use byteorder::ReadBytesExt;
 use std::io::Read;
 use std::ops::Deref;
-use anyhow::Result;
 
 pub(crate) fn read_varint(bytes: &[u8]) -> Option<(u32, usize)> {
     match read_varint_impl(bytes) {

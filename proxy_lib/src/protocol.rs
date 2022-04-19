@@ -1,11 +1,11 @@
 use crate::de::MinecraftDeserialize;
 use crate::game::Gamemode;
 use crate::varint::VarInt;
-use crate::{PacketDirection};
+use crate::PacketDirection;
 use anyhow::Result;
 use flate2::read::ZlibDecoder;
-use std::io::{Cursor, Read};
 use num_enum::TryFromPrimitive;
+use std::io::{Cursor, Read};
 
 macro_rules! deserialize_for {
     ($type:ident $($field:ident)*) => {
@@ -98,11 +98,18 @@ deserialize_for!(SetCompression value);
 
 #[derive(Debug, Default)]
 pub struct LoginSuccess {
-    pub uuid: String,
+    pub uuid: u128,
     pub username: String,
 }
 
 deserialize_for!(LoginSuccess uuid username);
+
+#[derive(Debug, Default)]
+pub struct LoginStart {
+    pub name: String,
+}
+
+deserialize_for!(LoginStart name);
 
 #[derive(Debug)]
 pub enum PlayerInfoTabAction {
@@ -206,6 +213,7 @@ Handshake      Handshake ClientToServer 0x00
 StatusRequest  Status    ClientToServer 0x00
 StatusResponse Status    ServerToClient 0x00
 
+LoginStart     Login     ClientToServer 0x00
 LoginSuccess   Login     ServerToClient 0x02
 SetCompression Login     ServerToClient 0x03
 
@@ -267,6 +275,7 @@ fn deserialize_uncompressed(
 ) -> Result<Option<Packet>> {
     let mut reader = Cursor::new(bytes);
     let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
+    println!("state={:?}, id={}", state, *id);
 
     //    tokio::task::spawn_blocking( move || dbg!(id) );
     let packet = deserialize(direction, state, id.get(), &mut reader)?;

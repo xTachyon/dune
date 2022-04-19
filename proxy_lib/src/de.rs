@@ -1,9 +1,9 @@
 use crate::game::Gamemode;
 use crate::varint::VarInt;
-use byteorder::ReadBytesExt;
-use std::io::Read;
-use std::convert::TryFrom;
 use anyhow::Result;
+use byteorder::ReadBytesExt;
+use std::convert::TryFrom;
+use std::io::Read;
 
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> Result<Self>

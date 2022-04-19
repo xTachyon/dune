@@ -6,6 +6,4 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
-async-trait = "0.1.24"
 proxy_lib = { path = "../proxy_lib" }
-tokio = { version = "0.2.17", features = ["tcp", "macros", "sync", "rt-core", "io-util", "dns", "blocking"] }
