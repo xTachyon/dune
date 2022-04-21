@@ -1,7 +1,7 @@
-use std::fs::File;
 use anyhow::Result;
-use proxy_lib::{AuthData, do_things};
 use proxy_lib::events::{ChatEvent, EventSubscriber};
+use proxy_lib::{do_things, AuthData};
+use std::fs::File;
 
 struct EventHandler {}
 
@@ -22,7 +22,10 @@ fn get_access_token() -> Result<AuthData> {
     let acc = accounts.get(selected_acc).unwrap().as_object().unwrap();
     let token = acc.get("accessToken").unwrap().as_str().unwrap();
 
-    Ok(AuthData { selected_profile: selected_acc.to_string(), access_token: token.to_string() })
+    Ok(AuthData {
+        selected_profile: selected_acc.to_string(),
+        access_token: token.to_string(),
+    })
 }
 
 fn main() -> Result<()> {

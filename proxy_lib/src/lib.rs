@@ -5,22 +5,22 @@ mod protocol;
 mod varint;
 
 use crate::events::{ChatEvent, EventSubscriber};
-use crate::protocol::{ConnectionState, EncRequest};
 use crate::protocol::Packet;
+use crate::protocol::{ConnectionState, EncRequest};
 use crate::ConnectionState::Handshake;
 use anyhow::Result;
 use bytes::{Bytes, BytesMut};
 use polling::{Event, Poller};
+use rand::RngCore;
+use rsa::Hash::SHA1;
+use rsa::RsaPrivateKey;
+use serde_derive::Serialize;
+use sha1::Digest;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::{channel, Sender};
-use rand::RngCore;
-use rsa::Hash::SHA1;
-use rsa::RsaPrivateKey;
-use sha1::Digest;
-use serde_derive::Serialize;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PacketDirection {
@@ -236,7 +236,7 @@ fn read_packet(
     loop {
         read_some(socket, buffer)?;
         if let Some((packet, size)) =
-        protocol::deserialize_with_header(direction, state, &buffer, None)?
+            protocol::deserialize_with_header(direction, state, &buffer, None)?
         {
             buffer.drain(..size);
             println!("{:?}", packet);
@@ -317,7 +317,7 @@ struct Proxy {
     state: ConnectionState,
     compression: Option<u32>,
     start_done: bool,
-    auth_data: Option<AuthData>
+    auth_data: Option<AuthData>,
 }
 
 impl Proxy {
@@ -355,16 +355,17 @@ impl Proxy {
         let auth_data = self.auth_data.take().unwrap();
         let selected_profile = auth_data.selected_profile.replace("-", "");
 
-        #[allow(non_snake_case)] #[derive(Serialize)]
+        #[allow(non_snake_case)]
+        #[derive(Serialize)]
         struct RequestData {
             accessToken: String,
             selectedProfile: String,
-            serverId: String
+            serverId: String,
         };
         let req = RequestData {
             accessToken: auth_data.access_token,
             selectedProfile: selected_profile,
-            serverId: hash
+            serverId: hash,
         };
         let req = serde_json::to_string(&req)?;
         dbg!(&req);
@@ -439,7 +440,11 @@ impl Proxy {
     }
 }
 
-fn run(mut client_socket: TcpStream, mut server_socket: TcpStream, auth_data: AuthData) -> Result<()> {
+fn run(
+    mut client_socket: TcpStream,
+    mut server_socket: TcpStream,
+    auth_data: AuthData,
+) -> Result<()> {
     const CLIENT_KEY: usize = 0;
     const SERVER_KEY: usize = 1;
 
@@ -510,7 +515,11 @@ fn run(mut client_socket: TcpStream, mut server_socket: TcpStream, auth_data: Au
     Ok(())
 }
 
-pub fn do_things(server_address: &str, auth_data: AuthData, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
+pub fn do_things(
+    server_address: &str,
+    auth_data: AuthData,
+    handler: Box<dyn EventSubscriber + Sync>,
+) -> Result<()> {
     let incoming = TcpListener::bind("0.0.0.0:25566")?;
 
     let (client, _) = incoming.accept()?;

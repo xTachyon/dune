@@ -179,8 +179,8 @@ pub struct PlayerInfoTab {
 
 impl MinecraftDeserialize for PlayerInfoTab {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         let action = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
         assert!(action.get() <= 4);
