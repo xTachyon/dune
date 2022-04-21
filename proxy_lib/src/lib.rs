@@ -4,23 +4,22 @@ mod game;
 mod protocol;
 mod varint;
 
-use crate::events::{ChatEvent, EventSubscriber};
-use crate::protocol::Packet;
+use crate::events::EventSubscriber;
 use crate::protocol::{ConnectionState, EncRequest};
-use crate::ConnectionState::Handshake;
+use crate::protocol::{EncResponse, Packet};
+use crate::varint::write_varint;
 use anyhow::Result;
-use bytes::{Bytes, BytesMut};
+use byteorder::WriteBytesExt;
+use cfb8::cipher::AsyncStreamCipher;
+use cfb8::cipher::NewCipher;
 use polling::{Event, Poller};
 use rand::RngCore;
-use rsa::Hash::SHA1;
-use rsa::RsaPrivateKey;
+use rsa::pkcs8::DecodePublicKey;
+use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::Digest;
-use std::convert::TryFrom;
-use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc::{channel, Sender};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PacketDirection {
@@ -28,282 +27,47 @@ pub enum PacketDirection {
     ServerToClient,
 }
 
-#[derive(Default)]
-struct ClientGame {
-    buffer: Vec<u8>,
-    buffer_offset: usize,
-    compression: Option<u32>,
-}
+type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
-impl ClientGame {
-    fn on_receive(&mut self, new: &[u8]) {
-        if self.buffer_offset > self.buffer.len() - self.buffer_offset {
-            self.buffer.drain(..self.buffer_offset);
-            self.buffer_offset = 0;
-        }
-        self.buffer.extend_from_slice(new);
-    }
-
-    fn get_packet(
-        &mut self,
-        direction: PacketDirection,
-        state: ConnectionState,
-    ) -> Result<Option<Packet>> {
-        match protocol::deserialize_with_header(
-            direction,
-            state,
-            &self.buffer[self.buffer_offset..],
-            self.compression,
-        )? {
-            Some((packet, offset)) => {
-                self.buffer_offset += offset;
-                Ok(Some(packet))
-            }
-            None => Ok(None),
-        }
-    }
-}
-
-struct GameData {
-    client_state: ClientGame,
-    server_state: ClientGame,
-    connection_state: ConnectionState,
-    handler: Box<dyn EventSubscriber + Sync>,
-    packet_file: File,
-}
-
-impl GameData {
-    fn new(handler: Box<dyn EventSubscriber + Sync>) -> Result<GameData> {
-        let packet_file = File::create("packet_file.txt")?;
-        Ok(GameData {
-            client_state: Default::default(),
-            server_state: Default::default(),
-            connection_state: ConnectionState::Handshake,
-            handler,
-            packet_file,
-        })
-    }
-
-    fn get_state(&mut self, direction: PacketDirection) -> &mut ClientGame {
-        match direction {
-            PacketDirection::ClientToServer => &mut self.server_state,
-            PacketDirection::ServerToClient => &mut self.client_state,
-        }
-    }
-
-    fn on_receive(&mut self, direction: PacketDirection, bytes: &[u8]) -> Result<()> {
-        let state = self.get_state(direction);
-        state.on_receive(bytes);
-
-        loop {
-            let connection_state = self.connection_state;
-            let state = self.get_state(direction);
-            if let Some(packet) = state.get_packet(direction, connection_state)? {
-                match packet {
-                    Packet::Unknown(_, _) => {}
-                    _ => {
-                        let string =
-                            format!("{:?} {:?} {:?}\n", direction, connection_state, packet);
-                        self.packet_file.write_all(string.as_bytes())?;
-                    }
-                };
-                match packet {
-                    Packet::Handshake(x) => self.on_handshake(x)?,
-                    Packet::SetCompression(x) => self.on_set_compression(x)?,
-                    Packet::LoginSuccess(x) => self.on_login_success(x)?,
-                    Packet::ChatResponse(x) => self.on_chat_response(x)?,
-                    Packet::SpawnMob(x) => self.on_spawn_mob(x)?,
-                    _ => {}
-                };
-            } else {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    fn on_handshake(&mut self, packet: protocol::Handshake) -> Result<()> {
-        self.connection_state = ConnectionState::try_from(packet.next_state.get() as u8)?;
-        Ok(())
-    }
-
-    fn on_set_compression(&mut self, packet: protocol::SetCompression) -> Result<()> {
-        let value = packet.value.get() as i32;
-        let value = if value < 0 { None } else { Some(value as u32) };
-        self.client_state.compression = value;
-        self.server_state.compression = value;
-        Ok(())
-    }
-
-    fn on_login_success(&mut self, _packet: protocol::LoginSuccess) -> Result<()> {
-        self.connection_state = ConnectionState::Play;
-
-        Ok(())
-    }
-
-    fn on_chat_response(&mut self, packet: protocol::ChatResponse) -> Result<()> {
-        let event = ChatEvent {
-            message: packet.response,
-        };
-        self.handler.on_chat(event)?;
-        Ok(())
-    }
-
-    fn on_spawn_mob(&mut self, packet: protocol::SpawnMob) -> Result<()> {
-        // println!("{:?}", packet);
-        Ok(())
-    }
-}
-
-// async fn process_traffic(mut receiver: Receiver<(PacketDirection, Bytes)>, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
-//     let mut game = GameData::new(handler).await?;
-//     loop {
-//         let (direction, bytes) = match receiver.recv().await {
-//             Some(x) => x,
-//             None => break,
-//         };
-//         game.on_receive(direction, &bytes).await?;
-//     }
-//
-//     Ok(())
-// }
-
-// async fn forward_data<R: AsyncReadExt + Unpin, W: AsyncWriteExt + Unpin>(
-//     mut reader: R,
-//     mut writer: W,
-//     mut channel: Sender<(PacketDirection, Bytes)>,
-//     direction: PacketDirection,
-// ) -> Result<()> {
-//     let mut bytes = BytesMut::new();
-//     loop {
-//         if bytes.capacity() == 0 || bytes.is_empty() {
-//             bytes = BytesMut::with_capacity(64 * 1024);
-//             bytes.resize(bytes.capacity(), 0);
-//         }
-//         let read = reader.read(&mut bytes).await?;
-//         if read == 0 {
-//             break;
-//         }
-//
-//         let new = bytes.split_to(read).freeze();
-//         channel.send((direction, new.clone())).await?;
-//         writer.write_all(&new).await?;
-//     }
-//
-//     Ok(())
-// }
-
-fn forward_data<R: Read, W: Write>(
-    mut reader: R,
-    mut writer: W,
-    mut channel: Sender<(PacketDirection, Bytes)>,
-    direction: PacketDirection,
-) -> Result<()> {
-    const SIZE: usize = 64 * 1024;
-    let mut bytes = [0; SIZE];
-    let mut bytes_send = BytesMut::with_capacity(SIZE);
-    loop {
-        let read = reader.read(&mut bytes)?;
-        if read == 0 {
-            break;
-        }
-        println!("read {} bytes", read);
-
-        bytes_send.extend_from_slice(&bytes[..read]);
-        let new = bytes_send.split_to(read).freeze();
-        channel.send((direction, new));
-
-        writer.write_all(&bytes[..read])?;
-    }
-
-    Ok(())
-}
-
-fn read_some(mut socket: &TcpStream, buffer: &mut Vec<u8>) -> Result<()> {
-    let mut bytes = [0; 4096];
-    let read = socket.read(&mut bytes)?;
-    buffer.extend_from_slice(&bytes[..read]);
-
-    Ok(())
-}
-
-fn read_packet(
-    socket: &TcpStream,
-    buffer: &mut Vec<u8>,
-    state: ConnectionState,
-    direction: PacketDirection,
-) -> Result<Packet> {
-    loop {
-        read_some(socket, buffer)?;
-        if let Some((packet, size)) =
-            protocol::deserialize_with_header(direction, state, &buffer, None)?
-        {
-            buffer.drain(..size);
-            println!("{:?}", packet);
-            return Ok(packet);
-        }
-    }
-}
-
-fn do_login(client_socket: &TcpStream, server_socket: &TcpStream) -> Result<()> {
-    let mut c2s_buffer = Vec::new();
-    // let mut s2c_buffer = Vec::new();
-
-    read_packet(
-        client_socket,
-        &mut c2s_buffer,
-        ConnectionState::Handshake,
-        PacketDirection::ClientToServer,
-    )?;
-
-    Ok(())
-}
-
-fn on_connected(
-    mut client_socket: TcpStream,
-    mut server_socket: TcpStream,
-    handler: Box<dyn EventSubscriber + Sync>,
-) -> Result<()> {
-    // do_login(&client_socket, &server_socket)?;
-
-    let (send, recv) = channel();
-    let send2 = send.clone();
-
-    let client_socket2 = client_socket.try_clone()?;
-    let server_socket2 = server_socket.try_clone()?;
-    let t1 = std::thread::spawn(|| {
-        println!(
-            "{:?}",
-            forward_data(
-                client_socket,
-                server_socket,
-                send,
-                PacketDirection::ClientToServer,
-            )
-        );
-    });
-
-    let t2 = std::thread::spawn(|| {
-        println!(
-            "{:?}",
-            forward_data(
-                server_socket2,
-                client_socket2,
-                send2,
-                PacketDirection::ServerToClient,
-            )
-        );
-    });
-
-    t1.join();
-    t2.join();
-
-    Ok(())
+struct Encryption {
+    enc: Aes128Cfb8,
+    dec: Aes128Cfb8,
 }
 
 struct Session {
-    read_buffer: Vec<u8>,
-    write_buffer: Vec<u8>,
+    read_buf: Vec<u8>,
+    write_buf: Vec<u8>,
+    crypt: Option<Encryption>,
+}
+
+impl Session {
+    fn write(&mut self, buf: &mut [u8]) {
+        if let Some(crypt) = &mut self.crypt {
+            crypt.enc.encrypt(buf);
+        }
+
+        for i in buf.iter() {
+            if i.is_ascii() && !i.is_ascii_control() {
+                print!("{}", *i as char);
+            }
+        }
+
+        self.write_buf.extend_from_slice(buf);
+    }
+
+    fn read(&mut self, buf: &mut [u8]) {
+        if let Some(crypt) = &mut self.crypt {
+            crypt.dec.decrypt(buf);
+        }
+
+        for i in buf.iter() {
+            if i.is_ascii() && !i.is_ascii_control() {
+                print!("{}", *i as char);
+            }
+        }
+
+        self.read_buf.extend_from_slice(buf);
+    }
 }
 
 pub struct AuthData {
@@ -315,7 +79,7 @@ struct Proxy {
     client: Session,
     server: Session,
     state: ConnectionState,
-    compression: Option<u32>,
+    compression: bool,
     start_done: bool,
     auth_data: Option<AuthData>,
 }
@@ -324,21 +88,63 @@ impl Proxy {
     fn new(auth_data: AuthData) -> Proxy {
         Proxy {
             client: Session {
-                read_buffer: vec![],
-                write_buffer: vec![],
+                read_buf: vec![],
+                write_buf: vec![],
+                crypt: None,
             },
             server: Session {
-                read_buffer: vec![],
-                write_buffer: vec![],
+                read_buf: vec![],
+                write_buf: vec![],
+                crypt: None,
             },
             state: ConnectionState::Handshake,
-            compression: None,
+            compression: false,
             start_done: false,
             auth_data: Some(auth_data),
         }
     }
 
-    fn end_request(&mut self, packet: EncRequest, aes_key: &[u8]) -> Result<()> {
+    fn rsa_crypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
+        let public_key = RsaPublicKey::from_public_key_der(key)?;
+        let padding = PaddingScheme::new_pkcs1v15_encrypt();
+
+        let res = public_key.encrypt(&mut rand::thread_rng(), padding, data)?;
+        Ok(res)
+    }
+
+    fn serialize_enc_response(packet: EncResponse) -> Result<Vec<u8>> {
+        let mut cursor = Cursor::new(Vec::new());
+
+        // id = 1
+        cursor.write_u8(1)?;
+
+        // Shared Secret Length
+        let (buf, size) = write_varint(packet.shared_secret.len() as u32);
+        cursor.write_all(&buf[..size])?;
+
+        // Shared Secret
+        cursor.write_all(&packet.shared_secret)?;
+
+        // Verify Token Length
+        let (buf, size) = write_varint(packet.verify_token.len() as u32);
+        cursor.write_all(&buf[..size])?;
+
+        // Verify Token
+        cursor.write_all(&packet.verify_token)?;
+
+        let mut result = Vec::new();
+
+        // size
+        let (buf, size) = write_varint(cursor.get_ref().len() as u32);
+        result.extend_from_slice(&buf[..size]);
+        result.extend_from_slice(cursor.get_ref());
+
+        Ok(result)
+    }
+
+    fn enc_request(&mut self, packet: EncRequest) -> Result<()> {
+        let aes_key: [u8; 16] = rand::random();
+
         let mut buffer = [0; 16];
         rand::thread_rng().fill_bytes(&mut buffer);
 
@@ -346,7 +152,7 @@ impl Proxy {
             let mut sha1 = sha1::Sha1::new();
             sha1.update(packet.server_id);
             sha1.update(aes_key);
-            sha1.update(packet.public_key);
+            sha1.update(&packet.public_key);
             let hash = sha1.finalize();
 
             num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
@@ -361,20 +167,35 @@ impl Proxy {
             accessToken: String,
             selectedProfile: String,
             serverId: String,
-        };
+        }
         let req = RequestData {
             accessToken: auth_data.access_token,
             selectedProfile: selected_profile,
             serverId: hash,
         };
         let req = serde_json::to_string(&req)?;
-        dbg!(&req);
         let response = ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
             .set("Content-Type", "application/json; charset=utf-8")
             .send_string(&req)?;
-        dbg!(response);
 
-        unimplemented!()
+        // 204 No Content = Ok
+        if response.status() != 204 {
+            return Err(anyhow::Error::msg("bad mojang auth"));
+        }
+
+        let response = EncResponse {
+            shared_secret: Proxy::rsa_crypt(&packet.public_key, &aes_key)?,
+            verify_token: Proxy::rsa_crypt(&packet.public_key, &packet.verify_token)?,
+        };
+        let mut buf = Proxy::serialize_enc_response(response)?;
+        self.server.write(&mut buf);
+
+        let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
+        let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
+
+        self.server.crypt = Some(Encryption { enc, dec });
+
+        Ok(())
     }
 
     fn on_start(&mut self, direction: PacketDirection) -> Result<bool> {
@@ -386,33 +207,33 @@ impl Proxy {
         if let Some((packet, size)) = protocol::deserialize_with_header(
             direction,
             self.state,
-            &session.read_buffer,
+            &session.read_buf,
             self.compression,
         )? {
             println!("{:?}", packet);
-            session.read_buffer.drain(..size);
+            session.read_buf.drain(..size);
             match packet {
                 Packet::Handshake(x) => {
                     if *x.next_state == 1 {
                         self.start_done = true;
-                        return Ok(true);
+                    } else {
+                        assert_eq!(*x.next_state, 2);
+                        self.state = ConnectionState::Login;
                     }
-                    assert_eq!(*x.next_state, 2);
-                    self.state = ConnectionState::Login;
                 }
                 Packet::LoginStart(_) => {}
-                Packet::LoginSuccess(x) => {
+                Packet::LoginSuccess(_) => {
                     self.start_done = true;
                     self.state = ConnectionState::Play;
                 }
                 Packet::SetCompression(x) => {
-                    self.compression = Some(*x.value);
+                    let v = x.value.get_signed();
+                    self.compression = v >= 0;
                 }
                 Packet::EncRequest(x) => {
-                    let key: [u8; 16] = rand::random();
-                    self.end_request(x, &key)?;
+                    self.enc_request(x)?;
                 }
-                _ => unimplemented!(),
+                _ => {}
             }
             Ok(true)
         } else {
@@ -420,21 +241,21 @@ impl Proxy {
         }
     }
 
-    fn on_recv(&mut self, buf: &[u8], direction: PacketDirection) -> Result<()> {
+    fn on_recv(&mut self, buf: &mut [u8], direction: PacketDirection) -> Result<()> {
         if direction == PacketDirection::ClientToServer {
-            self.client.read_buffer.extend_from_slice(buf);
-            self.server.write_buffer.extend_from_slice(buf);
+            self.client.read(buf);
+            self.server.write(buf);
         } else {
-            self.server.read_buffer.extend_from_slice(buf);
-            self.client.write_buffer.extend_from_slice(buf);
+            self.server.read(buf);
+            self.client.write(buf);
         }
 
-        if !self.start_done {
-            let mut running = true;
-            while running {
-                running = self.on_start(direction)?;
-            }
+        // if !self.start_done {
+        let mut running = true;
+        while running {
+            running = self.on_start(direction)?;
         }
+        // }
 
         Ok(())
     }
@@ -481,15 +302,15 @@ fn run(
                 if read == 0 {
                     return Ok(());
                 }
-                proxy.on_recv(&buffer[..read], direction)?;
+                proxy.on_recv(&mut buffer[..read], direction)?;
             }
             if ev.writable {
                 if ev.key == CLIENT_KEY {
-                    let wrote = client_socket.write(&proxy.client.write_buffer)?;
-                    proxy.client.write_buffer.drain(..wrote);
+                    let wrote = client_socket.write(&proxy.client.write_buf)?;
+                    proxy.client.write_buf.drain(..wrote);
                 } else {
-                    let wrote = server_socket.write(&proxy.server.write_buffer)?;
-                    proxy.server.write_buffer.drain(..wrote);
+                    let wrote = server_socket.write(&proxy.server.write_buf)?;
+                    proxy.server.write_buf.drain(..wrote);
                 }
             }
         }
@@ -499,7 +320,7 @@ fn run(
             polling::Event {
                 key: CLIENT_KEY,
                 readable: true,
-                writable: !proxy.client.write_buffer.is_empty(),
+                writable: !proxy.client.write_buf.is_empty(),
             },
         )?;
         poller.modify(
@@ -507,12 +328,10 @@ fn run(
             polling::Event {
                 key: SERVER_KEY,
                 readable: true,
-                writable: !proxy.server.write_buffer.is_empty(),
+                writable: !proxy.server.write_buf.is_empty(),
             },
         )?;
     }
-
-    Ok(())
 }
 
 pub fn do_things(

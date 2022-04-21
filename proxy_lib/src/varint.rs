@@ -31,7 +31,7 @@ fn read_varint_impl<R: Read>(mut reader: R) -> Result<(u32, usize)> {
     Ok((result, bytes_read))
 }
 
-fn write_varint(mut value: u32) -> ([u8; 10], usize) {
+pub fn write_varint(mut value: u32) -> ([u8; 10], usize) {
     let mut result = [0; 10];
     let mut index = 0;
     loop {
@@ -85,5 +85,9 @@ impl VarInt {
 
     pub(crate) fn get(&self) -> u32 {
         self.inner
+    }
+
+    pub(crate) fn get_signed(&self) -> i32 {
+        self.inner as i32
     }
 }

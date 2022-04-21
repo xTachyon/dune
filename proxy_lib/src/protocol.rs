@@ -114,6 +114,14 @@ pub struct EncRequest {
 deserialize_for!(EncRequest server_id public_key verify_token);
 
 #[derive(Debug, Default)]
+pub struct EncResponse {
+    pub shared_secret: Vec<u8>,
+    pub verify_token: Vec<u8>,
+}
+
+deserialize_for!(EncResponse shared_secret verify_token);
+
+#[derive(Debug, Default)]
 pub struct LoginStart {
     pub name: String,
 }
@@ -223,6 +231,8 @@ StatusRequest  Status    ClientToServer 0x00
 StatusResponse Status    ServerToClient 0x00
 
 LoginStart     Login     ClientToServer 0x00
+EncResponse    Login     ClientToServer 0x01
+
 EncRequest     Login     ServerToClient 0x01
 LoginSuccess   Login     ServerToClient 0x02
 SetCompression Login     ServerToClient 0x03
@@ -236,7 +246,7 @@ pub fn deserialize_with_header(
     direction: PacketDirection,
     state: ConnectionState,
     bytes: &[u8],
-    compression: Option<u32>,
+    compression: bool,
 ) -> Result<Option<(Packet, usize)>> {
     if !has_enough_bytes(bytes) {
         return Ok(None);
@@ -244,9 +254,10 @@ pub fn deserialize_with_header(
     let length: VarInt = MinecraftDeserialize::deserialize(bytes)?;
     let bytes = &bytes[length.size()..length.get() as usize + length.size()];
 
-    let packet = match compression {
-        Some(x) => deserialize_compressed(direction, state, bytes, x),
-        None => deserialize_uncompressed(direction, state, bytes),
+    let packet = if compression {
+        deserialize_compressed(direction, state, bytes)
+    } else {
+        deserialize_uncompressed(direction, state, bytes)
     }?;
     let result = match packet {
         Some(packet) => Some((packet, length.get() as usize + length.size())),
@@ -259,7 +270,6 @@ fn deserialize_compressed(
     direction: PacketDirection,
     state: ConnectionState,
     bytes: &[u8],
-    _compression: u32,
 ) -> Result<Option<Packet>> {
     let mut reader = Cursor::new(bytes);
     let data_length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -267,7 +277,7 @@ fn deserialize_compressed(
     let mut bytes = &bytes[data_length.size()..];
 
     let mut buffer;
-    if data_length.get() != 0 {
+    if *data_length != 0 {
         buffer = Vec::new();
 
         let mut decompresser = ZlibDecoder::new(bytes);
