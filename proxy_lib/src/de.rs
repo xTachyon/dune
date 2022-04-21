@@ -7,8 +7,8 @@ use std::io::Read;
 
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> Result<Self>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
 }
 
 macro_rules! impl_for_numbers {
@@ -58,10 +58,19 @@ impl MinecraftDeserialize for String {
     }
 }
 
+impl MinecraftDeserialize for Vec<u8> {
+    fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
+        let size = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
+        let mut buffer = vec![0; size.get() as usize];
+        reader.read_exact(&mut buffer)?;
+        Ok(buffer)
+    }
+}
+
 impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
     fn deserialize<R: Read>(mut reader: R) -> Result<Option<T>>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         let b = MinecraftDeserialize::deserialize(&mut reader)?;
         let result = if b {
@@ -91,14 +100,14 @@ impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
 //impl_for_tuples!(A, B);
 
 impl<A, B, C> MinecraftDeserialize for (A, B, C)
-where
-    A: MinecraftDeserialize,
-    B: MinecraftDeserialize,
-    C: MinecraftDeserialize,
+    where
+        A: MinecraftDeserialize,
+        B: MinecraftDeserialize,
+        C: MinecraftDeserialize,
 {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         let a = MinecraftDeserialize::deserialize(&mut reader)?;
         let b = MinecraftDeserialize::deserialize(&mut reader)?;

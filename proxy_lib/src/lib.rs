@@ -5,7 +5,7 @@ mod protocol;
 mod varint;
 
 use crate::events::{ChatEvent, EventSubscriber};
-use crate::protocol::ConnectionState;
+use crate::protocol::{ConnectionState, EncRequest};
 use crate::protocol::Packet;
 use crate::ConnectionState::Handshake;
 use anyhow::Result;
@@ -16,6 +16,11 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::{channel, Sender};
+use rand::RngCore;
+use rsa::Hash::SHA1;
+use rsa::RsaPrivateKey;
+use sha1::Digest;
+use serde_derive::Serialize;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PacketDirection {
@@ -231,7 +236,7 @@ fn read_packet(
     loop {
         read_some(socket, buffer)?;
         if let Some((packet, size)) =
-            protocol::deserialize_with_header(direction, state, &buffer, None)?
+        protocol::deserialize_with_header(direction, state, &buffer, None)?
         {
             buffer.drain(..size);
             println!("{:?}", packet);
@@ -301,16 +306,22 @@ struct Session {
     write_buffer: Vec<u8>,
 }
 
+pub struct AuthData {
+    pub selected_profile: String,
+    pub access_token: String,
+}
+
 struct Proxy {
     client: Session,
     server: Session,
     state: ConnectionState,
     compression: Option<u32>,
     start_done: bool,
+    auth_data: Option<AuthData>
 }
 
 impl Proxy {
-    fn new() -> Proxy {
+    fn new(auth_data: AuthData) -> Proxy {
         Proxy {
             client: Session {
                 read_buffer: vec![],
@@ -323,16 +334,55 @@ impl Proxy {
             state: ConnectionState::Handshake,
             compression: None,
             start_done: false,
+            auth_data: Some(auth_data),
         }
     }
 
-    fn on_start(&mut self, direction: PacketDirection) -> Result<()> {
+    fn end_request(&mut self, packet: EncRequest, aes_key: &[u8]) -> Result<()> {
+        let mut buffer = [0; 16];
+        rand::thread_rng().fill_bytes(&mut buffer);
+
+        let hash = {
+            let mut sha1 = sha1::Sha1::new();
+            sha1.update(packet.server_id);
+            sha1.update(aes_key);
+            sha1.update(packet.public_key);
+            let hash = sha1.finalize();
+
+            num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
+        };
+
+        let auth_data = self.auth_data.take().unwrap();
+        let selected_profile = auth_data.selected_profile.replace("-", "");
+
+        #[allow(non_snake_case)] #[derive(Serialize)]
+        struct RequestData {
+            accessToken: String,
+            selectedProfile: String,
+            serverId: String
+        };
+        let req = RequestData {
+            accessToken: auth_data.access_token,
+            selectedProfile: selected_profile,
+            serverId: hash
+        };
+        let req = serde_json::to_string(&req)?;
+        dbg!(&req);
+        let response = ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
+            .set("Content-Type", "application/json; charset=utf-8")
+            .send_string(&req)?;
+        dbg!(response);
+
+        unimplemented!()
+    }
+
+    fn on_start(&mut self, direction: PacketDirection) -> Result<bool> {
         let session = if direction == PacketDirection::ClientToServer {
             &mut self.client
         } else {
             &mut self.server
         };
-        while let Some((packet, size)) = protocol::deserialize_with_header(
+        if let Some((packet, size)) = protocol::deserialize_with_header(
             direction,
             self.state,
             &session.read_buffer,
@@ -344,7 +394,7 @@ impl Proxy {
                 Packet::Handshake(x) => {
                     if *x.next_state == 1 {
                         self.start_done = true;
-                        return Ok(());
+                        return Ok(true);
                     }
                     assert_eq!(*x.next_state, 2);
                     self.state = ConnectionState::Login;
@@ -357,11 +407,16 @@ impl Proxy {
                 Packet::SetCompression(x) => {
                     self.compression = Some(*x.value);
                 }
+                Packet::EncRequest(x) => {
+                    let key: [u8; 16] = rand::random();
+                    self.end_request(x, &key)?;
+                }
                 _ => unimplemented!(),
             }
+            Ok(true)
+        } else {
+            Ok(false)
         }
-
-        Ok(())
     }
 
     fn on_recv(&mut self, buf: &[u8], direction: PacketDirection) -> Result<()> {
@@ -374,18 +429,21 @@ impl Proxy {
         }
 
         if !self.start_done {
-            self.on_start(direction)?;
+            let mut running = true;
+            while running {
+                running = self.on_start(direction)?;
+            }
         }
 
         Ok(())
     }
 }
 
-fn run(mut client_socket: TcpStream, mut server_socket: TcpStream) -> Result<()> {
+fn run(mut client_socket: TcpStream, mut server_socket: TcpStream, auth_data: AuthData) -> Result<()> {
     const CLIENT_KEY: usize = 0;
     const SERVER_KEY: usize = 1;
 
-    let mut proxy = Proxy::new();
+    let mut proxy = Proxy::new(auth_data);
 
     let poller = Poller::new()?;
 
@@ -452,13 +510,13 @@ fn run(mut client_socket: TcpStream, mut server_socket: TcpStream) -> Result<()>
     Ok(())
 }
 
-pub fn do_things(server_address: &str, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
-    let mut incoming = TcpListener::bind("0.0.0.0:25566")?;
+pub fn do_things(server_address: &str, auth_data: AuthData, handler: Box<dyn EventSubscriber + Sync>) -> Result<()> {
+    let incoming = TcpListener::bind("0.0.0.0:25566")?;
 
     let (client, _) = incoming.accept()?;
     let server = TcpStream::connect(server_address)?;
 
-    println!("{:?}", run(client, server));
+    println!("{:?}", run(client, server, auth_data));
     // println!("{:?}", on_connected(client, server, handler));
     Ok(())
 }

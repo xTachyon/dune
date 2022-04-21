@@ -105,6 +105,15 @@ pub struct LoginSuccess {
 deserialize_for!(LoginSuccess uuid username);
 
 #[derive(Debug, Default)]
+pub struct EncRequest {
+    pub server_id: String,
+    pub public_key: Vec<u8>,
+    pub verify_token: Vec<u8>,
+}
+
+deserialize_for!(EncRequest server_id public_key verify_token);
+
+#[derive(Debug, Default)]
 pub struct LoginStart {
     pub name: String,
 }
@@ -170,8 +179,8 @@ pub struct PlayerInfoTab {
 
 impl MinecraftDeserialize for PlayerInfoTab {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self>
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         let action = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
         assert!(action.get() <= 4);
@@ -214,6 +223,7 @@ StatusRequest  Status    ClientToServer 0x00
 StatusResponse Status    ServerToClient 0x00
 
 LoginStart     Login     ClientToServer 0x00
+EncRequest     Login     ServerToClient 0x01
 LoginSuccess   Login     ServerToClient 0x02
 SetCompression Login     ServerToClient 0x03
 
