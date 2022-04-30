@@ -3,10 +3,9 @@ pub mod events;
 mod game;
 mod protocol;
 mod varint;
-mod pro;
 
 use crate::events::EventSubscriber;
-use crate::protocol::{ConnectionState};
+use crate::protocol::{ConnectionState, Packet, PacketDirection};
 use crate::varint::write_varint;
 use anyhow::Result;
 use byteorder::WriteBytesExt;
@@ -20,13 +19,7 @@ use serde_derive::Serialize;
 use sha1::Digest;
 use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use pro::Packet;
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PacketDirection {
-    ClientToServer,
-    ServerToClient,
-}
+use crate::protocol::v1_18_1::login::EncryptionBeginRequest;
 
 type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
@@ -113,7 +106,7 @@ impl Proxy {
         Ok(res)
     }
 
-    fn serialize_enc_response(packet: pro::v1_18_1::login::EncryptionBeginRequest) -> Result<Vec<u8>> {
+    fn serialize_enc_response(packet: EncryptionBeginRequest) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(Vec::new());
 
         // id = 1
@@ -143,103 +136,139 @@ impl Proxy {
         Ok(result)
     }
 
-    fn enc_request(&mut self, packet: pro::v1_18_1::login::EncryptionBeginResponse) -> Result<()> {
-        let aes_key: [u8; 16] = rand::random();
-
-        let mut buffer = [0; 16];
-        rand::thread_rng().fill_bytes(&mut buffer);
-
-        let hash = {
-            let mut sha1 = sha1::Sha1::new();
-            sha1.update(packet.server_id);
-            sha1.update(aes_key);
-            sha1.update(&packet.public_key);
-            let hash = sha1.finalize();
-
-            num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
-        };
-
-        let auth_data = self.auth_data.take().unwrap();
-        let selected_profile = auth_data.selected_profile.replace("-", "");
-
-        #[allow(non_snake_case)]
-        #[derive(Serialize)]
-        struct RequestData {
-            accessToken: String,
-            selectedProfile: String,
-            serverId: String,
-        }
-        let req = RequestData {
-            accessToken: auth_data.access_token,
-            selectedProfile: selected_profile,
-            serverId: hash,
-        };
-        let req = serde_json::to_string(&req)?;
-        let response = ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
-            .set("Content-Type", "application/json; charset=utf-8")
-            .send_string(&req)?;
-
-        // 204 No Content = Ok
-        if response.status() != 204 {
-            return Err(anyhow::Error::msg("bad mojang auth"));
-        }
-
-        let response = pro::v1_18_1::login::EncryptionBeginRequest {
-            shared_secret: &Proxy::rsa_crypt(&packet.public_key, &aes_key)?,
-            verify_token: &Proxy::rsa_crypt(&packet.public_key, &packet.verify_token)?,
-        };
-        let mut buf = Proxy::serialize_enc_response(response)?;
-        self.server.write(&mut buf);
-
-        let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
-        let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
-
-        self.server.crypt = Some(Encryption { enc, dec });
-
-        Ok(())
-    }
-
     fn on_start(&mut self, direction: PacketDirection) -> Result<bool> {
-        let session = if direction == PacketDirection::ClientToServer {
-            &self.client
-        } else {
-            &self.server
-        };
-        if let Some((packet, size)) = protocol::deserialize_with_header(
-            direction,
-            self.state,
-            &session.read_buf,
-            self.compression,
-        )? {
-            println!("{:?}", packet);
-            // session.read_buf.drain(..size);
-            match packet {
-                Packet::SetProtocolRequest(x) => {
-                    if x.next_state == 1 {
-                        self.start_done = true;
-                    } else {
-                        assert_eq!(x.next_state, 2);
-                        self.state = ConnectionState::Login;
+        match direction {
+            PacketDirection::ClientToServer => {}
+            PacketDirection::ServerToClient => {
+                let session = &mut self.client;
+                let p = protocol::deserialize_with_header(
+                    direction,
+                    self.state,
+                    &session.read_buf,
+                    self.compression,
+                )?;
+                match p {
+                    Some((packet, size)) => {
+                        println!("{:?}", packet);
+                        match packet {
+                            Packet::SetProtocolRequest(x) => {
+                                if x.next_state == 1 {
+                                    self.start_done = true;
+                                } else {
+                                    assert_eq!(x.next_state, 2);
+                                    self.state = ConnectionState::Login;
+                                }
+                            }
+                            Packet::SuccessResponse(_) => {
+                                self.start_done = true;
+                                self.state = ConnectionState::Play;
+                            }
+                            Packet::CompressResponse(x) => {
+                                let v = x.threshold;
+                                self.compression = v >= 0;
+                            }
+                            Packet::EncryptionBeginResponse(packet) => {
+                                let aes_key: [u8; 16] = rand::random();
+
+                                let mut buffer = [0; 16];
+                                rand::thread_rng().fill_bytes(&mut buffer);
+
+                                let hash = {
+                                    let mut sha1 = sha1::Sha1::new();
+                                    sha1.update(packet.server_id);
+                                    sha1.update(aes_key);
+                                    sha1.update(&packet.public_key);
+                                    let hash = sha1.finalize();
+
+                                    num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
+                                };
+
+                                let auth_data = self.auth_data.take().unwrap();
+                                let selected_profile = auth_data.selected_profile.replace("-", "");
+
+                                #[allow(non_snake_case)]
+                                #[derive(Serialize)]
+                                struct RequestData {
+                                    accessToken: String,
+                                    selectedProfile: String,
+                                    serverId: String,
+                                }
+                                let req = RequestData {
+                                    accessToken: auth_data.access_token,
+                                    selectedProfile: selected_profile,
+                                    serverId: hash,
+                                };
+                                let req = serde_json::to_string(&req)?;
+                                let response = ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
+                                    .set("Content-Type", "application/json; charset=utf-8")
+                                    .send_string(&req)?;
+
+                                // 204 No Content = Ok
+                                if response.status() != 204 {
+                                    return Err(anyhow::Error::msg("bad mojang auth"));
+                                }
+
+                                let response = EncryptionBeginRequest {
+                                    shared_secret: &Proxy::rsa_crypt(&packet.public_key, &aes_key)?,
+                                    verify_token: &Proxy::rsa_crypt(&packet.public_key, &packet.verify_token)?,
+                                };
+                                let mut buf = Proxy::serialize_enc_response(response)?;
+                                self.server.write(&mut buf);
+
+                                let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
+                                let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
+
+                                self.server.crypt = Some(Encryption { enc, dec });
+                            }
+                            _ => {}
+                        }
+                        session.read_buf.drain(..size);
                     }
+                    None => { return Ok(false); }
                 }
-                Packet::LoginStartRequest(_) => {}
-                Packet::SuccessResponse(_) => {
-                    self.start_done = true;
-                    self.state = ConnectionState::Play;
-                }
-                Packet::CompressResponse(x) => {
-                    let v = x.threshold;
-                    self.compression = v >= 0;
-                }
-                Packet::EncryptionBeginResponse(x) => {
-                    self.enc_request(x)?;
-                }
-                _ => {}
             }
-            Ok(true)
-        } else {
-            Ok(false)
         }
+        unimplemented!()
+        // let session = if direction == PacketDirection::ClientToServer {
+        //     &self.client
+        // } else {
+        //     &self.server
+        // };
+        // if let Some((packet, size)) = protocol::deserialize_with_header(
+        //     direction,
+        //     self.state,
+        //     &session.read_buf,
+        //     self.compression,
+        // )? {
+        //     println!("{:?}", packet);
+        //     // session.read_buf.drain(..size);
+        //     match packet {
+        //         Packet::SetProtocolRequest(x) => {
+        //             if x.next_state == 1 {
+        //                 self.start_done = true;
+        //             } else {
+        //                 assert_eq!(x.next_state, 2);
+        //                 self.state = ConnectionState::Login;
+        //             }
+        //         }
+        //         Packet::LoginStartRequest(_) => {}
+        //         Packet::SuccessResponse(_) => {
+        //             self.start_done = true;
+        //             self.state = ConnectionState::Play;
+        //         }
+        //         Packet::CompressResponse(x) => {
+        //             let v = x.threshold;
+        //             self.compression = v >= 0;
+        //         }
+        //         Packet::EncryptionBeginResponse(x) => {
+        //             self.enc_request(x)?;
+        //         }
+        //         _ => {}
+        //     }
+        //     Ok(true)
+        // } else {
+        //     Ok(false)
+        // }
     }
 
     fn on_recv(&mut self, buf: &mut [u8], direction: PacketDirection) -> Result<()> {
@@ -338,13 +367,13 @@ fn run(
 pub fn do_things(
     server_address: &str,
     auth_data: AuthData,
-    handler: Box<dyn EventSubscriber + Sync>,
+    _handler: Box<dyn EventSubscriber + Sync>,
 ) -> Result<()> {
-    // let incoming = TcpListener::bind("0.0.0.0:25566")?;
-    //
-    // let (client, _) = incoming.accept()?;
-    // let server = TcpStream::connect(server_address)?;
+    let incoming = TcpListener::bind("0.0.0.0:25566")?;
 
-    // println!("{:?}", run(client, server, auth_data));
+    let (client, _) = incoming.accept()?;
+    let server = TcpStream::connect(server_address)?;
+
+    println!("{:?}", run(client, server, auth_data));
     Ok(())
 }

@@ -266,7 +266,7 @@ use crate::de::Reader;
         self.out += f'''
 use anyhow::{{anyhow, Result}};
 use crate::protocol::ConnectionState as S;
-use crate::PacketDirection as D;
+use crate::protocol::PacketDirection as D;
 use crate::de::Reader;
 
 #[derive(Debug)]
@@ -307,7 +307,7 @@ def main():
     gen = Generator()
     gen.gen(states)
 
-    out_file = "../proxy_lib/src/pro/v1_18_1.rs"
+    out_file = "../proxy_lib/src/protocol/v1_18_1.rs"
     with open(out_file, "w") as f:
         f.write(gen.out)
     subprocess.run(["rustfmt", out_file])
