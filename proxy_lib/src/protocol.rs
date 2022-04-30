@@ -1,11 +1,14 @@
-// use crate::de::MinecraftDeserialize;
+use crate::de::{MinecraftDeserialize, Reader};
 // use crate::game::Gamemode;
-// use crate::varint::VarInt;
+use crate::varint::VarInt;
 // use crate::PacketDirection;
-// use anyhow::Result;
-// use flate2::read::ZlibDecoder;
+use anyhow::Result;
+use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
-// use std::io::{Cursor, Read};
+use crate::{PacketDirection, pro};
+use crate::pro::Packet;
+use std::io::{Cursor, Read};
+
 //
 // macro_rules! deserialize_for {
 //     ($type:ident $($field:ident)*) => {
@@ -33,6 +36,7 @@ pub enum ConnectionState {
     Login = 2,
     Play = 3,
 }
+
 //
 // //#[derive(Default)]
 // //pub struct PacketHeaderNoCompression {
@@ -242,70 +246,70 @@ pub enum ConnectionState {
 // PlayerInfoTab  Play      ServerToClient 0x34
 // );
 //
-// pub fn deserialize_with_header(
-//     direction: PacketDirection,
-//     state: ConnectionState,
-//     bytes: &[u8],
-//     compression: bool,
-// ) -> Result<Option<(Packet, usize)>> {
-//     if !has_enough_bytes(bytes) {
-//         return Ok(None);
-//     }
-//     let length: VarInt = MinecraftDeserialize::deserialize(bytes)?;
-//     let bytes = &bytes[length.size()..length.get() as usize + length.size()];
-//
-//     let packet = if compression {
-//         deserialize_compressed(direction, state, bytes)
-//     } else {
-//         deserialize_uncompressed(direction, state, bytes)
-//     }?;
-//     let result = match packet {
-//         Some(packet) => Some((packet, length.get() as usize + length.size())),
-//         None => None,
-//     };
-//     Ok(result)
-// }
-//
-// fn deserialize_compressed(
-//     direction: PacketDirection,
-//     state: ConnectionState,
-//     bytes: &[u8],
-// ) -> Result<Option<Packet>> {
-//     let mut reader = Cursor::new(bytes);
-//     let data_length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
-//
-//     let mut bytes = &bytes[data_length.size()..];
-//
-//     let mut buffer;
-//     if *data_length != 0 {
-//         buffer = Vec::new();
-//
-//         let mut decompresser = ZlibDecoder::new(bytes);
-//         decompresser.read_to_end(&mut buffer)?;
-//         bytes = &buffer;
-//     }
-//
-//     deserialize_uncompressed(direction, state, bytes)
-// }
-//
-// fn deserialize_uncompressed(
-//     direction: PacketDirection,
-//     state: ConnectionState,
-//     bytes: &[u8],
-// ) -> Result<Option<Packet>> {
-//     let mut reader = Cursor::new(bytes);
-//     let id: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
-//     println!("state={:?}, id={}", state, *id);
-//
-//     //    tokio::task::spawn_blocking( move || dbg!(id) );
-//     let packet = deserialize(direction, state, id.get(), &mut reader)?;
-//     Ok(Some(packet))
-// }
-//
-// fn has_enough_bytes(bytes: &[u8]) -> bool {
-//     if let Some(x) = VarInt::deserialize(bytes) {
-//         bytes.len() >= x.get() as usize + x.size()
-//     } else {
-//         false
-//     }
-// }
+pub fn deserialize_with_header(
+    direction: PacketDirection,
+    state: ConnectionState,
+    bytes: &[u8],
+    compression: bool,
+) -> Result<Option<(Packet, usize)>> {
+    if !has_enough_bytes(bytes) {
+        return Ok(None);
+    }
+    let length: VarInt = MinecraftDeserialize::deserialize(bytes)?;
+    let bytes = &bytes[length.size()..length.get() as usize + length.size()];
+
+    let mut reader = Reader { cursor: Cursor::new(bytes) };
+    let reader = &mut reader;
+    let packet = if compression {
+        deserialize_compressed(direction, state, reader)
+    } else {
+        deserialize_uncompressed(direction, state, reader)
+    }?;
+    let result = match packet {
+        Some(packet) => Some((packet, length.get() as usize + length.size())),
+        None => None,
+    };
+    unimplemented!()
+    // Ok(result)
+}
+
+fn deserialize_compressed<'r>(
+    direction: PacketDirection,
+    state: ConnectionState,
+    reader: &'r mut Reader<'r>,
+) -> Result<Option<Packet<'r>>> {
+    let data_length: VarInt = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+
+    let mut bytes = reader.get_buf_from(data_length.size()..reader.cursor.get_ref().len() as usize)?;
+
+    let mut buffer;
+    if *data_length != 0 {
+        buffer = Vec::new();
+
+        let mut decompresser = ZlibDecoder::new(bytes);
+        decompresser.read_to_end(&mut buffer)?;
+        bytes = &buffer;
+    }
+
+    deserialize_uncompressed(direction, state, reader)
+}
+
+fn deserialize_uncompressed<'r>(
+    direction: PacketDirection,
+    state: ConnectionState,
+    reader: &'r mut Reader<'r>,
+) -> Result<Option<Packet<'r>>> {
+    let id: VarInt = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    println!("state={:?}, id={}", state, *id);
+
+    let packet = pro::v1_18_1::de_packets(state, direction, id.get(), reader)?;
+    Ok(Some(packet))
+}
+
+fn has_enough_bytes(bytes: &[u8]) -> bool {
+    if let Some(x) = VarInt::deserialize(bytes) {
+        bytes.len() >= x.get() as usize + x.size()
+    } else {
+        false
+    }
+}

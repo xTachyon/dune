@@ -133,12 +133,13 @@ class Parser:
         return Packet(packet_name, fields, needs_lifetime, True)
 
     def make_name_direction(self, state, direction, name):
-        if name == "packet" or name.endswith("Request") or name.endswith("Response"):
+        if name == "packet" or name.endswith("_request") or name.endswith("_response"):
             return name
 
         if direction == Direction.C2S:
             name += "_request"
-        name += "_response"
+        else:
+            name += "_response"
 
         if name == "ping_response":
             if state == State.PLAY:
@@ -203,7 +204,7 @@ class Generator:
 
         lifetime_simple = f'''{"'p" if needs_lifetime else ""}'''
         lifetime = f'''{"<'p>" if needs_lifetime else ""}'''
-        self.out += f'''pub struct {p.name} {lifetime} {{'''
+        self.out += f'''#[derive(Debug)] pub struct {p.name} {lifetime} {{'''
         for i in p.fields:
             if i.ty == Ty.VARINT:
                 ty = "i32"
@@ -250,9 +251,8 @@ class Generator:
     def gen(self, states):
         for state in states:
             self.out += f'''
-mod {state.state.value} {{
+pub mod {state.state.value} {{
 use anyhow::Result;
-use std::io::Read;
 use crate::de::MinecraftDeserialize;
 use crate::de::Reader;
 
@@ -269,7 +269,8 @@ use crate::protocol::ConnectionState as S;
 use crate::PacketDirection as D;
 use crate::de::Reader;
 
-enum Packet<'p> {{
+#[derive(Debug)]
+pub enum Packet<'p> {{
 '''
 
         for state in states:

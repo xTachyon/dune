@@ -6,8 +6,7 @@ mod varint;
 mod pro;
 
 use crate::events::EventSubscriber;
-use crate::protocol::{ConnectionState, EncRequest};
-use crate::protocol::{EncResponse, Packet};
+use crate::protocol::{ConnectionState};
 use crate::varint::write_varint;
 use anyhow::Result;
 use byteorder::WriteBytesExt;
@@ -21,6 +20,7 @@ use serde_derive::Serialize;
 use sha1::Digest;
 use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use pro::Packet;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PacketDirection {
@@ -98,7 +98,7 @@ impl Proxy {
                 write_buf: vec![],
                 crypt: None,
             },
-            state: ConnectionState::Handshake,
+            state: ConnectionState::Handshaking,
             compression: false,
             start_done: false,
             auth_data: Some(auth_data),
@@ -113,7 +113,7 @@ impl Proxy {
         Ok(res)
     }
 
-    fn serialize_enc_response(packet: EncResponse) -> Result<Vec<u8>> {
+    fn serialize_enc_response(packet: pro::v1_18_1::login::EncryptionBeginRequest) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(Vec::new());
 
         // id = 1
@@ -143,7 +143,7 @@ impl Proxy {
         Ok(result)
     }
 
-    fn enc_request(&mut self, packet: EncRequest) -> Result<()> {
+    fn enc_request(&mut self, packet: pro::v1_18_1::login::EncryptionBeginResponse) -> Result<()> {
         let aes_key: [u8; 16] = rand::random();
 
         let mut buffer = [0; 16];
@@ -184,9 +184,9 @@ impl Proxy {
             return Err(anyhow::Error::msg("bad mojang auth"));
         }
 
-        let response = EncResponse {
-            shared_secret: Proxy::rsa_crypt(&packet.public_key, &aes_key)?,
-            verify_token: Proxy::rsa_crypt(&packet.public_key, &packet.verify_token)?,
+        let response = pro::v1_18_1::login::EncryptionBeginRequest {
+            shared_secret: &Proxy::rsa_crypt(&packet.public_key, &aes_key)?,
+            verify_token: &Proxy::rsa_crypt(&packet.public_key, &packet.verify_token)?,
         };
         let mut buf = Proxy::serialize_enc_response(response)?;
         self.server.write(&mut buf);
@@ -201,9 +201,9 @@ impl Proxy {
 
     fn on_start(&mut self, direction: PacketDirection) -> Result<bool> {
         let session = if direction == PacketDirection::ClientToServer {
-            &mut self.client
+            &self.client
         } else {
-            &mut self.server
+            &self.server
         };
         if let Some((packet, size)) = protocol::deserialize_with_header(
             direction,
@@ -212,26 +212,26 @@ impl Proxy {
             self.compression,
         )? {
             println!("{:?}", packet);
-            session.read_buf.drain(..size);
+            // session.read_buf.drain(..size);
             match packet {
-                Packet::Handshake(x) => {
-                    if *x.next_state == 1 {
+                Packet::SetProtocolRequest(x) => {
+                    if x.next_state == 1 {
                         self.start_done = true;
                     } else {
-                        assert_eq!(*x.next_state, 2);
+                        assert_eq!(x.next_state, 2);
                         self.state = ConnectionState::Login;
                     }
                 }
-                Packet::LoginStart(_) => {}
-                Packet::LoginSuccess(_) => {
+                Packet::LoginStartRequest(_) => {}
+                Packet::SuccessResponse(_) => {
                     self.start_done = true;
                     self.state = ConnectionState::Play;
                 }
-                Packet::SetCompression(x) => {
-                    let v = x.value.get_signed();
+                Packet::CompressResponse(x) => {
+                    let v = x.threshold;
                     self.compression = v >= 0;
                 }
-                Packet::EncRequest(x) => {
+                Packet::EncryptionBeginResponse(x) => {
                     self.enc_request(x)?;
                 }
                 _ => {}
