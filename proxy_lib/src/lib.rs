@@ -3,6 +3,7 @@ pub mod events;
 mod game;
 mod protocol;
 mod varint;
+mod pro;
 
 use crate::events::EventSubscriber;
 use crate::protocol::{ConnectionState, EncRequest};
@@ -339,12 +340,11 @@ pub fn do_things(
     auth_data: AuthData,
     handler: Box<dyn EventSubscriber + Sync>,
 ) -> Result<()> {
-    let incoming = TcpListener::bind("0.0.0.0:25566")?;
+    // let incoming = TcpListener::bind("0.0.0.0:25566")?;
+    //
+    // let (client, _) = incoming.accept()?;
+    // let server = TcpStream::connect(server_address)?;
 
-    let (client, _) = incoming.accept()?;
-    let server = TcpStream::connect(server_address)?;
-
-    println!("{:?}", run(client, server, auth_data));
-    // println!("{:?}", on_connected(client, server, handler));
+    // println!("{:?}", run(client, server, auth_data));
     Ok(())
 }
