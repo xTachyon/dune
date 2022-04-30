@@ -1,19 +1,17 @@
-mod de;
 pub mod events;
 mod game;
 mod protocol;
-mod varint;
 
-use crate::de::Reader;
 use crate::events::EventSubscriber;
 use crate::protocol::v1_18_1::login::EncryptionBeginRequest;
 use crate::protocol::{ConnectionState, Packet, PacketDirection};
-use crate::varint::write_varint;
 use anyhow::Result;
 use byteorder::WriteBytesExt;
 use cfb8::cipher::AsyncStreamCipher;
 use cfb8::cipher::NewCipher;
 use polling::{Event, Poller};
+use protocol::de::Reader;
+use protocol::varint::write_varint;
 use rand::RngCore;
 use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};

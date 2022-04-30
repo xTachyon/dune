@@ -1,9 +1,9 @@
 #![allow(unused_imports)]
 #![allow(unused_mut)]
 pub mod handshaking {
-    use crate::de::MinecraftDeserialize;
-    use crate::de::Reader;
-    use crate::varint::read_varint;
+    use crate::protocol::de::MinecraftDeserialize;
+    use crate::protocol::de::Reader;
+    use crate::protocol::varint::read_varint;
     use anyhow::Result;
 
     #[derive(Debug)]
@@ -44,9 +44,9 @@ pub mod handshaking {
     }
 }
 pub mod status {
-    use crate::de::MinecraftDeserialize;
-    use crate::de::Reader;
-    use crate::varint::read_varint;
+    use crate::protocol::de::MinecraftDeserialize;
+    use crate::protocol::de::Reader;
+    use crate::protocol::varint::read_varint;
     use anyhow::Result;
 
     #[derive(Debug)]
@@ -90,9 +90,9 @@ pub mod status {
     }
 }
 pub mod login {
-    use crate::de::MinecraftDeserialize;
-    use crate::de::Reader;
-    use crate::varint::read_varint;
+    use crate::protocol::de::MinecraftDeserialize;
+    use crate::protocol::de::Reader;
+    use crate::protocol::varint::read_varint;
     use anyhow::Result;
 
     #[derive(Debug)]
@@ -220,9 +220,9 @@ pub mod login {
     }
 }
 pub mod play {
-    use crate::de::MinecraftDeserialize;
-    use crate::de::Reader;
-    use crate::varint::read_varint;
+    use crate::protocol::de::MinecraftDeserialize;
+    use crate::protocol::de::Reader;
+    use crate::protocol::varint::read_varint;
     use anyhow::Result;
 
     #[derive(Debug)]
@@ -240,7 +240,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct QueryBlockNbtRequest {
         pub transaction_id: i32,
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
     }
     pub(super) fn packet_query_block_nbt_request(
         mut reader: &mut Reader,
@@ -343,7 +343,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateCommandBlockRequest<'p> {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub command: &'p str,
         pub mode: i32,
         pub flags: u8,
@@ -388,7 +388,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateStructureBlockRequest<'p> {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub action: i32,
         pub mode: i32,
         pub name: &'p str,
@@ -584,7 +584,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct GenerateStructureRequest {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub levels: i32,
         pub keep_jigsaws: bool,
     }
@@ -772,7 +772,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct BlockDigRequest {
         pub status: i8,
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub face: i8,
     }
     pub(super) fn packet_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
@@ -892,7 +892,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateJigsawBlockRequest<'p> {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub name: &'p str,
         pub target: &'p str,
         pub pool: &'p str,
@@ -926,7 +926,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateSignRequest<'p> {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub text1: &'p str,
         pub text2: &'p str,
         pub text3: &'p str,
@@ -979,7 +979,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct BlockPlaceRequest {
         pub hand: i32,
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub direction: i32,
         pub cursor_x: f32,
         pub cursor_y: f32,
@@ -1159,7 +1159,7 @@ pub mod play {
         pub entity_id: i32,
         pub entity_uuid: u128,
         pub title: i32,
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub direction: u8,
     }
     pub(super) fn packet_spawn_entity_painting_response(
@@ -1246,7 +1246,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct BlockBreakAnimationResponse {
         pub entity_id: i32,
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub destroy_stage: i8,
     }
     pub(super) fn packet_block_break_animation_response(
@@ -1273,7 +1273,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct BlockActionResponse {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub byte1: u8,
         pub byte2: u8,
         pub block_id: i32,
@@ -1296,7 +1296,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct BlockChangeResponse {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub type_: i32,
     }
     pub(super) fn packet_block_change_response(
@@ -1623,7 +1623,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct WorldEventResponse {
         pub effect_id: i32,
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub data: i32,
         pub global: bool,
     }
@@ -1798,7 +1798,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct OpenSignEntityResponse {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
     }
     pub(super) fn packet_open_sign_entity_response(
         mut reader: &mut Reader,
@@ -2183,7 +2183,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct SpawnPositionResponse {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub angle: f32,
     }
     pub(super) fn packet_spawn_position_response(
@@ -2399,7 +2399,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct AcknowledgePlayerDiggingResponse {
-        pub location: crate::de::Position,
+        pub location: crate::protocol::de::Position,
         pub block: i32,
         pub status: i32,
         pub successful: bool,
@@ -2627,7 +2627,7 @@ pub mod play {
         Ok(result)
     }
 }
-use crate::de::Reader;
+use crate::protocol::de::Reader;
 use crate::protocol::ConnectionState as S;
 use crate::protocol::PacketDirection as D;
 use anyhow::{anyhow, Result};

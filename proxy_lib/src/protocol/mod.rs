@@ -1,8 +1,10 @@
+pub mod de;
 pub mod v1_18_1;
+pub mod varint;
 
-use crate::de::{MinecraftDeserialize, Reader};
-use crate::varint::{read_varint, VarInt};
+use crate::protocol::varint::{read_varint, read_varint_with_size};
 use anyhow::Result;
+use de::Reader;
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
 use std::io::Read;
@@ -34,7 +36,7 @@ pub fn deserialize_with_header<'r>(
     if !has_enough_bytes(reader.get()) {
         return Ok(None);
     }
-    let length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
+    let (length, length_size) = read_varint_with_size(&mut reader)?;
 
     let packet = if compression {
         deserialize_compressed(direction, state, reader, tmp)
@@ -42,7 +44,7 @@ pub fn deserialize_with_header<'r>(
         deserialize_uncompressed(direction, state, reader)
     }?;
     let result = match packet {
-        Some(packet) => Some((packet, length.get() as usize + length.size())),
+        Some(packet) => Some((packet, length as usize + length_size)),
         None => None,
     };
     Ok(result)
@@ -78,8 +80,8 @@ fn deserialize_uncompressed<'r>(
 }
 
 fn has_enough_bytes(bytes: &[u8]) -> bool {
-    match VarInt::deserialize(bytes) {
-        Some(x) => bytes.len() >= x.get() as usize + x.size(),
-        None => false,
+    match read_varint_with_size(bytes) {
+        Ok((value, size)) => size + value as usize <= bytes.len(),
+        Err(_) => false,
     }
 }

@@ -1,5 +1,5 @@
 use crate::game::Gamemode;
-use crate::varint::VarInt;
+use crate::protocol::varint::read_varint;
 use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;
 use std::convert::TryFrom;
@@ -51,16 +51,16 @@ impl MinecraftDeserialize for bool {
     }
 }
 
-impl MinecraftDeserialize for VarInt {
-    fn deserialize<R: Read>(reader: R) -> Result<Self> {
-        VarInt::deserialize_read(reader)
-    }
-}
+// impl MinecraftDeserialize for VarInt {
+//     fn deserialize<R: Read>(reader: R) -> Result<Self> {
+//         VarInt::deserialize_read(reader)
+//     }
+// }
 
 impl MinecraftDeserialize for String {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
-        let size = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
-        let mut buffer = vec![0; size.get() as usize];
+        let size = read_varint(&mut reader)?;
+        let mut buffer = vec![0; size as usize];
         reader.read_exact(&mut buffer)?;
         Ok(String::from_utf8(buffer)?)
     }
@@ -68,8 +68,8 @@ impl MinecraftDeserialize for String {
 
 impl MinecraftDeserialize for Vec<u8> {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
-        let size = <VarInt as MinecraftDeserialize>::deserialize(&mut reader)?;
-        let mut buffer = vec![0; size.get() as usize];
+        let size = read_varint(&mut reader)?;
+        let mut buffer = vec![0; size as usize];
         reader.read_exact(&mut buffer)?;
         Ok(buffer)
     }
@@ -125,18 +125,18 @@ where
     }
 }
 
-macro_rules! impl_forward {
-    ($enu:ident, $type:ty) => {
+macro_rules! impl_with_varint {
+    ($enu:ident) => {
         impl MinecraftDeserialize for $enu {
             fn deserialize<R: Read>(reader: R) -> Result<Self> {
-                let value = <$type as MinecraftDeserialize>::deserialize(reader)?;
-                Ok($enu::try_from(value.get() as u8)?)
+                let value = read_varint(reader)?;
+                Ok($enu::try_from(value as u8)?)
             }
         }
     };
 }
 
-impl_forward!(Gamemode, VarInt);
+impl_with_varint!(Gamemode);
 
 pub struct Reader<'r> {
     cursor: Cursor<&'r [u8]>,
@@ -150,10 +150,10 @@ impl<'r> Reader<'r> {
     }
 
     pub fn read_range(&mut self) -> Result<Range<usize>> {
-        let size = *VarInt::deserialize_read(&mut self.cursor)? as usize;
-        let start = self.cursor.position() as usize;
+        let size = read_varint(&mut self.cursor)? as usize;
+        let start = self.offset();
         let end = start + size;
-        let vec_len = self.cursor.get_ref().len();
+        let vec_len = self.get().len();
 
         if end <= vec_len {
             self.cursor.set_position(end as u64);
@@ -164,13 +164,13 @@ impl<'r> Reader<'r> {
     }
 
     pub fn get_str_from(&self, r: Range<usize>) -> Result<&str> {
-        let bytes = &self.cursor.get_ref()[r];
+        let bytes = &self.get()[r];
         let result = std::str::from_utf8(bytes)?;
         Ok(result)
     }
 
     pub fn get_buf_from(&self, r: Range<usize>) -> Result<&[u8]> {
-        let bytes = &self.cursor.get_ref()[r];
+        let bytes = &self.get()[r];
         Ok(bytes)
     }
 
@@ -178,7 +178,7 @@ impl<'r> Reader<'r> {
         self.cursor.get_ref()
     }
 
-    pub fn offset(&self) -> usize {
+    fn offset(&self) -> usize {
         self.cursor.position() as usize
     }
 }
