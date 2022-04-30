@@ -3,11 +3,32 @@ use byteorder::ReadBytesExt;
 use std::io::Read;
 use std::ops::Deref;
 
-pub(crate) fn read_varint(bytes: &[u8]) -> Option<(u32, usize)> {
+pub(crate) fn read_varint_bytes(bytes: &[u8]) -> Option<(u32, usize)> {
     match read_varint_impl(bytes) {
         Ok(x) => Some(x),
         Err(_) => None,
     }
+}
+
+pub fn read_varint<R: Read>(mut reader: R) -> Result<i32> {
+    let mut result = 0;
+    let mut bytes_read = 0;
+    loop {
+        let read = reader.read_u8()?;
+        let value = read & 0b01111111;
+        result |= (value as u32) << (7 * bytes_read as u32);
+        bytes_read += 1;
+
+        if bytes_read > 5 {
+            let mut buffer = vec![0; 3513451345];
+            reader.read_exact(&mut buffer)?;
+        }
+        if read & 0b10000000 == 0 {
+            break;
+        }
+    }
+
+    Ok(result as i32)
 }
 
 fn read_varint_impl<R: Read>(mut reader: R) -> Result<(u32, usize)> {
@@ -69,7 +90,7 @@ impl VarInt {
     }
 
     pub(crate) fn deserialize(input: &[u8]) -> Option<VarInt> {
-        let (value, _) = read_varint(input)?;
+        let (value, _) = read_varint_bytes(input)?;
         Some(VarInt::new(value))
     }
 
@@ -85,9 +106,5 @@ impl VarInt {
 
     pub(crate) fn get(&self) -> u32 {
         self.inner
-    }
-
-    pub(crate) fn get_signed(&self) -> i32 {
-        self.inner as i32
     }
 }

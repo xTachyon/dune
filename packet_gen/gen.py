@@ -193,7 +193,7 @@ class Parser:
 
 class Generator:
     def __init__(self):
-        self.out = ""
+        self.out = "#![allow(unused_imports)]"
 
     def gen_packet(self, p):
         needs_lifetime = False
@@ -226,6 +226,8 @@ class Generator:
             self.out += f"let {i.name} = "
             if i.ty == Ty.STRING or i.ty == Ty.BUFFER:
                 self.out += "reader.read_range()?;"
+            elif i.ty == Ty.VARINT:
+                self.out += "read_varint(&mut reader.cursor)?;"
             else:
                 self.out += "MinecraftDeserialize::deserialize(&mut reader.cursor)?;"
 
@@ -255,6 +257,7 @@ pub mod {state.state.value} {{
 use anyhow::Result;
 use crate::de::MinecraftDeserialize;
 use crate::de::Reader;
+use crate::varint::read_varint;
 
 '''
             for direction in state.directions:

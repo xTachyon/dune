@@ -8,8 +8,8 @@ use std::ops::Range;
 
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 macro_rules! impl_for_numbers {
@@ -77,8 +77,8 @@ impl MinecraftDeserialize for Vec<u8> {
 
 impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
     fn deserialize<R: Read>(mut reader: R) -> Result<Option<T>>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         let b = MinecraftDeserialize::deserialize(&mut reader)?;
         let result = if b {
@@ -108,14 +108,14 @@ impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
 //impl_for_tuples!(A, B);
 
 impl<A, B, C> MinecraftDeserialize for (A, B, C)
-    where
-        A: MinecraftDeserialize,
-        B: MinecraftDeserialize,
-        C: MinecraftDeserialize,
+where
+    A: MinecraftDeserialize,
+    B: MinecraftDeserialize,
+    C: MinecraftDeserialize,
 {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         let a = MinecraftDeserialize::deserialize(&mut reader)?;
         let b = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -167,6 +167,14 @@ impl<'r> Reader<'r> {
         let bytes = &self.cursor.get_ref()[r];
         Ok(bytes)
     }
+
+    pub fn get(&self) -> &[u8] {
+        self.cursor.get_ref()
+    }
+
+    pub fn offset(&self) -> usize {
+        self.cursor.position() as usize
+    }
 }
 
 #[derive(Debug)]
@@ -178,8 +186,8 @@ pub struct Position {
 
 impl MinecraftDeserialize for Position {
     fn deserialize<R: Read>(mut reader: R) -> Result<Position>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         let val: u64 = MinecraftDeserialize::deserialize(&mut reader)?;
         let x = (val >> 38) as i32;
