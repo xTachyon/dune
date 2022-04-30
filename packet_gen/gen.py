@@ -193,7 +193,7 @@ class Parser:
 
 class Generator:
     def __init__(self):
-        self.out = "#![allow(unused_imports)]"
+        self.out = "#![allow(unused_imports)] #![allow(unused_mut)]"
 
     def gen_packet(self, p):
         needs_lifetime = False
@@ -220,16 +220,16 @@ class Generator:
 
         self.out += "}"
         underscore = "_" if len(p.fields) == 0 else ""
-        self.out += f'''pub(super) fn packet_{pascal_to_snake(p.name)}{lifetime}({underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
+        self.out += f'''pub(super) fn packet_{pascal_to_snake(p.name)}{lifetime}(mut {underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
         -> Result<{p.name}{lifetime}> {{ '''
         for i in p.fields:
             self.out += f"let {i.name} = "
             if i.ty == Ty.STRING or i.ty == Ty.BUFFER:
                 self.out += "reader.read_range()?;"
             elif i.ty == Ty.VARINT:
-                self.out += "read_varint(&mut reader.cursor)?;"
+                self.out += "read_varint(&mut reader)?;"
             else:
-                self.out += "MinecraftDeserialize::deserialize(&mut reader.cursor)?;"
+                self.out += "MinecraftDeserialize::deserialize(&mut reader)?;"
 
         for i in p.fields:
             if i.ty == Ty.STRING:

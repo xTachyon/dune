@@ -5,7 +5,7 @@ use crate::varint::{read_varint, VarInt};
 use anyhow::Result;
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
-use std::io::{Cursor, Read};
+use std::io::Read;
 pub use v1_18_1::de_packets;
 pub use v1_18_1::Packet;
 
@@ -27,14 +27,14 @@ pub enum PacketDirection {
 pub fn deserialize_with_header<'r>(
     direction: PacketDirection,
     state: ConnectionState,
-    reader: &'r mut Reader<'r>,
+    mut reader: &'r mut Reader<'r>,
     compression: bool,
     tmp: &'r mut Vec<u8>,
 ) -> Result<Option<(Packet<'r>, usize)>> {
     if !has_enough_bytes(reader.get()) {
         return Ok(None);
     }
-    let length: VarInt = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    let length: VarInt = MinecraftDeserialize::deserialize(&mut reader)?;
 
     let packet = if compression {
         deserialize_compressed(direction, state, reader, tmp)
@@ -51,17 +51,15 @@ pub fn deserialize_with_header<'r>(
 fn deserialize_compressed<'r>(
     direction: PacketDirection,
     state: ConnectionState,
-    reader: &'r mut Reader<'r>,
+    mut reader: &'r mut Reader<'r>,
     tmp: &'r mut Vec<u8>,
 ) -> Result<Option<Packet<'r>>> {
-    let data_length = read_varint(&mut reader.cursor)?;
+    let data_length = read_varint(&mut reader)?;
 
     if data_length != 0 {
-        let mut decompress = ZlibDecoder::new(&mut reader.cursor);
+        let mut decompress = ZlibDecoder::new(&mut reader);
         decompress.read_to_end(tmp)?;
-        *reader = Reader {
-            cursor: Cursor::new(tmp),
-        };
+        *reader = Reader::new(tmp);
     }
 
     deserialize_uncompressed(direction, state, reader)
@@ -70,9 +68,9 @@ fn deserialize_compressed<'r>(
 fn deserialize_uncompressed<'r>(
     direction: PacketDirection,
     state: ConnectionState,
-    reader: &'r mut Reader<'r>,
+    mut reader: &'r mut Reader<'r>,
 ) -> Result<Option<Packet<'r>>> {
-    let id = read_varint(&mut reader.cursor)?;
+    let id = read_varint(&mut reader)?;
     // println!("state={:?}, id={}", state, *id);
 
     let packet = de_packets(state, direction, id as u32, reader)?;

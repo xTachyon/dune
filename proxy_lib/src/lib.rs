@@ -144,9 +144,7 @@ impl Proxy {
         match direction {
             PacketDirection::ClientToServer => {
                 let session = &mut self.client;
-                let mut reader = Reader {
-                    cursor: Cursor::new(&session.read_buf),
-                };
+                let mut reader = Reader::new(&session.read_buf);
                 let p = protocol::deserialize_with_header(
                     direction,
                     self.state,
@@ -176,9 +174,7 @@ impl Proxy {
             }
             PacketDirection::ServerToClient => {
                 let session = &mut self.server;
-                let mut reader = Reader {
-                    cursor: Cursor::new(&session.read_buf),
-                };
+                let mut reader = Reader::new(&session.read_buf);
                 let p = protocol::deserialize_with_header(
                     direction,
                     self.state,

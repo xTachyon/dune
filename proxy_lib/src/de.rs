@@ -139,10 +139,16 @@ macro_rules! impl_forward {
 impl_forward!(Gamemode, VarInt);
 
 pub struct Reader<'r> {
-    pub cursor: Cursor<&'r [u8]>,
+    cursor: Cursor<&'r [u8]>,
 }
 
 impl<'r> Reader<'r> {
+    pub fn new(buffer: &[u8]) -> Reader {
+        Reader {
+            cursor: Cursor::new(buffer),
+        }
+    }
+
     pub fn read_range(&mut self) -> Result<Range<usize>> {
         let size = *VarInt::deserialize_read(&mut self.cursor)? as usize;
         let start = self.cursor.position() as usize;
@@ -174,6 +180,12 @@ impl<'r> Reader<'r> {
 
     pub fn offset(&self) -> usize {
         self.cursor.position() as usize
+    }
+}
+
+impl<'r> Read for &mut Reader<'r> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.cursor.read(buf)
     }
 }
 

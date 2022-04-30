@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(unused_mut)]
 pub mod handshaking {
     use crate::de::MinecraftDeserialize;
     use crate::de::Reader;
@@ -13,12 +14,12 @@ pub mod handshaking {
         pub next_state: i32,
     }
     pub(super) fn packet_set_protocol_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<SetProtocolRequest<'p>> {
-        let protocol_version = read_varint(&mut reader.cursor)?;
+        let protocol_version = read_varint(&mut reader)?;
         let server_host = reader.read_range()?;
-        let server_port = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let next_state = read_varint(&mut reader.cursor)?;
+        let server_port = MinecraftDeserialize::deserialize(&mut reader)?;
+        let next_state = read_varint(&mut reader)?;
         let server_host = reader.get_str_from(server_host)?;
 
         let result = SetProtocolRequest {
@@ -34,9 +35,9 @@ pub mod handshaking {
         pub payload: u8,
     }
     pub(super) fn packet_legacy_server_list_ping_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<LegacyServerListPingRequest> {
-        let payload = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let payload = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = LegacyServerListPingRequest { payload };
         Ok(result)
@@ -50,7 +51,7 @@ pub mod status {
 
     #[derive(Debug)]
     pub struct PingStartRequest {}
-    pub(super) fn packet_ping_start_request(_reader: &mut Reader) -> Result<PingStartRequest> {
+    pub(super) fn packet_ping_start_request(mut _reader: &mut Reader) -> Result<PingStartRequest> {
         let result = PingStartRequest {};
         Ok(result)
     }
@@ -58,8 +59,8 @@ pub mod status {
     pub struct PingRequest {
         pub time: i64,
     }
-    pub(super) fn packet_ping_request(reader: &mut Reader) -> Result<PingRequest> {
-        let time = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_ping_request(mut reader: &mut Reader) -> Result<PingRequest> {
+        let time = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PingRequest { time };
         Ok(result)
@@ -69,7 +70,7 @@ pub mod status {
         pub response: &'p str,
     }
     pub(super) fn packet_server_info_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<ServerInfoResponse<'p>> {
         let response = reader.read_range()?;
         let response = reader.get_str_from(response)?;
@@ -81,8 +82,8 @@ pub mod status {
     pub struct PingResponse {
         pub time: i64,
     }
-    pub(super) fn packet_ping_response(reader: &mut Reader) -> Result<PingResponse> {
-        let time = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_ping_response(mut reader: &mut Reader) -> Result<PingResponse> {
+        let time = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PingResponse { time };
         Ok(result)
@@ -99,7 +100,7 @@ pub mod login {
         pub username: &'p str,
     }
     pub(super) fn packet_login_start_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<LoginStartRequest<'p>> {
         let username = reader.read_range()?;
         let username = reader.get_str_from(username)?;
@@ -113,7 +114,7 @@ pub mod login {
         pub verify_token: &'p [u8],
     }
     pub(super) fn packet_encryption_begin_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<EncryptionBeginRequest<'p>> {
         let shared_secret = reader.read_range()?;
         let verify_token = reader.read_range()?;
@@ -130,8 +131,10 @@ pub mod login {
     pub struct LoginPluginResponse {
         pub message_id: i32,
     }
-    pub(super) fn packet_login_plugin_response(reader: &mut Reader) -> Result<LoginPluginResponse> {
-        let message_id = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_login_plugin_response(
+        mut reader: &mut Reader,
+    ) -> Result<LoginPluginResponse> {
+        let message_id = read_varint(&mut reader)?;
 
         let result = LoginPluginResponse { message_id };
         Ok(result)
@@ -141,7 +144,7 @@ pub mod login {
         pub reason: &'p str,
     }
     pub(super) fn packet_disconnect_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<DisconnectResponse<'p>> {
         let reason = reader.read_range()?;
         let reason = reader.get_str_from(reason)?;
@@ -156,7 +159,7 @@ pub mod login {
         pub verify_token: &'p [u8],
     }
     pub(super) fn packet_encryption_begin_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<EncryptionBeginResponse<'p>> {
         let server_id = reader.read_range()?;
         let public_key = reader.read_range()?;
@@ -178,9 +181,9 @@ pub mod login {
         pub username: &'p str,
     }
     pub(super) fn packet_success_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<SuccessResponse<'p>> {
-        let uuid = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let uuid = MinecraftDeserialize::deserialize(&mut reader)?;
         let username = reader.read_range()?;
         let username = reader.get_str_from(username)?;
 
@@ -191,8 +194,8 @@ pub mod login {
     pub struct CompressResponse {
         pub threshold: i32,
     }
-    pub(super) fn packet_compress_response(reader: &mut Reader) -> Result<CompressResponse> {
-        let threshold = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_compress_response(mut reader: &mut Reader) -> Result<CompressResponse> {
+        let threshold = read_varint(&mut reader)?;
 
         let result = CompressResponse { threshold };
         Ok(result)
@@ -203,9 +206,9 @@ pub mod login {
         pub channel: &'p str,
     }
     pub(super) fn packet_login_plugin_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<LoginPluginRequest<'p>> {
-        let message_id = read_varint(&mut reader.cursor)?;
+        let message_id = read_varint(&mut reader)?;
         let channel = reader.read_range()?;
         let channel = reader.get_str_from(channel)?;
 
@@ -227,9 +230,9 @@ pub mod play {
         pub teleport_id: i32,
     }
     pub(super) fn packet_teleport_confirm_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<TeleportConfirmRequest> {
-        let teleport_id = read_varint(&mut reader.cursor)?;
+        let teleport_id = read_varint(&mut reader)?;
 
         let result = TeleportConfirmRequest { teleport_id };
         Ok(result)
@@ -240,10 +243,10 @@ pub mod play {
         pub location: crate::de::Position,
     }
     pub(super) fn packet_query_block_nbt_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<QueryBlockNbtRequest> {
-        let transaction_id = read_varint(&mut reader.cursor)?;
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let transaction_id = read_varint(&mut reader)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = QueryBlockNbtRequest {
             transaction_id,
@@ -256,16 +259,16 @@ pub mod play {
         pub new_difficulty: u8,
     }
     pub(super) fn packet_set_difficulty_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SetDifficultyRequest> {
-        let new_difficulty = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let new_difficulty = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SetDifficultyRequest { new_difficulty };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct EditBookRequest {}
-    pub(super) fn packet_edit_book_request(_reader: &mut Reader) -> Result<EditBookRequest> {
+    pub(super) fn packet_edit_book_request(mut _reader: &mut Reader) -> Result<EditBookRequest> {
         let result = EditBookRequest {};
         Ok(result)
     }
@@ -275,10 +278,10 @@ pub mod play {
         pub entity_id: i32,
     }
     pub(super) fn packet_query_entity_nbt_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<QueryEntityNbtRequest> {
-        let transaction_id = read_varint(&mut reader.cursor)?;
-        let entity_id = read_varint(&mut reader.cursor)?;
+        let transaction_id = read_varint(&mut reader)?;
+        let entity_id = read_varint(&mut reader)?;
 
         let result = QueryEntityNbtRequest {
             transaction_id,
@@ -290,8 +293,8 @@ pub mod play {
     pub struct PickItemRequest {
         pub slot: i32,
     }
-    pub(super) fn packet_pick_item_request(reader: &mut Reader) -> Result<PickItemRequest> {
-        let slot = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_pick_item_request(mut reader: &mut Reader) -> Result<PickItemRequest> {
+        let slot = read_varint(&mut reader)?;
 
         let result = PickItemRequest { slot };
         Ok(result)
@@ -301,7 +304,7 @@ pub mod play {
         pub name: &'p str,
     }
     pub(super) fn packet_name_item_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<NameItemRequest<'p>> {
         let name = reader.read_range()?;
         let name = reader.get_str_from(name)?;
@@ -313,8 +316,10 @@ pub mod play {
     pub struct SelectTradeRequest {
         pub slot: i32,
     }
-    pub(super) fn packet_select_trade_request(reader: &mut Reader) -> Result<SelectTradeRequest> {
-        let slot = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_select_trade_request(
+        mut reader: &mut Reader,
+    ) -> Result<SelectTradeRequest> {
+        let slot = read_varint(&mut reader)?;
 
         let result = SelectTradeRequest { slot };
         Ok(result)
@@ -325,10 +330,10 @@ pub mod play {
         pub secondary_effect: i32,
     }
     pub(super) fn packet_set_beacon_effect_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SetBeaconEffectRequest> {
-        let primary_effect = read_varint(&mut reader.cursor)?;
-        let secondary_effect = read_varint(&mut reader.cursor)?;
+        let primary_effect = read_varint(&mut reader)?;
+        let secondary_effect = read_varint(&mut reader)?;
 
         let result = SetBeaconEffectRequest {
             primary_effect,
@@ -344,12 +349,12 @@ pub mod play {
         pub flags: u8,
     }
     pub(super) fn packet_update_command_block_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<UpdateCommandBlockRequest<'p>> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let command = reader.read_range()?;
-        let mode = read_varint(&mut reader.cursor)?;
-        let flags = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let mode = read_varint(&mut reader)?;
+        let flags = MinecraftDeserialize::deserialize(&mut reader)?;
         let command = reader.get_str_from(command)?;
 
         let result = UpdateCommandBlockRequest {
@@ -367,11 +372,11 @@ pub mod play {
         pub track_output: bool,
     }
     pub(super) fn packet_update_command_block_minecart_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<UpdateCommandBlockMinecartRequest<'p>> {
-        let entity_id = read_varint(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
         let command = reader.read_range()?;
-        let track_output = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let track_output = MinecraftDeserialize::deserialize(&mut reader)?;
         let command = reader.get_str_from(command)?;
 
         let result = UpdateCommandBlockMinecartRequest {
@@ -401,24 +406,24 @@ pub mod play {
         pub flags: u8,
     }
     pub(super) fn packet_update_structure_block_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<UpdateStructureBlockRequest<'p>> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let action = read_varint(&mut reader.cursor)?;
-        let mode = read_varint(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let action = read_varint(&mut reader)?;
+        let mode = read_varint(&mut reader)?;
         let name = reader.read_range()?;
-        let offset_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let offset_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let offset_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let size_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let size_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let size_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let mirror = read_varint(&mut reader.cursor)?;
-        let rotation = read_varint(&mut reader.cursor)?;
+        let offset_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let offset_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let offset_z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let size_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let size_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let size_z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let mirror = read_varint(&mut reader)?;
+        let rotation = read_varint(&mut reader)?;
         let metadata = reader.read_range()?;
-        let integrity = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let seed = read_varint(&mut reader.cursor)?;
-        let flags = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let integrity = MinecraftDeserialize::deserialize(&mut reader)?;
+        let seed = read_varint(&mut reader)?;
+        let flags = MinecraftDeserialize::deserialize(&mut reader)?;
         let name = reader.get_str_from(name)?;
         let metadata = reader.get_str_from(metadata)?;
 
@@ -448,9 +453,9 @@ pub mod play {
         pub text: &'p str,
     }
     pub(super) fn packet_tab_complete_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<TabCompleteRequest<'p>> {
-        let transaction_id = read_varint(&mut reader.cursor)?;
+        let transaction_id = read_varint(&mut reader)?;
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
 
@@ -464,7 +469,9 @@ pub mod play {
     pub struct ChatRequest<'p> {
         pub message: &'p str,
     }
-    pub(super) fn packet_chat_request<'p>(reader: &'p mut Reader<'p>) -> Result<ChatRequest<'p>> {
+    pub(super) fn packet_chat_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ChatRequest<'p>> {
         let message = reader.read_range()?;
         let message = reader.get_str_from(message)?;
 
@@ -476,9 +483,9 @@ pub mod play {
         pub action_id: i32,
     }
     pub(super) fn packet_client_command_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<ClientCommandRequest> {
-        let action_id = read_varint(&mut reader.cursor)?;
+        let action_id = read_varint(&mut reader)?;
 
         let result = ClientCommandRequest { action_id };
         Ok(result)
@@ -495,16 +502,16 @@ pub mod play {
         pub enable_server_listing: bool,
     }
     pub(super) fn packet_settings_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<SettingsRequest<'p>> {
         let locale = reader.read_range()?;
-        let view_distance = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let chat_flags = read_varint(&mut reader.cursor)?;
-        let chat_colors = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let skin_parts = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let main_hand = read_varint(&mut reader.cursor)?;
-        let enable_text_filtering = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let enable_server_listing = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let view_distance = MinecraftDeserialize::deserialize(&mut reader)?;
+        let chat_flags = read_varint(&mut reader)?;
+        let chat_colors = MinecraftDeserialize::deserialize(&mut reader)?;
+        let skin_parts = MinecraftDeserialize::deserialize(&mut reader)?;
+        let main_hand = read_varint(&mut reader)?;
+        let enable_text_filtering = MinecraftDeserialize::deserialize(&mut reader)?;
+        let enable_server_listing = MinecraftDeserialize::deserialize(&mut reader)?;
         let locale = reader.get_str_from(locale)?;
 
         let result = SettingsRequest {
@@ -524,9 +531,11 @@ pub mod play {
         pub window_id: i8,
         pub enchantment: i8,
     }
-    pub(super) fn packet_enchant_item_request(reader: &mut Reader) -> Result<EnchantItemRequest> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let enchantment = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_enchant_item_request(
+        mut reader: &mut Reader,
+    ) -> Result<EnchantItemRequest> {
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let enchantment = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EnchantItemRequest {
             window_id,
@@ -536,7 +545,9 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct WindowClickRequest {}
-    pub(super) fn packet_window_click_request(_reader: &mut Reader) -> Result<WindowClickRequest> {
+    pub(super) fn packet_window_click_request(
+        mut _reader: &mut Reader,
+    ) -> Result<WindowClickRequest> {
         let result = WindowClickRequest {};
         Ok(result)
     }
@@ -544,8 +555,10 @@ pub mod play {
     pub struct CloseWindowRequest {
         pub window_id: u8,
     }
-    pub(super) fn packet_close_window_request(reader: &mut Reader) -> Result<CloseWindowRequest> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_close_window_request(
+        mut reader: &mut Reader,
+    ) -> Result<CloseWindowRequest> {
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = CloseWindowRequest { window_id };
         Ok(result)
@@ -555,7 +568,7 @@ pub mod play {
         pub channel: &'p str,
     }
     pub(super) fn packet_custom_payload_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<CustomPayloadRequest<'p>> {
         let channel = reader.read_range()?;
         let channel = reader.get_str_from(channel)?;
@@ -565,7 +578,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UseEntityRequest {}
-    pub(super) fn packet_use_entity_request(_reader: &mut Reader) -> Result<UseEntityRequest> {
+    pub(super) fn packet_use_entity_request(mut _reader: &mut Reader) -> Result<UseEntityRequest> {
         let result = UseEntityRequest {};
         Ok(result)
     }
@@ -576,11 +589,11 @@ pub mod play {
         pub keep_jigsaws: bool,
     }
     pub(super) fn packet_generate_structure_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<GenerateStructureRequest> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let levels = read_varint(&mut reader.cursor)?;
-        let keep_jigsaws = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let levels = read_varint(&mut reader)?;
+        let keep_jigsaws = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = GenerateStructureRequest {
             location,
@@ -593,8 +606,8 @@ pub mod play {
     pub struct KeepAliveRequest {
         pub keep_alive_id: i64,
     }
-    pub(super) fn packet_keep_alive_request(reader: &mut Reader) -> Result<KeepAliveRequest> {
-        let keep_alive_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_keep_alive_request(mut reader: &mut Reader) -> Result<KeepAliveRequest> {
+        let keep_alive_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = KeepAliveRequest { keep_alive_id };
         Ok(result)
@@ -604,9 +617,9 @@ pub mod play {
         pub locked: bool,
     }
     pub(super) fn packet_lock_difficulty_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<LockDifficultyRequest> {
-        let locked = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let locked = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = LockDifficultyRequest { locked };
         Ok(result)
@@ -618,11 +631,11 @@ pub mod play {
         pub z: f64,
         pub on_ground: bool,
     }
-    pub(super) fn packet_position_request(reader: &mut Reader) -> Result<PositionRequest> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_position_request(mut reader: &mut Reader) -> Result<PositionRequest> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PositionRequest { x, y, z, on_ground };
         Ok(result)
@@ -636,13 +649,15 @@ pub mod play {
         pub pitch: f32,
         pub on_ground: bool,
     }
-    pub(super) fn packet_position_look_request(reader: &mut Reader) -> Result<PositionLookRequest> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_position_look_request(
+        mut reader: &mut Reader,
+    ) -> Result<PositionLookRequest> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PositionLookRequest {
             x,
@@ -660,10 +675,10 @@ pub mod play {
         pub pitch: f32,
         pub on_ground: bool,
     }
-    pub(super) fn packet_look_request(reader: &mut Reader) -> Result<LookRequest> {
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_look_request(mut reader: &mut Reader) -> Result<LookRequest> {
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = LookRequest {
             yaw,
@@ -676,8 +691,8 @@ pub mod play {
     pub struct FlyingRequest {
         pub on_ground: bool,
     }
-    pub(super) fn packet_flying_request(reader: &mut Reader) -> Result<FlyingRequest> {
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_flying_request(mut reader: &mut Reader) -> Result<FlyingRequest> {
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = FlyingRequest { on_ground };
         Ok(result)
@@ -690,12 +705,14 @@ pub mod play {
         pub yaw: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_vehicle_move_request(reader: &mut Reader) -> Result<VehicleMoveRequest> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_vehicle_move_request(
+        mut reader: &mut Reader,
+    ) -> Result<VehicleMoveRequest> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = VehicleMoveRequest {
             x,
@@ -711,9 +728,9 @@ pub mod play {
         pub left_paddle: bool,
         pub right_paddle: bool,
     }
-    pub(super) fn packet_steer_boat_request(reader: &mut Reader) -> Result<SteerBoatRequest> {
-        let left_paddle = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let right_paddle = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_steer_boat_request(mut reader: &mut Reader) -> Result<SteerBoatRequest> {
+        let left_paddle = MinecraftDeserialize::deserialize(&mut reader)?;
+        let right_paddle = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SteerBoatRequest {
             left_paddle,
@@ -728,11 +745,11 @@ pub mod play {
         pub make_all: bool,
     }
     pub(super) fn packet_craft_recipe_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<CraftRecipeRequest<'p>> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let recipe = reader.read_range()?;
-        let make_all = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let make_all = MinecraftDeserialize::deserialize(&mut reader)?;
         let recipe = reader.get_str_from(recipe)?;
 
         let result = CraftRecipeRequest {
@@ -746,8 +763,8 @@ pub mod play {
     pub struct AbilitiesRequest {
         pub flags: i8,
     }
-    pub(super) fn packet_abilities_request(reader: &mut Reader) -> Result<AbilitiesRequest> {
-        let flags = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_abilities_request(mut reader: &mut Reader) -> Result<AbilitiesRequest> {
+        let flags = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AbilitiesRequest { flags };
         Ok(result)
@@ -758,10 +775,10 @@ pub mod play {
         pub location: crate::de::Position,
         pub face: i8,
     }
-    pub(super) fn packet_block_dig_request(reader: &mut Reader) -> Result<BlockDigRequest> {
-        let status = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let face = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
+        let status = MinecraftDeserialize::deserialize(&mut reader)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let face = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = BlockDigRequest {
             status,
@@ -776,10 +793,12 @@ pub mod play {
         pub action_id: i32,
         pub jump_boost: i32,
     }
-    pub(super) fn packet_entity_action_request(reader: &mut Reader) -> Result<EntityActionRequest> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let action_id = read_varint(&mut reader.cursor)?;
-        let jump_boost = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_entity_action_request(
+        mut reader: &mut Reader,
+    ) -> Result<EntityActionRequest> {
+        let entity_id = read_varint(&mut reader)?;
+        let action_id = read_varint(&mut reader)?;
+        let jump_boost = read_varint(&mut reader)?;
 
         let result = EntityActionRequest {
             entity_id,
@@ -794,10 +813,12 @@ pub mod play {
         pub forward: f32,
         pub jump: u8,
     }
-    pub(super) fn packet_steer_vehicle_request(reader: &mut Reader) -> Result<SteerVehicleRequest> {
-        let sideways = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let forward = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let jump = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_steer_vehicle_request(
+        mut reader: &mut Reader,
+    ) -> Result<SteerVehicleRequest> {
+        let sideways = MinecraftDeserialize::deserialize(&mut reader)?;
+        let forward = MinecraftDeserialize::deserialize(&mut reader)?;
+        let jump = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SteerVehicleRequest {
             sideways,
@@ -811,7 +832,7 @@ pub mod play {
         pub recipe_id: &'p str,
     }
     pub(super) fn packet_displayed_recipe_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<DisplayedRecipeRequest<'p>> {
         let recipe_id = reader.read_range()?;
         let recipe_id = reader.get_str_from(recipe_id)?;
@@ -825,10 +846,10 @@ pub mod play {
         pub book_open: bool,
         pub filter_active: bool,
     }
-    pub(super) fn packet_recipe_book_request(reader: &mut Reader) -> Result<RecipeBookRequest> {
-        let book_id = read_varint(&mut reader.cursor)?;
-        let book_open = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let filter_active = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_recipe_book_request(mut reader: &mut Reader) -> Result<RecipeBookRequest> {
+        let book_id = read_varint(&mut reader)?;
+        let book_open = MinecraftDeserialize::deserialize(&mut reader)?;
+        let filter_active = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = RecipeBookRequest {
             book_id,
@@ -842,9 +863,9 @@ pub mod play {
         pub result: i32,
     }
     pub(super) fn packet_resource_pack_receive_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<ResourcePackReceiveRequest> {
-        let result = read_varint(&mut reader.cursor)?;
+        let result = read_varint(&mut reader)?;
 
         let result = ResourcePackReceiveRequest { result };
         Ok(result)
@@ -854,9 +875,9 @@ pub mod play {
         pub slot_id: i16,
     }
     pub(super) fn packet_held_item_slot_request(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<HeldItemSlotRequest> {
-        let slot_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let slot_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = HeldItemSlotRequest { slot_id };
         Ok(result)
@@ -864,7 +885,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct SetCreativeSlotRequest {}
     pub(super) fn packet_set_creative_slot_request(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<SetCreativeSlotRequest> {
         let result = SetCreativeSlotRequest {};
         Ok(result)
@@ -879,9 +900,9 @@ pub mod play {
         pub joint_type: &'p str,
     }
     pub(super) fn packet_update_jigsaw_block_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<UpdateJigsawBlockRequest<'p>> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let name = reader.read_range()?;
         let target = reader.read_range()?;
         let pool = reader.read_range()?;
@@ -912,9 +933,9 @@ pub mod play {
         pub text4: &'p str,
     }
     pub(super) fn packet_update_sign_request<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<UpdateSignRequest<'p>> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let text1 = reader.read_range()?;
         let text2 = reader.read_range()?;
         let text3 = reader.read_range()?;
@@ -937,8 +958,10 @@ pub mod play {
     pub struct ArmAnimationRequest {
         pub hand: i32,
     }
-    pub(super) fn packet_arm_animation_request(reader: &mut Reader) -> Result<ArmAnimationRequest> {
-        let hand = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_arm_animation_request(
+        mut reader: &mut Reader,
+    ) -> Result<ArmAnimationRequest> {
+        let hand = read_varint(&mut reader)?;
 
         let result = ArmAnimationRequest { hand };
         Ok(result)
@@ -947,8 +970,8 @@ pub mod play {
     pub struct SpectateRequest {
         pub target: u128,
     }
-    pub(super) fn packet_spectate_request(reader: &mut Reader) -> Result<SpectateRequest> {
-        let target = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_spectate_request(mut reader: &mut Reader) -> Result<SpectateRequest> {
+        let target = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SpectateRequest { target };
         Ok(result)
@@ -963,14 +986,14 @@ pub mod play {
         pub cursor_z: f32,
         pub inside_block: bool,
     }
-    pub(super) fn packet_block_place_request(reader: &mut Reader) -> Result<BlockPlaceRequest> {
-        let hand = read_varint(&mut reader.cursor)?;
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let direction = read_varint(&mut reader.cursor)?;
-        let cursor_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let cursor_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let cursor_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let inside_block = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_block_place_request(mut reader: &mut Reader) -> Result<BlockPlaceRequest> {
+        let hand = read_varint(&mut reader)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let direction = read_varint(&mut reader)?;
+        let cursor_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let cursor_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let cursor_z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let inside_block = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = BlockPlaceRequest {
             hand,
@@ -987,8 +1010,8 @@ pub mod play {
     pub struct UseItemRequest {
         pub hand: i32,
     }
-    pub(super) fn packet_use_item_request(reader: &mut Reader) -> Result<UseItemRequest> {
-        let hand = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_use_item_request(mut reader: &mut Reader) -> Result<UseItemRequest> {
+        let hand = read_varint(&mut reader)?;
 
         let result = UseItemRequest { hand };
         Ok(result)
@@ -996,7 +1019,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct AdvancementTabRequest {}
     pub(super) fn packet_advancement_tab_request(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<AdvancementTabRequest> {
         let result = AdvancementTabRequest {};
         Ok(result)
@@ -1005,8 +1028,8 @@ pub mod play {
     pub struct PongRequest {
         pub id: i32,
     }
-    pub(super) fn packet_pong_request(reader: &mut Reader) -> Result<PongRequest> {
-        let id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_pong_request(mut reader: &mut Reader) -> Result<PongRequest> {
+        let id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PongRequest { id };
         Ok(result)
@@ -1026,19 +1049,21 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn packet_spawn_entity_response(reader: &mut Reader) -> Result<SpawnEntityResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let object_uuid = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let type_ = read_varint(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let object_data = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_spawn_entity_response(
+        mut reader: &mut Reader,
+    ) -> Result<SpawnEntityResponse> {
+        let entity_id = read_varint(&mut reader)?;
+        let object_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
+        let type_ = read_varint(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let object_data = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_z = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SpawnEntityResponse {
             entity_id,
@@ -1065,13 +1090,13 @@ pub mod play {
         pub count: i16,
     }
     pub(super) fn packet_spawn_entity_experience_orb_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SpawnEntityExperienceOrbResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let count = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let count = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SpawnEntityExperienceOrbResponse {
             entity_id,
@@ -1098,20 +1123,20 @@ pub mod play {
         pub velocity_z: i16,
     }
     pub(super) fn packet_spawn_entity_living_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SpawnEntityLivingResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let entity_uuid = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let type_ = read_varint(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let head_pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let entity_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
+        let type_ = read_varint(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let head_pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_z = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SpawnEntityLivingResponse {
             entity_id,
@@ -1138,13 +1163,13 @@ pub mod play {
         pub direction: u8,
     }
     pub(super) fn packet_spawn_entity_painting_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SpawnEntityPaintingResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let entity_uuid = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let title = read_varint(&mut reader.cursor)?;
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let direction = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let entity_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
+        let title = read_varint(&mut reader)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let direction = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SpawnEntityPaintingResponse {
             entity_id,
@@ -1166,15 +1191,15 @@ pub mod play {
         pub pitch: i8,
     }
     pub(super) fn packet_named_entity_spawn_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<NamedEntitySpawnResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let player_uuid = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let player_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = NamedEntitySpawnResponse {
             entity_id,
@@ -1192,9 +1217,9 @@ pub mod play {
         pub entity_id: i32,
         pub animation: u8,
     }
-    pub(super) fn packet_animation_response(reader: &mut Reader) -> Result<AnimationResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let animation = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_animation_response(mut reader: &mut Reader) -> Result<AnimationResponse> {
+        let entity_id = read_varint(&mut reader)?;
+        let animation = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AnimationResponse {
             entity_id,
@@ -1204,14 +1229,16 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct StatisticsResponse {}
-    pub(super) fn packet_statistics_response(_reader: &mut Reader) -> Result<StatisticsResponse> {
+    pub(super) fn packet_statistics_response(
+        mut _reader: &mut Reader,
+    ) -> Result<StatisticsResponse> {
         let result = StatisticsResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct AdvancementsResponse {}
     pub(super) fn packet_advancements_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<AdvancementsResponse> {
         let result = AdvancementsResponse {};
         Ok(result)
@@ -1223,11 +1250,11 @@ pub mod play {
         pub destroy_stage: i8,
     }
     pub(super) fn packet_block_break_animation_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<BlockBreakAnimationResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let destroy_stage = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let destroy_stage = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = BlockBreakAnimationResponse {
             entity_id,
@@ -1239,7 +1266,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct TileEntityDataResponse {}
     pub(super) fn packet_tile_entity_data_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<TileEntityDataResponse> {
         let result = TileEntityDataResponse {};
         Ok(result)
@@ -1251,11 +1278,13 @@ pub mod play {
         pub byte2: u8,
         pub block_id: i32,
     }
-    pub(super) fn packet_block_action_response(reader: &mut Reader) -> Result<BlockActionResponse> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let byte1 = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let byte2 = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let block_id = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_block_action_response(
+        mut reader: &mut Reader,
+    ) -> Result<BlockActionResponse> {
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let byte1 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let byte2 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let block_id = read_varint(&mut reader)?;
 
         let result = BlockActionResponse {
             location,
@@ -1270,16 +1299,18 @@ pub mod play {
         pub location: crate::de::Position,
         pub type_: i32,
     }
-    pub(super) fn packet_block_change_response(reader: &mut Reader) -> Result<BlockChangeResponse> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let type_ = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_block_change_response(
+        mut reader: &mut Reader,
+    ) -> Result<BlockChangeResponse> {
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let type_ = read_varint(&mut reader)?;
 
         let result = BlockChangeResponse { location, type_ };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct BossBarResponse {}
-    pub(super) fn packet_boss_bar_response(_reader: &mut Reader) -> Result<BossBarResponse> {
+    pub(super) fn packet_boss_bar_response(mut _reader: &mut Reader) -> Result<BossBarResponse> {
         let result = BossBarResponse {};
         Ok(result)
     }
@@ -1288,9 +1319,11 @@ pub mod play {
         pub difficulty: u8,
         pub difficulty_locked: bool,
     }
-    pub(super) fn packet_difficulty_response(reader: &mut Reader) -> Result<DifficultyResponse> {
-        let difficulty = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let difficulty_locked = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_difficulty_response(
+        mut reader: &mut Reader,
+    ) -> Result<DifficultyResponse> {
+        let difficulty = MinecraftDeserialize::deserialize(&mut reader)?;
+        let difficulty_locked = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = DifficultyResponse {
             difficulty,
@@ -1301,7 +1334,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct TabCompleteResponse {}
     pub(super) fn packet_tab_complete_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<TabCompleteResponse> {
         let result = TabCompleteResponse {};
         Ok(result)
@@ -1309,20 +1342,22 @@ pub mod play {
     #[derive(Debug)]
     pub struct DeclareCommandsResponse {}
     pub(super) fn packet_declare_commands_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<DeclareCommandsResponse> {
         let result = DeclareCommandsResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct FacePlayerResponse {}
-    pub(super) fn packet_face_player_response(_reader: &mut Reader) -> Result<FacePlayerResponse> {
+    pub(super) fn packet_face_player_response(
+        mut _reader: &mut Reader,
+    ) -> Result<FacePlayerResponse> {
         let result = FacePlayerResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct NbtQueryResponse {}
-    pub(super) fn packet_nbt_query_response(_reader: &mut Reader) -> Result<NbtQueryResponse> {
+    pub(super) fn packet_nbt_query_response(mut _reader: &mut Reader) -> Result<NbtQueryResponse> {
         let result = NbtQueryResponse {};
         Ok(result)
     }
@@ -1332,10 +1367,12 @@ pub mod play {
         pub position: i8,
         pub sender: u128,
     }
-    pub(super) fn packet_chat_response<'p>(reader: &'p mut Reader<'p>) -> Result<ChatResponse<'p>> {
+    pub(super) fn packet_chat_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ChatResponse<'p>> {
         let message = reader.read_range()?;
-        let position = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let sender = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let position = MinecraftDeserialize::deserialize(&mut reader)?;
+        let sender = MinecraftDeserialize::deserialize(&mut reader)?;
         let message = reader.get_str_from(message)?;
 
         let result = ChatResponse {
@@ -1348,7 +1385,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct MultiBlockChangeResponse {}
     pub(super) fn packet_multi_block_change_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<MultiBlockChangeResponse> {
         let result = MultiBlockChangeResponse {};
         Ok(result)
@@ -1357,8 +1394,10 @@ pub mod play {
     pub struct CloseWindowResponse {
         pub window_id: u8,
     }
-    pub(super) fn packet_close_window_response(reader: &mut Reader) -> Result<CloseWindowResponse> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_close_window_response(
+        mut reader: &mut Reader,
+    ) -> Result<CloseWindowResponse> {
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = CloseWindowResponse { window_id };
         Ok(result)
@@ -1370,10 +1409,10 @@ pub mod play {
         pub window_title: &'p str,
     }
     pub(super) fn packet_open_window_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<OpenWindowResponse<'p>> {
-        let window_id = read_varint(&mut reader.cursor)?;
-        let inventory_type = read_varint(&mut reader.cursor)?;
+        let window_id = read_varint(&mut reader)?;
+        let inventory_type = read_varint(&mut reader)?;
         let window_title = reader.read_range()?;
         let window_title = reader.get_str_from(window_title)?;
 
@@ -1387,7 +1426,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct WindowItemsResponse {}
     pub(super) fn packet_window_items_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<WindowItemsResponse> {
         let result = WindowItemsResponse {};
         Ok(result)
@@ -1399,11 +1438,11 @@ pub mod play {
         pub value: i16,
     }
     pub(super) fn packet_craft_progress_bar_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<CraftProgressBarResponse> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let property = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let value = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let property = MinecraftDeserialize::deserialize(&mut reader)?;
+        let value = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = CraftProgressBarResponse {
             window_id,
@@ -1414,7 +1453,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct SetSlotResponse {}
-    pub(super) fn packet_set_slot_response(_reader: &mut Reader) -> Result<SetSlotResponse> {
+    pub(super) fn packet_set_slot_response(mut _reader: &mut Reader) -> Result<SetSlotResponse> {
         let result = SetSlotResponse {};
         Ok(result)
     }
@@ -1423,9 +1462,11 @@ pub mod play {
         pub item_id: i32,
         pub cooldown_ticks: i32,
     }
-    pub(super) fn packet_set_cooldown_response(reader: &mut Reader) -> Result<SetCooldownResponse> {
-        let item_id = read_varint(&mut reader.cursor)?;
-        let cooldown_ticks = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_set_cooldown_response(
+        mut reader: &mut Reader,
+    ) -> Result<SetCooldownResponse> {
+        let item_id = read_varint(&mut reader)?;
+        let cooldown_ticks = read_varint(&mut reader)?;
 
         let result = SetCooldownResponse {
             item_id,
@@ -1438,7 +1479,7 @@ pub mod play {
         pub channel: &'p str,
     }
     pub(super) fn packet_custom_payload_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<CustomPayloadResponse<'p>> {
         let channel = reader.read_range()?;
         let channel = reader.get_str_from(channel)?;
@@ -1457,15 +1498,15 @@ pub mod play {
         pub pitch: f32,
     }
     pub(super) fn packet_named_sound_effect_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<NamedSoundEffectResponse<'p>> {
         let sound_name = reader.read_range()?;
-        let sound_category = read_varint(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let volume = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let sound_category = read_varint(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let volume = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
         let sound_name = reader.get_str_from(sound_name)?;
 
         let result = NamedSoundEffectResponse {
@@ -1484,7 +1525,7 @@ pub mod play {
         pub reason: &'p str,
     }
     pub(super) fn packet_kick_disconnect_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<KickDisconnectResponse<'p>> {
         let reason = reader.read_range()?;
         let reason = reader.get_str_from(reason)?;
@@ -1498,10 +1539,10 @@ pub mod play {
         pub entity_status: i8,
     }
     pub(super) fn packet_entity_status_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityStatusResponse> {
-        let entity_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let entity_status = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let entity_status = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityStatusResponse {
             entity_id,
@@ -1511,7 +1552,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct ExplosionResponse {}
-    pub(super) fn packet_explosion_response(_reader: &mut Reader) -> Result<ExplosionResponse> {
+    pub(super) fn packet_explosion_response(mut _reader: &mut Reader) -> Result<ExplosionResponse> {
         let result = ExplosionResponse {};
         Ok(result)
     }
@@ -1520,9 +1561,11 @@ pub mod play {
         pub chunk_x: i32,
         pub chunk_z: i32,
     }
-    pub(super) fn packet_unload_chunk_response(reader: &mut Reader) -> Result<UnloadChunkResponse> {
-        let chunk_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let chunk_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_unload_chunk_response(
+        mut reader: &mut Reader,
+    ) -> Result<UnloadChunkResponse> {
+        let chunk_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let chunk_z = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = UnloadChunkResponse { chunk_x, chunk_z };
         Ok(result)
@@ -1533,10 +1576,10 @@ pub mod play {
         pub game_mode: f32,
     }
     pub(super) fn packet_game_state_change_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<GameStateChangeResponse> {
-        let reason = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let game_mode = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let reason = MinecraftDeserialize::deserialize(&mut reader)?;
+        let game_mode = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = GameStateChangeResponse { reason, game_mode };
         Ok(result)
@@ -1548,11 +1591,11 @@ pub mod play {
         pub entity_id: i32,
     }
     pub(super) fn packet_open_horse_window_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<OpenHorseWindowResponse> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let nb_slots = read_varint(&mut reader.cursor)?;
-        let entity_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let nb_slots = read_varint(&mut reader)?;
+        let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = OpenHorseWindowResponse {
             window_id,
@@ -1565,15 +1608,15 @@ pub mod play {
     pub struct KeepAliveResponse {
         pub keep_alive_id: i64,
     }
-    pub(super) fn packet_keep_alive_response(reader: &mut Reader) -> Result<KeepAliveResponse> {
-        let keep_alive_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_keep_alive_response(mut reader: &mut Reader) -> Result<KeepAliveResponse> {
+        let keep_alive_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = KeepAliveResponse { keep_alive_id };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct MapChunkResponse {}
-    pub(super) fn packet_map_chunk_response(_reader: &mut Reader) -> Result<MapChunkResponse> {
+    pub(super) fn packet_map_chunk_response(mut _reader: &mut Reader) -> Result<MapChunkResponse> {
         let result = MapChunkResponse {};
         Ok(result)
     }
@@ -1584,11 +1627,13 @@ pub mod play {
         pub data: i32,
         pub global: bool,
     }
-    pub(super) fn packet_world_event_response(reader: &mut Reader) -> Result<WorldEventResponse> {
-        let effect_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let data = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let global = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_world_event_response(
+        mut reader: &mut Reader,
+    ) -> Result<WorldEventResponse> {
+        let effect_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let data = MinecraftDeserialize::deserialize(&mut reader)?;
+        let global = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = WorldEventResponse {
             effect_id,
@@ -1601,7 +1646,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct WorldParticlesResponse {}
     pub(super) fn packet_world_particles_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<WorldParticlesResponse> {
         let result = WorldParticlesResponse {};
         Ok(result)
@@ -1609,26 +1654,28 @@ pub mod play {
     #[derive(Debug)]
     pub struct UpdateLightResponse {}
     pub(super) fn packet_update_light_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<UpdateLightResponse> {
         let result = UpdateLightResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct LoginResponse {}
-    pub(super) fn packet_login_response(_reader: &mut Reader) -> Result<LoginResponse> {
+    pub(super) fn packet_login_response(mut _reader: &mut Reader) -> Result<LoginResponse> {
         let result = LoginResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct MapResponse {}
-    pub(super) fn packet_map_response(_reader: &mut Reader) -> Result<MapResponse> {
+    pub(super) fn packet_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
         let result = MapResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct TradeListResponse {}
-    pub(super) fn packet_trade_list_response(_reader: &mut Reader) -> Result<TradeListResponse> {
+    pub(super) fn packet_trade_list_response(
+        mut _reader: &mut Reader,
+    ) -> Result<TradeListResponse> {
         let result = TradeListResponse {};
         Ok(result)
     }
@@ -1641,13 +1688,13 @@ pub mod play {
         pub on_ground: bool,
     }
     pub(super) fn packet_rel_entity_move_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<RelEntityMoveResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let d_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let d_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let d_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let d_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let d_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let d_z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = RelEntityMoveResponse {
             entity_id,
@@ -1669,15 +1716,15 @@ pub mod play {
         pub on_ground: bool,
     }
     pub(super) fn packet_entity_move_look_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityMoveLookResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let d_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let d_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let d_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let d_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let d_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let d_z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityMoveLookResponse {
             entity_id,
@@ -1697,11 +1744,13 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn packet_entity_look_response(reader: &mut Reader) -> Result<EntityLookResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_entity_look_response(
+        mut reader: &mut Reader,
+    ) -> Result<EntityLookResponse> {
+        let entity_id = read_varint(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityLookResponse {
             entity_id,
@@ -1719,12 +1768,14 @@ pub mod play {
         pub yaw: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_vehicle_move_response(reader: &mut Reader) -> Result<VehicleMoveResponse> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_vehicle_move_response(
+        mut reader: &mut Reader,
+    ) -> Result<VehicleMoveResponse> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = VehicleMoveResponse {
             x,
@@ -1739,8 +1790,8 @@ pub mod play {
     pub struct OpenBookResponse {
         pub hand: i32,
     }
-    pub(super) fn packet_open_book_response(reader: &mut Reader) -> Result<OpenBookResponse> {
-        let hand = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_open_book_response(mut reader: &mut Reader) -> Result<OpenBookResponse> {
+        let hand = read_varint(&mut reader)?;
 
         let result = OpenBookResponse { hand };
         Ok(result)
@@ -1750,9 +1801,9 @@ pub mod play {
         pub location: crate::de::Position,
     }
     pub(super) fn packet_open_sign_entity_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<OpenSignEntityResponse> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = OpenSignEntityResponse { location };
         Ok(result)
@@ -1763,9 +1814,9 @@ pub mod play {
         pub recipe: &'p str,
     }
     pub(super) fn packet_craft_recipe_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<CraftRecipeResponse<'p>> {
-        let window_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let recipe = reader.read_range()?;
         let recipe = reader.get_str_from(recipe)?;
 
@@ -1778,10 +1829,10 @@ pub mod play {
         pub flying_speed: f32,
         pub walking_speed: f32,
     }
-    pub(super) fn packet_abilities_response(reader: &mut Reader) -> Result<AbilitiesResponse> {
-        let flags = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let flying_speed = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let walking_speed = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_abilities_response(mut reader: &mut Reader) -> Result<AbilitiesResponse> {
+        let flags = MinecraftDeserialize::deserialize(&mut reader)?;
+        let flying_speed = MinecraftDeserialize::deserialize(&mut reader)?;
+        let walking_speed = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AbilitiesResponse {
             flags,
@@ -1796,10 +1847,10 @@ pub mod play {
         pub entity_id: i32,
     }
     pub(super) fn packet_end_combat_event_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EndCombatEventResponse> {
-        let duration = read_varint(&mut reader.cursor)?;
-        let entity_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let duration = read_varint(&mut reader)?;
+        let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EndCombatEventResponse {
             duration,
@@ -1810,7 +1861,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EnterCombatEventResponse {}
     pub(super) fn packet_enter_combat_event_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<EnterCombatEventResponse> {
         let result = EnterCombatEventResponse {};
         Ok(result)
@@ -1822,10 +1873,10 @@ pub mod play {
         pub message: &'p str,
     }
     pub(super) fn packet_death_combat_event_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<DeathCombatEventResponse<'p>> {
-        let player_id = read_varint(&mut reader.cursor)?;
-        let entity_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let player_id = read_varint(&mut reader)?;
+        let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let message = reader.read_range()?;
         let message = reader.get_str_from(message)?;
 
@@ -1838,7 +1889,9 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct PlayerInfoResponse {}
-    pub(super) fn packet_player_info_response(_reader: &mut Reader) -> Result<PlayerInfoResponse> {
+    pub(super) fn packet_player_info_response(
+        mut _reader: &mut Reader,
+    ) -> Result<PlayerInfoResponse> {
         let result = PlayerInfoResponse {};
         Ok(result)
     }
@@ -1853,15 +1906,15 @@ pub mod play {
         pub teleport_id: i32,
         pub dismount_vehicle: bool,
     }
-    pub(super) fn packet_position_response(reader: &mut Reader) -> Result<PositionResponse> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let flags = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let teleport_id = read_varint(&mut reader.cursor)?;
-        let dismount_vehicle = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_position_response(mut reader: &mut Reader) -> Result<PositionResponse> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let flags = MinecraftDeserialize::deserialize(&mut reader)?;
+        let teleport_id = read_varint(&mut reader)?;
+        let dismount_vehicle = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PositionResponse {
             x,
@@ -1878,7 +1931,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct UnlockRecipesResponse {}
     pub(super) fn packet_unlock_recipes_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<UnlockRecipesResponse> {
         let result = UnlockRecipesResponse {};
         Ok(result)
@@ -1886,7 +1939,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EntityDestroyResponse {}
     pub(super) fn packet_entity_destroy_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<EntityDestroyResponse> {
         let result = EntityDestroyResponse {};
         Ok(result)
@@ -1897,10 +1950,10 @@ pub mod play {
         pub effect_id: i8,
     }
     pub(super) fn packet_remove_entity_effect_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<RemoveEntityEffectResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let effect_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let effect_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = RemoveEntityEffectResponse {
             entity_id,
@@ -1911,14 +1964,14 @@ pub mod play {
     #[derive(Debug)]
     pub struct ResourcePackSendResponse {}
     pub(super) fn packet_resource_pack_send_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<ResourcePackSendResponse> {
         let result = ResourcePackSendResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct RespawnResponse {}
-    pub(super) fn packet_respawn_response(_reader: &mut Reader) -> Result<RespawnResponse> {
+    pub(super) fn packet_respawn_response(mut _reader: &mut Reader) -> Result<RespawnResponse> {
         let result = RespawnResponse {};
         Ok(result)
     }
@@ -1928,10 +1981,10 @@ pub mod play {
         pub head_yaw: i8,
     }
     pub(super) fn packet_entity_head_rotation_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityHeadRotationResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let head_yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let head_yaw = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityHeadRotationResponse {
             entity_id,
@@ -1943,8 +1996,8 @@ pub mod play {
     pub struct CameraResponse {
         pub camera_id: i32,
     }
-    pub(super) fn packet_camera_response(reader: &mut Reader) -> Result<CameraResponse> {
-        let camera_id = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_camera_response(mut reader: &mut Reader) -> Result<CameraResponse> {
+        let camera_id = read_varint(&mut reader)?;
 
         let result = CameraResponse { camera_id };
         Ok(result)
@@ -1954,9 +2007,9 @@ pub mod play {
         pub slot: i8,
     }
     pub(super) fn packet_held_item_slot_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<HeldItemSlotResponse> {
-        let slot = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let slot = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = HeldItemSlotResponse { slot };
         Ok(result)
@@ -1967,10 +2020,10 @@ pub mod play {
         pub chunk_z: i32,
     }
     pub(super) fn packet_update_view_position_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<UpdateViewPositionResponse> {
-        let chunk_x = read_varint(&mut reader.cursor)?;
-        let chunk_z = read_varint(&mut reader.cursor)?;
+        let chunk_x = read_varint(&mut reader)?;
+        let chunk_z = read_varint(&mut reader)?;
 
         let result = UpdateViewPositionResponse { chunk_x, chunk_z };
         Ok(result)
@@ -1980,9 +2033,9 @@ pub mod play {
         pub view_distance: i32,
     }
     pub(super) fn packet_update_view_distance_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<UpdateViewDistanceResponse> {
-        let view_distance = read_varint(&mut reader.cursor)?;
+        let view_distance = read_varint(&mut reader)?;
 
         let result = UpdateViewDistanceResponse { view_distance };
         Ok(result)
@@ -1993,9 +2046,9 @@ pub mod play {
         pub name: &'p str,
     }
     pub(super) fn packet_scoreboard_display_objective_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<ScoreboardDisplayObjectiveResponse<'p>> {
-        let position = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let position = MinecraftDeserialize::deserialize(&mut reader)?;
         let name = reader.read_range()?;
         let name = reader.get_str_from(name)?;
 
@@ -2005,7 +2058,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EntityMetadataResponse {}
     pub(super) fn packet_entity_metadata_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<EntityMetadataResponse> {
         let result = EntityMetadataResponse {};
         Ok(result)
@@ -2016,10 +2069,10 @@ pub mod play {
         pub vehicle_id: i32,
     }
     pub(super) fn packet_attach_entity_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<AttachEntityResponse> {
-        let entity_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let vehicle_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let vehicle_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AttachEntityResponse {
             entity_id,
@@ -2035,12 +2088,12 @@ pub mod play {
         pub velocity_z: i16,
     }
     pub(super) fn packet_entity_velocity_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityVelocityResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let velocity_x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let velocity_z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let velocity_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let velocity_z = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityVelocityResponse {
             entity_id,
@@ -2053,7 +2106,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EntityEquipmentResponse {}
     pub(super) fn packet_entity_equipment_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<EntityEquipmentResponse> {
         let result = EntityEquipmentResponse {};
         Ok(result)
@@ -2064,10 +2117,12 @@ pub mod play {
         pub level: i32,
         pub total_experience: i32,
     }
-    pub(super) fn packet_experience_response(reader: &mut Reader) -> Result<ExperienceResponse> {
-        let experience_bar = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let level = read_varint(&mut reader.cursor)?;
-        let total_experience = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_experience_response(
+        mut reader: &mut Reader,
+    ) -> Result<ExperienceResponse> {
+        let experience_bar = MinecraftDeserialize::deserialize(&mut reader)?;
+        let level = read_varint(&mut reader)?;
+        let total_experience = read_varint(&mut reader)?;
 
         let result = ExperienceResponse {
             experience_bar,
@@ -2083,11 +2138,11 @@ pub mod play {
         pub food_saturation: f32,
     }
     pub(super) fn packet_update_health_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<UpdateHealthResponse> {
-        let health = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let food = read_varint(&mut reader.cursor)?;
-        let food_saturation = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let health = MinecraftDeserialize::deserialize(&mut reader)?;
+        let food = read_varint(&mut reader)?;
+        let food_saturation = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = UpdateHealthResponse {
             health,
@@ -2099,7 +2154,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct ScoreboardObjectiveResponse {}
     pub(super) fn packet_scoreboard_objective_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<ScoreboardObjectiveResponse> {
         let result = ScoreboardObjectiveResponse {};
         Ok(result)
@@ -2107,21 +2162,21 @@ pub mod play {
     #[derive(Debug)]
     pub struct SetPassengersResponse {}
     pub(super) fn packet_set_passengers_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<SetPassengersResponse> {
         let result = SetPassengersResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct TeamsResponse {}
-    pub(super) fn packet_teams_response(_reader: &mut Reader) -> Result<TeamsResponse> {
+    pub(super) fn packet_teams_response(mut _reader: &mut Reader) -> Result<TeamsResponse> {
         let result = TeamsResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct ScoreboardScoreResponse {}
     pub(super) fn packet_scoreboard_score_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<ScoreboardScoreResponse> {
         let result = ScoreboardScoreResponse {};
         Ok(result)
@@ -2132,10 +2187,10 @@ pub mod play {
         pub angle: f32,
     }
     pub(super) fn packet_spawn_position_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SpawnPositionResponse> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let angle = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let angle = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SpawnPositionResponse { location, angle };
         Ok(result)
@@ -2145,9 +2200,11 @@ pub mod play {
         pub age: i64,
         pub time: i64,
     }
-    pub(super) fn packet_update_time_response(reader: &mut Reader) -> Result<UpdateTimeResponse> {
-        let age = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let time = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_update_time_response(
+        mut reader: &mut Reader,
+    ) -> Result<UpdateTimeResponse> {
+        let age = MinecraftDeserialize::deserialize(&mut reader)?;
+        let time = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = UpdateTimeResponse { age, time };
         Ok(result)
@@ -2161,13 +2218,13 @@ pub mod play {
         pub pitch: f32,
     }
     pub(super) fn packet_entity_sound_effect_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntitySoundEffectResponse> {
-        let sound_id = read_varint(&mut reader.cursor)?;
-        let sound_category = read_varint(&mut reader.cursor)?;
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let volume = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let sound_id = read_varint(&mut reader)?;
+        let sound_category = read_varint(&mut reader)?;
+        let entity_id = read_varint(&mut reader)?;
+        let volume = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntitySoundEffectResponse {
             sound_id,
@@ -2180,7 +2237,9 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct StopSoundResponse {}
-    pub(super) fn packet_stop_sound_response(_reader: &mut Reader) -> Result<StopSoundResponse> {
+    pub(super) fn packet_stop_sound_response(
+        mut _reader: &mut Reader,
+    ) -> Result<StopSoundResponse> {
         let result = StopSoundResponse {};
         Ok(result)
     }
@@ -2194,14 +2253,16 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_sound_effect_response(reader: &mut Reader) -> Result<SoundEffectResponse> {
-        let sound_id = read_varint(&mut reader.cursor)?;
-        let sound_category = read_varint(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let volume = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_sound_effect_response(
+        mut reader: &mut Reader,
+    ) -> Result<SoundEffectResponse> {
+        let sound_id = read_varint(&mut reader)?;
+        let sound_category = read_varint(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let volume = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SoundEffectResponse {
             sound_id,
@@ -2220,7 +2281,7 @@ pub mod play {
         pub footer: &'p str,
     }
     pub(super) fn packet_playerlist_header_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<PlayerlistHeaderResponse<'p>> {
         let header = reader.read_range()?;
         let footer = reader.read_range()?;
@@ -2236,10 +2297,10 @@ pub mod play {
         pub collector_entity_id: i32,
         pub pickup_item_count: i32,
     }
-    pub(super) fn packet_collect_response(reader: &mut Reader) -> Result<CollectResponse> {
-        let collected_entity_id = read_varint(&mut reader.cursor)?;
-        let collector_entity_id = read_varint(&mut reader.cursor)?;
-        let pickup_item_count = read_varint(&mut reader.cursor)?;
+    pub(super) fn packet_collect_response(mut reader: &mut Reader) -> Result<CollectResponse> {
+        let collected_entity_id = read_varint(&mut reader)?;
+        let collector_entity_id = read_varint(&mut reader)?;
+        let pickup_item_count = read_varint(&mut reader)?;
 
         let result = CollectResponse {
             collected_entity_id,
@@ -2259,15 +2320,15 @@ pub mod play {
         pub on_ground: bool,
     }
     pub(super) fn packet_entity_teleport_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityTeleportResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let y = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let yaw = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let pitch = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let on_ground = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
+        let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
+        let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityTeleportResponse {
             entity_id,
@@ -2283,7 +2344,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EntityUpdateAttributesResponse {}
     pub(super) fn packet_entity_update_attributes_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<EntityUpdateAttributesResponse> {
         let result = EntityUpdateAttributesResponse {};
         Ok(result)
@@ -2297,13 +2358,13 @@ pub mod play {
         pub hide_particles: i8,
     }
     pub(super) fn packet_entity_effect_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityEffectResponse> {
-        let entity_id = read_varint(&mut reader.cursor)?;
-        let effect_id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let amplifier = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let duration = read_varint(&mut reader.cursor)?;
-        let hide_particles = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let entity_id = read_varint(&mut reader)?;
+        let effect_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let amplifier = MinecraftDeserialize::deserialize(&mut reader)?;
+        let duration = read_varint(&mut reader)?;
+        let hide_particles = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityEffectResponse {
             entity_id,
@@ -2317,7 +2378,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct SelectAdvancementTabResponse {}
     pub(super) fn packet_select_advancement_tab_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<SelectAdvancementTabResponse> {
         let result = SelectAdvancementTabResponse {};
         Ok(result)
@@ -2325,14 +2386,14 @@ pub mod play {
     #[derive(Debug)]
     pub struct DeclareRecipesResponse {}
     pub(super) fn packet_declare_recipes_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<DeclareRecipesResponse> {
         let result = DeclareRecipesResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct TagsResponse {}
-    pub(super) fn packet_tags_response(_reader: &mut Reader) -> Result<TagsResponse> {
+    pub(super) fn packet_tags_response(mut _reader: &mut Reader) -> Result<TagsResponse> {
         let result = TagsResponse {};
         Ok(result)
     }
@@ -2344,12 +2405,12 @@ pub mod play {
         pub successful: bool,
     }
     pub(super) fn packet_acknowledge_player_digging_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<AcknowledgePlayerDiggingResponse> {
-        let location = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let block = read_varint(&mut reader.cursor)?;
-        let status = read_varint(&mut reader.cursor)?;
-        let successful = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let location = MinecraftDeserialize::deserialize(&mut reader)?;
+        let block = read_varint(&mut reader)?;
+        let status = read_varint(&mut reader)?;
+        let successful = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AcknowledgePlayerDiggingResponse {
             location,
@@ -2362,7 +2423,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct SculkVibrationSignalResponse {}
     pub(super) fn packet_sculk_vibration_signal_response(
-        _reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<SculkVibrationSignalResponse> {
         let result = SculkVibrationSignalResponse {};
         Ok(result)
@@ -2371,8 +2432,10 @@ pub mod play {
     pub struct ClearTitlesResponse {
         pub reset: bool,
     }
-    pub(super) fn packet_clear_titles_response(reader: &mut Reader) -> Result<ClearTitlesResponse> {
-        let reset = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_clear_titles_response(
+        mut reader: &mut Reader,
+    ) -> Result<ClearTitlesResponse> {
+        let reset = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = ClearTitlesResponse { reset };
         Ok(result)
@@ -2389,16 +2452,16 @@ pub mod play {
         pub warning_time: i32,
     }
     pub(super) fn packet_initialize_world_border_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<InitializeWorldBorderResponse> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let old_diameter = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let new_diameter = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let speed = read_varint(&mut reader.cursor)?;
-        let portal_teleport_boundary = read_varint(&mut reader.cursor)?;
-        let warning_blocks = read_varint(&mut reader.cursor)?;
-        let warning_time = read_varint(&mut reader.cursor)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let old_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
+        let new_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
+        let speed = read_varint(&mut reader)?;
+        let portal_teleport_boundary = read_varint(&mut reader)?;
+        let warning_blocks = read_varint(&mut reader)?;
+        let warning_time = read_varint(&mut reader)?;
 
         let result = InitializeWorldBorderResponse {
             x,
@@ -2417,7 +2480,7 @@ pub mod play {
         pub text: &'p str,
     }
     pub(super) fn packet_action_bar_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<ActionBarResponse<'p>> {
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
@@ -2431,10 +2494,10 @@ pub mod play {
         pub z: f64,
     }
     pub(super) fn packet_world_border_center_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<WorldBorderCenterResponse> {
-        let x = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let z = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = WorldBorderCenterResponse { x, z };
         Ok(result)
@@ -2446,11 +2509,11 @@ pub mod play {
         pub speed: i32,
     }
     pub(super) fn packet_world_border_lerp_size_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<WorldBorderLerpSizeResponse> {
-        let old_diameter = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let new_diameter = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let speed = read_varint(&mut reader.cursor)?;
+        let old_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
+        let new_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
+        let speed = read_varint(&mut reader)?;
 
         let result = WorldBorderLerpSizeResponse {
             old_diameter,
@@ -2464,9 +2527,9 @@ pub mod play {
         pub diameter: f64,
     }
     pub(super) fn packet_world_border_size_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<WorldBorderSizeResponse> {
-        let diameter = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let diameter = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = WorldBorderSizeResponse { diameter };
         Ok(result)
@@ -2476,9 +2539,9 @@ pub mod play {
         pub warning_time: i32,
     }
     pub(super) fn packet_world_border_warning_delay_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<WorldBorderWarningDelayResponse> {
-        let warning_time = read_varint(&mut reader.cursor)?;
+        let warning_time = read_varint(&mut reader)?;
 
         let result = WorldBorderWarningDelayResponse { warning_time };
         Ok(result)
@@ -2488,9 +2551,9 @@ pub mod play {
         pub warning_blocks: i32,
     }
     pub(super) fn packet_world_border_warning_reach_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<WorldBorderWarningReachResponse> {
-        let warning_blocks = read_varint(&mut reader.cursor)?;
+        let warning_blocks = read_varint(&mut reader)?;
 
         let result = WorldBorderWarningReachResponse { warning_blocks };
         Ok(result)
@@ -2499,8 +2562,8 @@ pub mod play {
     pub struct PlayPingResponse {
         pub id: i32,
     }
-    pub(super) fn packet_play_ping_response(reader: &mut Reader) -> Result<PlayPingResponse> {
-        let id = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+    pub(super) fn packet_play_ping_response(mut reader: &mut Reader) -> Result<PlayPingResponse> {
+        let id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = PlayPingResponse { id };
         Ok(result)
@@ -2510,7 +2573,7 @@ pub mod play {
         pub text: &'p str,
     }
     pub(super) fn packet_set_title_subtitle_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<SetTitleSubtitleResponse<'p>> {
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
@@ -2523,7 +2586,7 @@ pub mod play {
         pub text: &'p str,
     }
     pub(super) fn packet_set_title_text_response<'p>(
-        reader: &'p mut Reader<'p>,
+        mut reader: &'p mut Reader<'p>,
     ) -> Result<SetTitleTextResponse<'p>> {
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
@@ -2538,11 +2601,11 @@ pub mod play {
         pub fade_out: i32,
     }
     pub(super) fn packet_set_title_time_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SetTitleTimeResponse> {
-        let fade_in = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let stay = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
-        let fade_out = MinecraftDeserialize::deserialize(&mut reader.cursor)?;
+        let fade_in = MinecraftDeserialize::deserialize(&mut reader)?;
+        let stay = MinecraftDeserialize::deserialize(&mut reader)?;
+        let fade_out = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SetTitleTimeResponse {
             fade_in,
@@ -2556,9 +2619,9 @@ pub mod play {
         pub distance: i32,
     }
     pub(super) fn packet_simulation_distance_response(
-        reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SimulationDistanceResponse> {
-        let distance = read_varint(&mut reader.cursor)?;
+        let distance = read_varint(&mut reader)?;
 
         let result = SimulationDistanceResponse { distance };
         Ok(result)
