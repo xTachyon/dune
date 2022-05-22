@@ -213,7 +213,7 @@ class Generator:
             elif i.ty == Ty.BUFFER:
                 ty = "&'p [u8]"
             elif i.ty == Ty.POSITION:
-                ty = "crate::de::Position"
+                ty = "crate::protocol::de::Position"
             else:
                 ty = i.ty.value
             self.out += f"pub {i.name}: {ty},"
@@ -255,9 +255,9 @@ class Generator:
             self.out += f'''
 pub mod {state.state.value} {{
 use anyhow::Result;
-use crate::de::MinecraftDeserialize;
-use crate::de::Reader;
-use crate::varint::read_varint;
+use crate::protocol::de::MinecraftDeserialize;
+use crate::protocol::de::Reader;
+use crate::protocol::varint::read_varint;
 
 '''
             for direction in state.directions:
@@ -270,7 +270,7 @@ use crate::varint::read_varint;
 use anyhow::{{anyhow, Result}};
 use crate::protocol::ConnectionState as S;
 use crate::protocol::PacketDirection as D;
-use crate::de::Reader;
+use crate::protocol::de::Reader;
 
 #[derive(Debug)]
 pub enum Packet<'p> {{
@@ -301,7 +301,7 @@ let packet = match (state, direction, id) {
 
 
 def main():
-    with open("protocol.json") as f:
+    with open("minecraft-data/data/pc/1.18.2/protocol.json") as f:
         j = json.load(f)
 
     parser = Parser()
@@ -310,7 +310,7 @@ def main():
     gen = Generator()
     gen.gen(states)
 
-    out_file = "../proxy_lib/src/protocol/v1_18_1.rs"
+    out_file = "../proxy_lib/src/protocol/v1_18_2.rs"
     with open(out_file, "w") as f:
         f.write(gen.out)
     subprocess.run(["rustfmt", out_file])

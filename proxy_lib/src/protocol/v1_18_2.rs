@@ -128,15 +128,11 @@ pub mod login {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginPluginResponse {
-        pub message_id: i32,
-    }
+    pub struct LoginPluginResponse {}
     pub(super) fn packet_login_plugin_response(
-        mut reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<LoginPluginResponse> {
-        let message_id = read_varint(&mut reader)?;
-
-        let result = LoginPluginResponse { message_id };
+        let result = LoginPluginResponse {};
         Ok(result)
     }
     #[derive(Debug)]
@@ -201,21 +197,11 @@ pub mod login {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginPluginRequest<'p> {
-        pub message_id: i32,
-        pub channel: &'p str,
-    }
-    pub(super) fn packet_login_plugin_request<'p>(
-        mut reader: &'p mut Reader<'p>,
-    ) -> Result<LoginPluginRequest<'p>> {
-        let message_id = read_varint(&mut reader)?;
-        let channel = reader.read_range()?;
-        let channel = reader.get_str_from(channel)?;
-
-        let result = LoginPluginRequest {
-            message_id,
-            channel,
-        };
+    pub struct LoginPluginRequest {}
+    pub(super) fn packet_login_plugin_request(
+        mut _reader: &mut Reader,
+    ) -> Result<LoginPluginRequest> {
+        let result = LoginPluginRequest {};
         Ok(result)
     }
 }
@@ -564,16 +550,11 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CustomPayloadRequest<'p> {
-        pub channel: &'p str,
-    }
-    pub(super) fn packet_custom_payload_request<'p>(
-        mut reader: &'p mut Reader<'p>,
-    ) -> Result<CustomPayloadRequest<'p>> {
-        let channel = reader.read_range()?;
-        let channel = reader.get_str_from(channel)?;
-
-        let result = CustomPayloadRequest { channel };
+    pub struct CustomPayloadRequest {}
+    pub(super) fn packet_custom_payload_request(
+        mut _reader: &mut Reader,
+    ) -> Result<CustomPayloadRequest> {
+        let result = CustomPayloadRequest {};
         Ok(result)
     }
     #[derive(Debug)]
@@ -1475,16 +1456,11 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CustomPayloadResponse<'p> {
-        pub channel: &'p str,
-    }
-    pub(super) fn packet_custom_payload_response<'p>(
-        mut reader: &'p mut Reader<'p>,
-    ) -> Result<CustomPayloadResponse<'p>> {
-        let channel = reader.read_range()?;
-        let channel = reader.get_str_from(channel)?;
-
-        let result = CustomPayloadResponse { channel };
+    pub struct CustomPayloadResponse {}
+    pub(super) fn packet_custom_payload_response(
+        mut _reader: &mut Reader,
+    ) -> Result<CustomPayloadResponse> {
+        let result = CustomPayloadResponse {};
         Ok(result)
     }
     #[derive(Debug)]
@@ -1947,13 +1923,13 @@ pub mod play {
     #[derive(Debug)]
     pub struct RemoveEntityEffectResponse {
         pub entity_id: i32,
-        pub effect_id: i8,
+        pub effect_id: i32,
     }
     pub(super) fn packet_remove_entity_effect_response(
         mut reader: &mut Reader,
     ) -> Result<RemoveEntityEffectResponse> {
         let entity_id = read_varint(&mut reader)?;
-        let effect_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let effect_id = read_varint(&mut reader)?;
 
         let result = RemoveEntityEffectResponse {
             entity_id,
@@ -2352,7 +2328,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EntityEffectResponse {
         pub entity_id: i32,
-        pub effect_id: i8,
+        pub effect_id: i32,
         pub amplifier: i8,
         pub duration: i32,
         pub hide_particles: i8,
@@ -2361,7 +2337,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<EntityEffectResponse> {
         let entity_id = read_varint(&mut reader)?;
-        let effect_id = MinecraftDeserialize::deserialize(&mut reader)?;
+        let effect_id = read_varint(&mut reader)?;
         let amplifier = MinecraftDeserialize::deserialize(&mut reader)?;
         let duration = read_varint(&mut reader)?;
         let hide_particles = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2647,7 +2623,7 @@ pub enum Packet<'p> {
     EncryptionBeginResponse(login::EncryptionBeginResponse<'p>),
     SuccessResponse(login::SuccessResponse<'p>),
     CompressResponse(login::CompressResponse),
-    LoginPluginRequest(login::LoginPluginRequest<'p>),
+    LoginPluginRequest(login::LoginPluginRequest),
     TeleportConfirmRequest(play::TeleportConfirmRequest),
     QueryBlockNbtRequest(play::QueryBlockNbtRequest),
     SetDifficultyRequest(play::SetDifficultyRequest),
@@ -2667,7 +2643,7 @@ pub enum Packet<'p> {
     EnchantItemRequest(play::EnchantItemRequest),
     WindowClickRequest(play::WindowClickRequest),
     CloseWindowRequest(play::CloseWindowRequest),
-    CustomPayloadRequest(play::CustomPayloadRequest<'p>),
+    CustomPayloadRequest(play::CustomPayloadRequest),
     UseEntityRequest(play::UseEntityRequest),
     GenerateStructureRequest(play::GenerateStructureRequest),
     KeepAliveRequest(play::KeepAliveRequest),
@@ -2722,7 +2698,7 @@ pub enum Packet<'p> {
     CraftProgressBarResponse(play::CraftProgressBarResponse),
     SetSlotResponse(play::SetSlotResponse),
     SetCooldownResponse(play::SetCooldownResponse),
-    CustomPayloadResponse(play::CustomPayloadResponse<'p>),
+    CustomPayloadResponse(play::CustomPayloadResponse),
     NamedSoundEffectResponse(play::NamedSoundEffectResponse<'p>),
     KickDisconnectResponse(play::KickDisconnectResponse<'p>),
     EntityStatusResponse(play::EntityStatusResponse),

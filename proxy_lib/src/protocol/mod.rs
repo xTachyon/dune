@@ -1,5 +1,5 @@
 pub mod de;
-pub mod v1_18_1;
+pub mod v1_18_2;
 pub mod varint;
 
 use crate::protocol::varint::{read_varint, read_varint_with_size};
@@ -8,8 +8,8 @@ use de::Reader;
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
 use std::io::Read;
-pub use v1_18_1::de_packets;
-pub use v1_18_1::Packet;
+pub use v1_18_2::de_packets;
+pub use v1_18_2::Packet;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, TryFromPrimitive)]

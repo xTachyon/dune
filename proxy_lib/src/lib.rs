@@ -3,7 +3,7 @@ mod game;
 mod protocol;
 
 use crate::events::EventSubscriber;
-use crate::protocol::v1_18_1::login::EncryptionBeginRequest;
+use crate::protocol::v1_18_2::login::EncryptionBeginRequest;
 use crate::protocol::{ConnectionState, Packet, PacketDirection};
 use anyhow::Result;
 use byteorder::WriteBytesExt;

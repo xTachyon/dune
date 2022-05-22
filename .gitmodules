@@ -1,0 +1,3 @@
+[submodule "packet_gen/minecraft-data"]
+	path = packet_gen/minecraft-data
+	url = https://github.com/xTachyon/minecraft-data.git
