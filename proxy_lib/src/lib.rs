@@ -134,10 +134,11 @@ impl Proxy {
     fn on_start(
         &mut self,
         src_session: &mut Session,
+        offset: usize,
         direction: PacketDirection,
     ) -> Result<OnStartResult> {
         self.tmp.clear();
-        let src = &src_session.read_buf;
+        let src = &src_session.read_buf[offset..];
         let mut reader = Reader::new(src);
         let p = protocol::deserialize_with_header(
             direction,
@@ -189,8 +190,8 @@ impl Proxy {
                             num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
                         };
 
-                        let auth_data = self.auth_data.take().unwrap();
-                        let selected_profile = auth_data.selected_profile.replace('-', "");
+                        let mut auth_data = self.auth_data.take().unwrap();
+                        auth_data.selected_profile.retain(|c| c != '-');
 
                         #[allow(non_snake_case)]
                         #[derive(Serialize)]
@@ -201,7 +202,7 @@ impl Proxy {
                         }
                         let req = RequestData {
                             accessToken: auth_data.access_token,
-                            selectedProfile: selected_profile,
+                            selectedProfile: auth_data.selected_profile,
                             serverId: hash,
                         };
                         let req = serde_json::to_string(&req)?;
@@ -247,16 +248,19 @@ impl Proxy {
         direction: PacketDirection,
     ) -> Result<()> {
         src.read(buf);
+
+        let mut offset = 0;
         loop {
-            let result = self.on_start(src, direction)?;
+            let result = self.on_start(src, offset, direction)?;
             if result.done {
                 break;
             }
             if !result.skip {
-                dest.write(&src.read_buf[..result.count]);
+                dest.write(&src.read_buf[offset..offset + result.count]);
             }
-            src.read_buf.drain(..result.count);
+            offset += result.count;
         }
+        src.read_buf.drain(..offset);
 
         Ok(())
     }
