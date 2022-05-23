@@ -2,7 +2,7 @@ use num_enum::TryFromPrimitive;
 
 #[repr(u8)]
 #[derive(Debug, TryFromPrimitive)]
-pub enum Gamemode {
+pub enum GameMode {
     Survival = 0,
     Creative = 1,
     Adventure = 2,

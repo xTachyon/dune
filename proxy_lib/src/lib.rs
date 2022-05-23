@@ -112,14 +112,14 @@ impl Proxy {
         cursor.write_all(&buf[..size])?;
 
         // Shared Secret
-        cursor.write_all(&packet.shared_secret)?;
+        cursor.write_all(packet.shared_secret)?;
 
         // Verify Token Length
         let (buf, size) = write_varint(packet.verify_token.len() as u32);
         cursor.write_all(&buf[..size])?;
 
         // Verify Token
-        cursor.write_all(&packet.verify_token)?;
+        cursor.write_all(packet.verify_token)?;
 
         let mut result = Vec::new();
 
@@ -190,7 +190,7 @@ impl Proxy {
                         };
 
                         let auth_data = self.auth_data.take().unwrap();
-                        let selected_profile = auth_data.selected_profile.replace("-", "");
+                        let selected_profile = auth_data.selected_profile.replace('-', "");
 
                         #[allow(non_snake_case)]
                         #[derive(Serialize)]
@@ -216,14 +216,14 @@ impl Proxy {
                         }
 
                         let response = EncryptionBeginRequest {
-                            shared_secret: &Proxy::rsa_crypt(&packet.public_key, &aes_key)?,
+                            shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
                             verify_token: &Proxy::rsa_crypt(
-                                &packet.public_key,
-                                &packet.verify_token,
+                                packet.public_key,
+                                packet.verify_token,
                             )?,
                         };
-                        let mut buf = Proxy::serialize_enc_response(response)?;
-                        src_session.write(&mut buf);
+                        let buf = Proxy::serialize_enc_response(response)?;
+                        src_session.write(&buf);
 
                         let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
                         let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();

@@ -1,4 +1,4 @@
-use crate::game::Gamemode;
+use crate::game::GameMode;
 use crate::protocol::varint::read_varint;
 use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;
@@ -46,7 +46,7 @@ impl MinecraftDeserialize for i8 {
 impl MinecraftDeserialize for bool {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self> where {
         let value: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
-        let result = if value == 0 { false } else { true };
+        let result = value != 0;
         Ok(result)
     }
 }
@@ -136,7 +136,7 @@ macro_rules! impl_with_varint {
     };
 }
 
-impl_with_varint!(Gamemode);
+impl_with_varint!(GameMode);
 
 pub struct Reader<'r> {
     cursor: Cursor<&'r [u8]>,

@@ -43,10 +43,7 @@ pub fn deserialize_with_header<'r>(
     } else {
         deserialize_uncompressed(direction, state, reader)
     }?;
-    let result = match packet {
-        Some(packet) => Some((packet, length as usize + length_size)),
-        None => None,
-    };
+    let result = packet.map(|packet| (packet, length as usize + length_size));
     Ok(result)
 }
 
