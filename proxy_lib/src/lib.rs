@@ -3,6 +3,7 @@ mod game;
 mod protocol;
 
 use crate::events::EventSubscriber;
+use crate::protocol::de::MinecraftDeserialize;
 use crate::protocol::v1_18_2::login::EncryptionBeginRequest;
 use crate::protocol::{ConnectionState, Packet, PacketDirection};
 use anyhow::Result;
@@ -12,11 +13,11 @@ use cfb8::cipher::NewCipher;
 use polling::{Event, Poller};
 use protocol::de::Reader;
 use protocol::varint::write_varint;
-use rand::RngCore;
 use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::Digest;
+use std::convert::TryFrom;
 use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
 
@@ -77,9 +78,48 @@ struct Proxy {
 }
 
 struct OnStartResult {
-    done: bool,
     skip: bool,
-    count: usize,
+    total_size: usize,
+}
+
+struct DiskPacket {
+    pub id: u32,
+    pub direction: PacketDirection,
+    pub data: Vec<u8>, // todo: make it copy free
+}
+
+impl DiskPacket {
+    fn write<W: Write>(&self, mut writer: W) -> Result<()> {
+        let size = 4 + 1 + self.data.len() as u32;
+        writer.write_all(&size.to_le_bytes())?;
+        writer.write_all(&[self.direction as u8])?;
+        writer.write_all(&self.data)?;
+
+        Ok(())
+    }
+
+    fn read<R: Read>(mut reader: R) -> Result<DiskPacket> {
+        let size: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let id: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let direction: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let direction = PacketDirection::try_from(direction)?;
+        let mut data = vec![0; size as usize - 4 - 1];
+        reader.read_exact(&mut data)?;
+
+        Ok(DiskPacket {
+            id,
+            direction,
+            data,
+        })
+    }
+
+    fn has_enough_bytes(buf: &[u8]) -> bool {
+        if buf.len() < 4 {
+            return false;
+        }
+        let size = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+        size + 4 <= buf.len()
+    }
 }
 
 impl Proxy {
@@ -136,108 +176,95 @@ impl Proxy {
         src_session: &mut Session,
         offset: usize,
         direction: PacketDirection,
-    ) -> Result<OnStartResult> {
-        self.tmp.clear();
+    ) -> Result<Option<OnStartResult>> {
         let src = &src_session.read_buf[offset..];
-        let mut reader = Reader::new(src);
-        let p = protocol::deserialize_with_header(
-            direction,
-            self.state,
-            &mut reader,
-            self.compression,
-            &mut self.tmp,
-        )?;
-
-        let mut skip = false;
-        let mut count = 0;
-        let done = match p {
-            Some((packet, size)) => {
-                count = size;
-                println!("{:?}", packet);
-                match packet {
-                    Packet::SetProtocolRequest(x) => match x.next_state {
-                        1 => {
-                            self.start_done = true;
-                            self.state = ConnectionState::Status;
-                        }
-                        2 => {
-                            self.state = ConnectionState::Login;
-                        }
-                        _ => unimplemented!(),
-                    },
-                    // ---------------------------------------------------
-                    Packet::SuccessResponse(_) => {
-                        self.start_done = true;
-                        self.state = ConnectionState::Play;
-                    }
-                    Packet::CompressResponse(x) => {
-                        self.compression = x.threshold >= 0;
-                    }
-                    Packet::EncryptionBeginResponse(packet) => {
-                        skip = true;
-                        let aes_key: [u8; 16] = rand::random();
-
-                        let mut buffer = [0; 16];
-                        rand::thread_rng().fill_bytes(&mut buffer);
-
-                        let hash = {
-                            let mut sha1 = sha1::Sha1::new();
-                            sha1.update(packet.server_id);
-                            sha1.update(aes_key);
-                            sha1.update(&packet.public_key);
-                            let hash = sha1.finalize();
-
-                            num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
-                        };
-
-                        let mut auth_data = self.auth_data.take().unwrap();
-                        auth_data.selected_profile.retain(|c| c != '-');
-
-                        #[allow(non_snake_case)]
-                        #[derive(Serialize)]
-                        struct RequestData {
-                            accessToken: String,
-                            selectedProfile: String,
-                            serverId: String,
-                        }
-                        let req = RequestData {
-                            accessToken: auth_data.access_token,
-                            selectedProfile: auth_data.selected_profile,
-                            serverId: hash,
-                        };
-                        let req = serde_json::to_string(&req)?;
-                        let response =
-                            ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
-                                .set("Content-Type", "application/json; charset=utf-8")
-                                .send_string(&req)?;
-
-                        // 204 No Content = Ok
-                        if response.status() != 204 {
-                            return Err(anyhow::Error::msg("bad mojang auth"));
-                        }
-
-                        let response = EncryptionBeginRequest {
-                            shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
-                            verify_token: &Proxy::rsa_crypt(
-                                packet.public_key,
-                                packet.verify_token,
-                            )?,
-                        };
-                        let buf = Proxy::serialize_enc_response(response)?;
-                        src_session.write(&buf);
-
-                        let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
-                        let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
-
-                        src_session.crypt = Some(Encryption { enc, dec });
-                    }
-                    _ => {}
-                }
-                false
-            }
-            None => true,
+        let packet_data = match protocol::read_packet_info(src, self.compression, &mut self.tmp)? {
+            Some(x) => x,
+            None => return Ok(None),
         };
-        Ok(OnStartResult { done, skip, count })
+        let total_size = packet_data.total_size;
+
+        let mut reader = Reader::new(packet_data.data);
+        let packet =
+            protocol::just_deserialize(direction, self.state, packet_data.id, &mut reader)?;
+
+        println!("{:?}", packet);
+        let mut skip = false;
+        match packet {
+            Packet::SetProtocolRequest(x) => match x.next_state {
+                1 => {
+                    self.start_done = true;
+                    self.state = ConnectionState::Status;
+                }
+                2 => {
+                    self.state = ConnectionState::Login;
+                }
+                _ => unimplemented!(),
+            },
+            // ---------------------------------------------------
+            Packet::SuccessResponse(_) => {
+                self.start_done = true;
+                self.state = ConnectionState::Play;
+            }
+            Packet::CompressResponse(x) => {
+                self.compression = x.threshold >= 0;
+            }
+            Packet::EncryptionBeginResponse(packet) => {
+                skip = true;
+                let aes_key: [u8; 16] = rand::random();
+
+                let hash = {
+                    let mut sha1 = sha1::Sha1::new();
+                    sha1.update(packet.server_id);
+                    sha1.update(aes_key);
+                    sha1.update(&packet.public_key);
+                    let hash = sha1.finalize();
+
+                    num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
+                };
+
+                let mut auth_data = self.auth_data.take().unwrap();
+                auth_data.selected_profile.retain(|c| c != '-');
+
+                #[allow(non_snake_case)]
+                #[derive(Serialize)]
+                struct RequestData {
+                    accessToken: String,
+                    selectedProfile: String,
+                    serverId: String,
+                }
+                let req = RequestData {
+                    accessToken: auth_data.access_token,
+                    selectedProfile: auth_data.selected_profile,
+                    serverId: hash,
+                };
+                let req = serde_json::to_string(&req)?;
+                let response =
+                    ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
+                        .set("Content-Type", "application/json; charset=utf-8")
+                        .send_string(&req)?;
+
+                // 204 No Content = Ok
+                if response.status() != 204 {
+                    return Err(anyhow::Error::msg("bad mojang auth"));
+                }
+
+                let response = EncryptionBeginRequest {
+                    shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
+                    verify_token: &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
+                };
+                let buf = Proxy::serialize_enc_response(response)?;
+                src_session.write(&buf);
+
+                let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
+                let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
+
+                src_session.crypt = Some(Encryption { enc, dec });
+            }
+            _ => {}
+        }
+
+        Ok(Some(OnStartResult { skip, total_size }))
     }
 
     fn forward(
@@ -250,15 +277,11 @@ impl Proxy {
         src.read(buf);
 
         let mut offset = 0;
-        loop {
-            let result = self.on_start(src, offset, direction)?;
-            if result.done {
-                break;
-            }
+        while let Some(result) = self.on_start(src, offset, direction)? {
             if !result.skip {
-                dest.write(&src.read_buf[offset..offset + result.count]);
+                dest.write(&src.read_buf[offset..offset + result.total_size]);
             }
-            offset += result.count;
+            offset += result.total_size;
         }
         src.read_buf.drain(..offset);
 
@@ -306,7 +329,7 @@ fn run(
     poller.add(&server_socket, Event::readable(SERVER_KEY))?;
 
     let mut events = Vec::new();
-    let mut buffer = [0; 16 * 1024];
+    let mut buffer = [0; 64 * 1024];
     loop {
         events.clear();
         poller.wait(&mut events, None)?;

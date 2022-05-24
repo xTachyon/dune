@@ -51,16 +51,15 @@ impl MinecraftDeserialize for bool {
     }
 }
 
-// impl MinecraftDeserialize for VarInt {
-//     fn deserialize<R: Read>(reader: R) -> Result<Self> {
-//         VarInt::deserialize_read(reader)
-//     }
-// }
+const MAX_DATA_SIZE: usize = 5 * 1024 * 1024;
 
 impl MinecraftDeserialize for String {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
-        let size = read_varint(&mut reader)?;
-        let mut buffer = vec![0; size as usize];
+        let size = read_varint(&mut reader)? as usize;
+        if size > MAX_DATA_SIZE {
+            return Err(anyhow!("string size too big"));
+        }
+        let mut buffer = vec![0; size];
         reader.read_exact(&mut buffer)?;
         Ok(String::from_utf8(buffer)?)
     }
@@ -68,8 +67,11 @@ impl MinecraftDeserialize for String {
 
 impl MinecraftDeserialize for Vec<u8> {
     fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
-        let size = read_varint(&mut reader)?;
-        let mut buffer = vec![0; size as usize];
+        let size = read_varint(&mut reader)? as usize;
+        if size > MAX_DATA_SIZE {
+            return Err(anyhow!("buffer size too big"));
+        }
+        let mut buffer = vec![0; size];
         reader.read_exact(&mut buffer)?;
         Ok(buffer)
     }
@@ -87,41 +89,6 @@ impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
             None
         };
         Ok(result)
-    }
-}
-
-//macro_rules! impl_for_tuples {
-//    ($($template:ident,)*) => {
-//        impl<
-//        $(
-//            $template
-//        )* > MinecraftDeserialize for (
-//        $(
-//            $template
-//        )*
-//        ) {
-//
-//        }
-//    };
-//}
-//
-//impl_for_tuples!(A, B);
-
-impl<A, B, C> MinecraftDeserialize for (A, B, C)
-where
-    A: MinecraftDeserialize,
-    B: MinecraftDeserialize,
-    C: MinecraftDeserialize,
-{
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let a = MinecraftDeserialize::deserialize(&mut reader)?;
-        let b = MinecraftDeserialize::deserialize(&mut reader)?;
-        let c = MinecraftDeserialize::deserialize(&mut reader)?;
-
-        Ok((a, b, c))
     }
 }
 
@@ -178,7 +145,7 @@ impl<'r> Reader<'r> {
         self.cursor.get_ref()
     }
 
-    fn offset(&self) -> usize {
+    pub fn offset(&self) -> usize {
         self.cursor.position() as usize
     }
 }

@@ -20,60 +20,65 @@ pub enum ConnectionState {
     Play = 3,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, TryFromPrimitive)]
 pub enum PacketDirection {
     ClientToServer,
     ServerToClient,
 }
 
-pub fn deserialize_with_header<'r>(
-    direction: PacketDirection,
-    state: ConnectionState,
-    mut reader: &'r mut Reader<'r>,
-    compression: bool,
+pub struct PacketData<'p> {
+    pub id: u32,
+    pub data: &'p [u8],
+    pub total_size: usize,
+}
+
+pub fn read_packet_info<'r>(
+    buffer: &'r [u8],
+    mut compression: bool,
     tmp: &'r mut Vec<u8>,
-) -> Result<Option<(Packet<'r>, usize)>> {
-    if !has_enough_bytes(reader.get()) {
+) -> Result<Option<PacketData<'r>>> {
+    if !has_enough_bytes(buffer) {
         return Ok(None);
     }
+    let mut reader = Reader::new(buffer);
     let (length, length_size) = read_varint_with_size(&mut reader)?;
 
-    let packet = if compression {
-        deserialize_compressed(direction, state, reader, tmp)
-    } else {
-        deserialize_uncompressed(direction, state, reader)
-    }?;
-    let result = packet.map(|packet| (packet, length as usize + length_size));
-    Ok(result)
-}
+    if compression {
+        let data_length = read_varint(&mut reader)?;
+        compression = data_length != 0;
+        if compression {
+            tmp.clear();
 
-fn deserialize_compressed<'r>(
-    direction: PacketDirection,
-    state: ConnectionState,
-    mut reader: &'r mut Reader<'r>,
-    tmp: &'r mut Vec<u8>,
-) -> Result<Option<Packet<'r>>> {
-    let data_length = read_varint(&mut reader)?;
-
-    if data_length != 0 {
-        let mut decompress = ZlibDecoder::new(&mut reader);
-        decompress.read_to_end(tmp)?;
-        *reader = Reader::new(tmp);
+            let mut decompress = ZlibDecoder::new(&mut reader);
+            decompress.read_to_end(tmp)?;
+            reader = Reader::new(tmp);
+        }
     }
 
-    deserialize_uncompressed(direction, state, reader)
+    let id = read_varint(&mut reader)? as u32;
+    let data = if compression {
+        &tmp[reader.offset()..]
+    } else {
+        &buffer[reader.offset()..]
+    };
+    let result = PacketData {
+        id,
+        data,
+        total_size: length as usize + length_size,
+    };
+
+    Ok(Some(result))
 }
 
-fn deserialize_uncompressed<'r>(
+pub fn just_deserialize<'r>(
     direction: PacketDirection,
     state: ConnectionState,
-    mut reader: &'r mut Reader<'r>,
-) -> Result<Option<Packet<'r>>> {
-    let id = read_varint(&mut reader)?;
-    // println!("state={:?}, id={}", state, *id);
-
-    let packet = de_packets(state, direction, id as u32, reader)?;
-    Ok(Some(packet))
+    id: u32,
+    reader: &'r mut Reader<'r>,
+) -> Result<Packet<'r>> {
+    let packet = de_packets(state, direction, id, reader)?;
+    Ok(packet)
 }
 
 fn has_enough_bytes(bytes: &[u8]) -> bool {

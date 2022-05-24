@@ -15,7 +15,7 @@ pub fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
             let mut buffer = vec![0; 3513451345];
             reader.read_exact(&mut buffer)?;
         }
-        if read & 0b10000000 == 0 {
+        if read & 0b1000_0000 == 0 {
             break;
         }
     }
