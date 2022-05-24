@@ -1,11 +1,11 @@
-use crate::events::{ChatEvent, EventSubscriber};
+use crate::events::{EventSubscriber, Position};
 use crate::protocol::de::Reader;
-use crate::protocol::v1_18_2::play::ChatResponse;
 use crate::protocol::{ConnectionState, Packet};
 use crate::{protocol, DiskPacket};
 use anyhow::Result;
 use std::fs::File;
 use std::io::Read;
+use std::time::Duration;
 
 struct TrafficPlayer {
     reader: File,
@@ -24,14 +24,6 @@ impl TrafficPlayer {
         })
     }
 
-    fn do_chat(&mut self, chat: ChatResponse) -> Result<()> {
-        let event = ChatEvent {
-            message: chat.message.to_string(),
-        };
-        self.handler.on_chat(event)?;
-        Ok(())
-    }
-
     fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
         let mut reader = Reader::new(disk_packet.data);
         let packet = protocol::just_deserialize(
@@ -43,17 +35,28 @@ impl TrafficPlayer {
 
         // println!("{:?}", packet);
         match packet {
-            Packet::SetProtocolRequest(x) => {
-                self.state = match x.next_state {
+            Packet::SetProtocolRequest(p) => {
+                self.state = match p.next_state {
                     1 => ConnectionState::Status,
                     2 => ConnectionState::Login,
                     _ => unimplemented!(),
                 };
             }
-            Packet::SuccessResponse(_) => {
+            Packet::SuccessResponse(p) => {
                 self.state = ConnectionState::Play;
+                self.handler.player_info(p.username, p.uuid)?;
             }
-            Packet::ChatResponse(x) => self.do_chat(x)?,
+            Packet::ChatResponse(p) => self.handler.on_chat(p.message)?,
+            Packet::PositionRequest(p) => self.handler.position(Position {
+                x: p.x,
+                y: p.y,
+                z: p.z,
+            })?,
+            Packet::PositionResponse(p) => self.handler.position(Position {
+                x: p.x,
+                y: p.y,
+                z: p.z,
+            })?,
             _ => {}
         }
         Ok(())
@@ -65,7 +68,8 @@ impl TrafficPlayer {
         loop {
             let read = self.reader.read(&mut tmp)?;
             if read == 0 {
-                break;
+                std::thread::sleep(Duration::from_millis(20));
+                continue;
             }
             buffer.extend_from_slice(&tmp[..read]);
 
@@ -77,7 +81,6 @@ impl TrafficPlayer {
 
             buffer.drain(..cursor.offset());
         }
-        Ok(())
     }
 }
 

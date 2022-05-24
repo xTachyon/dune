@@ -1,15 +1,45 @@
 use anyhow::Result;
-use proxy_lib::events::{ChatEvent, EventSubscriber};
+use proxy_lib::events::{EventSubscriber, Position};
 use proxy_lib::player::play;
 use proxy_lib::recorder::{record_to_file, AuthData};
 use std::env;
 use std::fs::File;
 
-struct EventHandler {}
+struct EventHandler {
+    player_name: String,
+    player_uuid: u128,
+    player_position: Position,
+}
+
+impl EventHandler {
+    fn new() -> EventHandler {
+        EventHandler {
+            player_name: "".to_string(),
+            player_uuid: 0,
+            player_position: Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        }
+    }
+}
 
 impl EventSubscriber for EventHandler {
-    fn on_chat(&self, event: ChatEvent) -> Result<()> {
-        println!("chat: {}", event.message);
+    fn on_chat(&mut self, message: &str) -> Result<()> {
+        println!("chat: {}", message);
+        Ok(())
+    }
+    fn player_info(&mut self, name: &str, uuid: u128) -> Result<()> {
+        self.player_name = name.to_string();
+        self.player_uuid = uuid;
+        Ok(())
+    }
+    fn position(&mut self, pos: Position) -> Result<()> {
+        if pos != self.player_position {
+            println!("{:?}", pos);
+        }
+        self.player_position = pos;
         Ok(())
     }
 }
@@ -45,7 +75,7 @@ fn main() -> Result<()> {
             record_to_file(server_address, auth_data, "packets.dune")?;
         }
         "play" => {
-            let handler = Box::new(EventHandler {});
+            let handler = Box::new(EventHandler::new());
             play("packets.dune", handler)?;
         }
         _ => {}
