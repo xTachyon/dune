@@ -1,6 +1,7 @@
 use anyhow::Result;
 use proxy_lib::events::{ChatEvent, EventSubscriber};
-use proxy_lib::{play, record_to_file, AuthData};
+use proxy_lib::player::play;
+use proxy_lib::recorder::{record_to_file, AuthData};
 use std::env;
 use std::fs::File;
 
@@ -8,7 +9,7 @@ struct EventHandler {}
 
 impl EventSubscriber for EventHandler {
     fn on_chat(&self, event: ChatEvent) -> Result<()> {
-        println!("chat: {:?}", event);
+        println!("chat: {}", event.message);
         Ok(())
     }
 }
