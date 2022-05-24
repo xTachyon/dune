@@ -118,6 +118,10 @@ impl<'r> Reader<'r> {
 
     pub fn read_range(&mut self) -> Result<Range<usize>> {
         let size = read_varint(&mut self.cursor)? as usize;
+        self.read_range_size(size)
+    }
+
+    pub fn read_range_size(&mut self, size: usize) -> Result<Range<usize>> {
         let start = self.offset();
         let end = start + size;
         let vec_len = self.get().len();

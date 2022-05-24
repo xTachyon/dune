@@ -241,7 +241,7 @@ impl Proxy {
                 let disk_packet = DiskPacket {
                     id: packet_data.id,
                     direction,
-                    data: data.to_vec(),
+                    data,
                 };
                 disk_packet.write(&mut self.out_file)?;
 

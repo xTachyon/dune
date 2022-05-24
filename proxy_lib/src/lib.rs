@@ -1,7 +1,7 @@
-use crate::protocol::de::MinecraftDeserialize;
+use crate::protocol::de::{MinecraftDeserialize, Reader};
 use crate::protocol::PacketDirection;
 use anyhow::Result;
-use std::io::{Read, Write};
+use std::io::Write;
 
 pub mod events;
 mod game;
@@ -9,30 +9,30 @@ pub mod player;
 mod protocol;
 pub mod recorder;
 
-struct DiskPacket {
+struct DiskPacket<'p> {
     pub id: u32,
     pub direction: PacketDirection,
-    pub data: Vec<u8>, // todo: make it copy free
+    pub data: &'p [u8],
 }
 
-impl DiskPacket {
+impl<'p> DiskPacket<'p> {
     fn write<W: Write>(&self, mut writer: W) -> Result<()> {
         let size = 4 + 1 + self.data.len() as u32;
         writer.write_all(&size.to_be_bytes())?;
         writer.write_all(&self.id.to_be_bytes())?;
         writer.write_all(&[self.direction as u8])?;
-        writer.write_all(&self.data)?;
+        writer.write_all(self.data)?;
 
         Ok(())
     }
 
-    fn read<R: Read>(mut reader: R) -> Result<DiskPacket> {
+    fn read(mut reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
         let size: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
         let id: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
         let direction: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
         let direction = PacketDirection::try_from(direction)?;
-        let mut data = vec![0; size as usize - 4 - 1];
-        reader.read_exact(&mut data)?;
+        let data = reader.read_range_size(size as usize - 4 - 1)?;
+        let data = reader.get_buf_from(data)?;
 
         Ok(DiskPacket {
             id,

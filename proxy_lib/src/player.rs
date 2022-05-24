@@ -33,7 +33,7 @@ impl TrafficPlayer {
     }
 
     fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
-        let mut reader = Reader::new(&disk_packet.data);
+        let mut reader = Reader::new(disk_packet.data);
         let packet = protocol::just_deserialize(
             disk_packet.direction,
             self.state,
