@@ -2,10 +2,11 @@ pub mod events;
 mod game;
 mod protocol;
 
-use crate::events::EventSubscriber;
+use crate::events::{ChatEvent, EventSubscriber};
 use crate::protocol::de::MinecraftDeserialize;
 use crate::protocol::v1_18_2::login::EncryptionBeginRequest;
-use crate::protocol::{ConnectionState, Packet, PacketDirection};
+use crate::protocol::v1_18_2::play::ChatResponse;
+use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use anyhow::Result;
 use byteorder::WriteBytesExt;
 use cfb8::cipher::AsyncStreamCipher;
@@ -18,6 +19,7 @@ use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::Digest;
 use std::convert::TryFrom;
+use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
 
@@ -75,11 +77,12 @@ struct Proxy {
     start_done: bool,
     auth_data: Option<AuthData>,
     tmp: Vec<u8>,
+    out_file: File,
 }
 
 struct OnStartResult {
     skip: bool,
-    total_size: usize,
+    packet_data: PacketData,
 }
 
 struct DiskPacket {
@@ -91,7 +94,8 @@ struct DiskPacket {
 impl DiskPacket {
     fn write<W: Write>(&self, mut writer: W) -> Result<()> {
         let size = 4 + 1 + self.data.len() as u32;
-        writer.write_all(&size.to_le_bytes())?;
+        writer.write_all(&size.to_be_bytes())?;
+        writer.write_all(&self.id.to_be_bytes())?;
         writer.write_all(&[self.direction as u8])?;
         writer.write_all(&self.data)?;
 
@@ -117,20 +121,21 @@ impl DiskPacket {
         if buf.len() < 4 {
             return false;
         }
-        let size = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+        let size = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
         size + 4 <= buf.len()
     }
 }
 
 impl Proxy {
-    fn new(auth_data: AuthData) -> Proxy {
-        Proxy {
+    fn new(auth_data: AuthData, out_path: &str) -> Result<Proxy> {
+        Ok(Proxy {
             state: ConnectionState::Handshaking,
             compression: false,
             start_done: false,
             auth_data: Some(auth_data),
             tmp: vec![],
-        }
+            out_file: File::create(out_path)?,
+        })
     }
 
     fn rsa_crypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
@@ -171,9 +176,9 @@ impl Proxy {
         Ok(result)
     }
 
-    fn on_start(
-        &mut self,
-        src_session: &mut Session,
+    fn on_start<'p>(
+        &'p mut self,
+        src_session: &'p mut Session,
         offset: usize,
         direction: PacketDirection,
     ) -> Result<Option<OnStartResult>> {
@@ -182,9 +187,8 @@ impl Proxy {
             Some(x) => x,
             None => return Ok(None),
         };
-        let total_size = packet_data.total_size;
-
-        let mut reader = Reader::new(packet_data.data);
+        let data = packet_data.get_data(src, &mut self.tmp);
+        let mut reader = Reader::new(data);
         let packet =
             protocol::just_deserialize(direction, self.state, packet_data.id, &mut reader)?;
 
@@ -264,7 +268,7 @@ impl Proxy {
             _ => {}
         }
 
-        Ok(Some(OnStartResult { skip, total_size }))
+        Ok(Some(OnStartResult { skip, packet_data }))
     }
 
     fn forward(
@@ -278,10 +282,21 @@ impl Proxy {
 
         let mut offset = 0;
         while let Some(result) = self.on_start(src, offset, direction)? {
+            let packet_data = result.packet_data;
+            let data = packet_data.get_data(&src.read_buf[offset..], &mut self.tmp);
+
             if !result.skip {
-                dest.write(&src.read_buf[offset..offset + result.total_size]);
+                let disk_packet = DiskPacket {
+                    id: packet_data.id,
+                    direction,
+                    data: data.to_vec(),
+                };
+                disk_packet.write(&mut self.out_file)?;
+
+                let bytes = &src.read_buf[offset..offset + packet_data.total_size_original];
+                dest.write(bytes);
             }
-            offset += result.total_size;
+            offset += packet_data.total_size_original;
         }
         src.read_buf.drain(..offset);
 
@@ -311,6 +326,7 @@ fn run(
     mut client_socket: TcpStream,
     mut server_socket: TcpStream,
     auth_data: AuthData,
+    out_path: &str,
     stats: &mut RunStats,
 ) -> Result<()> {
     const CLIENT_KEY: usize = 0;
@@ -318,7 +334,7 @@ fn run(
 
     let mut client = Session::new();
     let mut server = Session::new();
-    let mut proxy = Proxy::new(auth_data);
+    let mut proxy = Proxy::new(auth_data, out_path)?;
 
     let poller = Poller::new()?;
 
@@ -386,11 +402,7 @@ fn run(
     }
 }
 
-pub fn do_things(
-    server_address: &str,
-    auth_data: AuthData,
-    _handler: Box<dyn EventSubscriber + Sync>,
-) -> Result<()> {
+pub fn record_to_file(server_address: &str, auth_data: AuthData, out_path: &str) -> Result<()> {
     let addr = "0.0.0.0:25566";
     let (client, client_addr) = {
         let incoming = TcpListener::bind(addr)?;
@@ -404,7 +416,89 @@ pub fn do_things(
     println!("connected to {}", server_address);
 
     let mut stats = RunStats { read: 0, write: 0 };
-    println!("{:?}", run(client, server, auth_data, &mut stats));
+    println!("{:?}", run(client, server, auth_data, out_path, &mut stats));
     println!("total read: {}\ntotal write: {}", stats.read, stats.write);
+    Ok(())
+}
+
+struct TrafficPlayer {
+    reader: File,
+    handler: Box<dyn EventSubscriber>,
+    state: ConnectionState,
+}
+
+impl TrafficPlayer {
+    fn new(in_path: &str, handler: Box<dyn EventSubscriber>) -> Result<TrafficPlayer> {
+        let reader = File::open(in_path)?;
+
+        Ok(TrafficPlayer {
+            reader,
+            handler,
+            state: ConnectionState::Handshaking,
+        })
+    }
+
+    fn do_chat(&mut self, chat: ChatResponse) -> Result<()> {
+        let event = ChatEvent {
+            message: chat.message.to_string(),
+        };
+        self.handler.on_chat(event)?;
+        Ok(())
+    }
+
+    fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
+        let mut reader = Reader::new(&disk_packet.data);
+        let packet = protocol::just_deserialize(
+            disk_packet.direction,
+            self.state,
+            disk_packet.id,
+            &mut reader,
+        )?;
+
+        println!("{:?}", packet);
+        match packet {
+            Packet::SetProtocolRequest(x) => match x.next_state {
+                1 => {
+                    self.state = ConnectionState::Status;
+                }
+                2 => {
+                    self.state = ConnectionState::Login;
+                }
+                _ => unimplemented!(),
+            },
+            Packet::SuccessResponse(_) => {
+                self.state = ConnectionState::Play;
+            }
+            Packet::ChatResponse(x) => self.do_chat(x)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn run(&mut self) -> Result<()> {
+        let mut buffer = Vec::new();
+        let mut tmp = [0; 64 * 1024];
+        loop {
+            let read = self.reader.read(&mut tmp)?;
+            if read == 0 {
+                break;
+            }
+            buffer.extend_from_slice(&tmp[..read]);
+
+            let mut cursor = Reader::new(&buffer);
+            while DiskPacket::has_enough_bytes(&buffer[cursor.offset()..]) {
+                let disk_packet = DiskPacket::read(&mut cursor)?;
+                self.do_packet(disk_packet)?;
+            }
+
+            buffer.drain(..cursor.offset());
+        }
+        Ok(())
+    }
+}
+
+pub fn play(in_path: &str, handler: Box<dyn EventSubscriber>) -> Result<()> {
+    let mut player = TrafficPlayer::new(in_path, handler)?;
+    player.run()?;
     Ok(())
 }

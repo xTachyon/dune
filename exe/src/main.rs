@@ -1,6 +1,7 @@
 use anyhow::Result;
 use proxy_lib::events::{ChatEvent, EventSubscriber};
-use proxy_lib::{do_things, AuthData};
+use proxy_lib::{play, record_to_file, AuthData};
+use std::env;
 use std::fs::File;
 
 struct EventHandler {}
@@ -13,7 +14,7 @@ impl EventSubscriber for EventHandler {
 }
 
 fn get_access_token() -> Result<AuthData> {
-    let path = std::env::var("appdata")? + "/.minecraft/TlauncherProfiles.json";
+    let path = env::var("appdata")? + "/.minecraft/TlauncherProfiles.json";
     let file = File::open(path)?;
     let value: serde_json::Value = serde_json::from_reader(file)?;
 
@@ -29,11 +30,25 @@ fn get_access_token() -> Result<AuthData> {
 }
 
 fn main() -> Result<()> {
-    let auth_data = get_access_token()?;
-    let server_address = "127.0.0.1:25565";
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 1 {
+        println!("no args supplied");
+        std::process::exit(1);
+    }
 
-    let handler = Box::new(EventHandler {});
-    do_things(server_address, auth_data, handler)?;
+    match args[1].as_str() {
+        "record" => {
+            let auth_data = get_access_token()?;
+            let server_address = "127.0.0.1:25565";
+
+            record_to_file(server_address, auth_data, "packets.dune")?;
+        }
+        "play" => {
+            let handler = Box::new(EventHandler {});
+            play("packets.dune", handler)?;
+        }
+        _ => {}
+    }
 
     Ok(())
 }

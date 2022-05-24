@@ -27,23 +27,38 @@ pub enum PacketDirection {
     ServerToClient,
 }
 
-pub struct PacketData<'p> {
+pub struct PacketData {
     pub id: u32,
-    pub data: &'p [u8],
+    pub total_size_original: usize,
     pub total_size: usize,
+    pub header_size: usize,
+    pub compression: bool,
+}
+
+impl PacketData {
+    pub fn get_data<'b>(&self, normal: &'b [u8], tmp: &'b [u8]) -> &'b [u8] {
+        let r = self.header_size..self.total_size;
+        if self.compression {
+            &tmp[r]
+        } else {
+            &normal[r]
+        }
+    }
 }
 
 pub fn read_packet_info<'r>(
     buffer: &'r [u8],
     mut compression: bool,
     tmp: &'r mut Vec<u8>,
-) -> Result<Option<PacketData<'r>>> {
+) -> Result<Option<PacketData>> {
     if !has_enough_bytes(buffer) {
         return Ok(None);
     }
     let mut reader = Reader::new(buffer);
     let (length, length_size) = read_varint_with_size(&mut reader)?;
 
+    let total_size_original = length as usize + length_size;
+    let mut total_size = total_size_original;
     if compression {
         let data_length = read_varint(&mut reader)?;
         compression = data_length != 0;
@@ -53,19 +68,17 @@ pub fn read_packet_info<'r>(
             let mut decompress = ZlibDecoder::new(&mut reader);
             decompress.read_to_end(tmp)?;
             reader = Reader::new(tmp);
+            total_size = tmp.len();
         }
     }
 
     let id = read_varint(&mut reader)? as u32;
-    let data = if compression {
-        &tmp[reader.offset()..]
-    } else {
-        &buffer[reader.offset()..]
-    };
     let result = PacketData {
         id,
-        data,
-        total_size: length as usize + length_size,
+        total_size,
+        total_size_original,
+        header_size: reader.offset(),
+        compression,
     };
 
     Ok(Some(result))
