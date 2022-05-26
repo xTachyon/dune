@@ -1,8 +1,8 @@
 [workspace]
 members = [
-  "exe",
-  "proxy_lib"
+  "dune",
+  "melon"
 ]
 
-[profile.release]
-lto = true
+#[profile.release]
+#lto = true

@@ -310,7 +310,7 @@ def main():
     gen = Generator()
     gen.gen(states)
 
-    out_file = "../proxy_lib/src/protocol/v1_18_2.rs"
+    out_file = "../melon/src/protocol/v1_18_2.rs"
     with open(out_file, "w") as f:
         f.write(gen.out)
     subprocess.run(["rustfmt", out_file])

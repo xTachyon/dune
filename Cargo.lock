@@ -198,7 +198,7 @@ name = "dune"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "proxy_lib",
+ "melon",
  "serde_json",
 ]
 
@@ -315,6 +315,28 @@ name = "matches"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
+
+[[package]]
+name = "melon"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "anyhow",
+ "byteorder",
+ "cfb8",
+ "cipher 0.4.3",
+ "flate2",
+ "num-bigint",
+ "num_enum",
+ "polling",
+ "rand",
+ "rsa",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha1",
+ "ureq",
+]
 
 [[package]]
 name = "miniz_oxide"
@@ -490,28 +512,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
-]
-
-[[package]]
-name = "proxy_lib"
-version = "0.1.0"
-dependencies = [
- "aes",
- "anyhow",
- "byteorder",
- "cfb8",
- "cipher 0.4.3",
- "flate2",
- "num-bigint",
- "num_enum",
- "polling",
- "rand",
- "rsa",
- "serde",
- "serde_derive",
- "serde_json",
- "sha1",
- "ureq",
 ]
 
 [[package]]

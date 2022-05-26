@@ -1,7 +1,7 @@
 use anyhow::Result;
-use proxy_lib::events::{EventSubscriber, Position};
-use proxy_lib::player::play;
-use proxy_lib::recorder::{record_to_file, AuthData};
+use melon::events::{EventSubscriber, Position};
+use melon::player::play;
+use melon::recorder::{record_to_file, AuthData};
 use std::env;
 use std::fs::File;
 
