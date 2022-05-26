@@ -61,6 +61,11 @@ fn get_access_token() -> Result<AuthData> {
 }
 
 fn main() -> Result<()> {
+    let file = std::fs::read(r#"C:\Users\andre\Downloads\bigtest.nbt"#).unwrap();
+    let mut data = file.as_slice();
+    let p = melon::nbt::read(&mut data).unwrap();
+    println!("{}", melon::nbt::pretty_print(&p)?);
+    return Ok(());
     let args: Vec<String> = env::args().collect();
     if args.len() == 1 {
         println!("no args supplied");

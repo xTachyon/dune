@@ -5,6 +5,7 @@ use std::io::Write;
 
 pub mod events;
 mod game;
+pub mod nbt;
 pub mod player;
 mod protocol;
 pub mod recorder;
