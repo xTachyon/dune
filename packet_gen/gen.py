@@ -17,7 +17,7 @@ def snake_to_pascal(name):
     return name.title().replace("_", "")
 
 
-class Ty(enum.Enum):
+class BuiltinType(enum.Enum):
     STRING = "string"
     BUFFER = "buffer"
     VARINT = "varint"
@@ -37,6 +37,40 @@ class Ty(enum.Enum):
     F64 = "f64"
 
 
+class ArrayType:
+    def __init__(self, subtype, count_type):
+        self.subtype = subtype
+        self.count_type = count_type
+
+
+class OptionType:
+    def __init__(self, subtype):
+        self.subtype = subtype
+
+
+class StructType:
+    def __init__(self, name, fields, needs_lifetime):
+        self.name = name
+        self.fields = fields
+        self.needs_lifetime = needs_lifetime
+
+
+def is_builtin(x):
+    return isinstance(x, BuiltinType)
+
+
+def is_array(x):
+    return isinstance(x, ArrayType)
+
+
+def is_option(x):
+    return isinstance(x, OptionType)
+
+
+def is_struct(x):
+    return isinstance(x, StructType)
+
+
 class Field:
     def __init__(self, name, ty):
         self.name = name
@@ -44,10 +78,9 @@ class Field:
 
 
 class Packet:
-    def __init__(self, name, fields, needs_lifetime, valid):
+    def __init__(self, name, struct, valid):
         self.name = name
-        self.fields = fields
-        self.needs_lifetime = needs_lifetime
+        self.struct = struct
         self.valid = valid
 
 
@@ -64,8 +97,9 @@ class Direction(enum.Enum):
 
 
 class DirectionInfo:
-    def __init__(self, direction, packets, mappings):
+    def __init__(self, direction, structs, packets, mappings):
         self.direction = direction
+        self.structs = structs
         self.packets = packets
         self.mappings = mappings
 
@@ -76,84 +110,123 @@ class StateInfo:
         self.directions = directions
 
 
-class Parser:
-    def parse_container(self, j, name):
-        packet_name = name.title().replace('_', '')
-        fields = []
+def parse_array(ty, parent_name, structs):
+    count_type = parse_type(ty["countType"], parent_name, structs)
+    ty = parse_type(ty["type"], parent_name, structs)
+    return ArrayType(ty, count_type)
 
-        needs_lifetime = False
-        for i in j:
-            name = i["name"]
-            name = pascal_to_snake(name)
-            if name == "type":
-                name = "type_"
-            ty = i["type"]
-            if isinstance(ty, str):
-                if ty == "u8":
-                    ty = Ty.U8
-                elif ty == "u16":
-                    ty = Ty.U16
 
-                elif ty == "i8":
-                    ty = Ty.I8
-                elif ty == "i16":
-                    ty = Ty.I16
-                elif ty == "i32":
-                    ty = Ty.I32
-                elif ty == "i64":
-                    ty = Ty.I64
+def parse_option(ty, parent_name, structs):
+    subtype = parse_type(ty, parent_name, structs)
+    return OptionType(subtype)
 
-                elif ty == "f32":
-                    ty = Ty.F32
-                elif ty == "f64":
-                    ty = Ty.F64
 
-                elif ty == "bool":
-                    ty = Ty.BOOL
-                elif ty == "UUID":
-                    ty = Ty.UUID
-                elif ty == "string":
-                    ty = Ty.STRING
-                elif ty == "varint":
-                    ty = Ty.VARINT
-                elif ty == "position":
-                    ty = Ty.POSITION
-            else:
-                ty = ty[0]
-                if ty == "buffer":
-                    ty = Ty.BUFFER
+def parse_type(ty, parent_name, structs):
+    original_ty = ty
+    if isinstance(ty, str):
+        if ty == "u8":
+            return BuiltinType.U8
+        if ty == "u16":
+            return BuiltinType.U16
 
-            if not isinstance(ty, Ty):
-                print(f"couldn't parse name=`{name}`,type=`{ty}` in packet `{packet_name}`")
-                return Packet(packet_name, [], False, False)
+        if ty == "i8":
+            return BuiltinType.I8
+        if ty == "i16":
+            return BuiltinType.I16
+        if ty == "i32":
+            return BuiltinType.I32
+        if ty == "i64":
+            return BuiltinType.I64
 
-            needs_lifetime = needs_lifetime or ty == Ty.STRING or ty == Ty.BUFFER
-            fields.append(Field(name, ty))
+        if ty == "f32":
+            return BuiltinType.F32
+        if ty == "f64":
+            return BuiltinType.F64
 
-        return Packet(packet_name, fields, needs_lifetime, True)
+        if ty == "bool":
+            return BuiltinType.BOOL
+        if ty == "UUID":
+            return BuiltinType.UUID
+        if ty == "string":
+            return BuiltinType.STRING
+        if ty == "varint":
+            return BuiltinType.VARINT
+        if ty == "position":
+            return BuiltinType.POSITION
+    ty = ty[0]
+    if ty == "buffer":
+        return BuiltinType.BUFFER
+    if ty == "array":
+        return parse_array(original_ty[1], parent_name, structs)
+    if ty == "option":
+        return parse_option(original_ty[1], parent_name, structs)
+    if ty == "container":
+        return parse_container(original_ty[1], parent_name, structs)
 
-    def make_name_direction(self, state, direction, name):
-        if name == "packet" or name.endswith("_request") or name.endswith("_response"):
-            return name
+    raise Exception("unknown type")
 
-        if direction == Direction.C2S:
-            name += "_request"
-        else:
-            name += "_response"
 
-        if name == "ping_response":
-            if state == State.PLAY:
-                name = "play_ping_response"
+def parse_container(j, struct_name, structs, root=False):
+    if struct_name == "TradeListResponse":
+        pass
+    if struct_name in ["UpdateLightResponse", "EntityDestroyResponse", "SetPassengersResponse", "EditBookRequest",
+                       "ResourcePackSendResponse", "SelectAdvancementTabResponse"]:
+        raise Exception("unsupported packet")
+
+    fields = []
+
+    needs_lifetime = False
+    for i in j:
+        name = i["name"]
+        name = pascal_to_snake(name)
+        if name == "type":
+            name = "type_"
+        if name == "match":
+            name = "match_"
+        ty = i["type"]
+        try:
+            ty = parse_type(ty, struct_name, structs)
+        except:
+            print(f"couldn't parse name=`{name}`,type=`{ty}` in packet `{struct_name}`")
+            raise
+
+        needs_lifetime = needs_lifetime or ty == BuiltinType.STRING or ty == BuiltinType.BUFFER
+        fields.append(Field(name, ty))
+
+    if not root:
+        for i in fields:
+            struct_name += i.name.title()
+
+    result = StructType(struct_name, fields, needs_lifetime)
+    structs.append(result)
+    return result
+
+
+def make_name_direction(state, direction, name):
+    if name == "packet" or name.endswith("_request") or name.endswith("_response"):
         return name
 
+    if direction == Direction.C2S:
+        name += "_request"
+    else:
+        name += "_response"
+
+    if name == "ping_response":
+        if state == State.PLAY:
+            name = "play_ping_response"
+    return name
+
+
+class Parser:
     def parse_direction(self, j, state, direction):
         packets = []
+        structs = []
         j = j[direction.value]["types"]
         m = {}
         for name in j:
             value = j[name]
             name = name.removeprefix("packet_")
-            name = self.make_name_direction(state, direction, name)
+            name = make_name_direction(state, direction, name)
 
             ty = value[0]
             if name == "packet":
@@ -164,16 +237,21 @@ class Parser:
                 mappings = mappings["type"][1]["mappings"]
                 for m_id in mappings:
                     mapping_name = mappings[m_id]
-                    mapping_name = self.make_name_direction(state, direction, mapping_name)
+                    mapping_name = make_name_direction(state, direction, mapping_name)
                     m_id = int(m_id, 16)
                     m[m_id] = mapping_name
             elif ty == "container":
-                p = self.parse_container(value[1], name)
-                packets.append(p)
+                packet_name = name.title().replace('_', '')
+                try:
+                    struct = parse_container(value[1], packet_name, structs, True)
+                    p = Packet(packet_name, struct, True)
+                    packets.append(p)
+                except:
+                    packets.append(Packet(packet_name, None, False))
             else:
                 unreachable()
 
-        return DirectionInfo(direction, packets, m)
+        return DirectionInfo(direction, structs, packets, m)
 
     def parse_state(self, j, state):
         j = j[state.value]
@@ -191,64 +269,84 @@ class Parser:
         return result
 
 
+def get_type(ty):
+    if is_array(ty):
+        return f"Vec<{get_type(ty.subtype)}>"
+    if is_option(ty):
+        return f"Option<{get_type(ty.subtype)}>"
+    if is_struct(ty):
+        return ty.name
+
+    if ty == BuiltinType.VARINT:
+        return "i32"
+    if ty == BuiltinType.STRING:
+        return "&'p str"
+    if ty == BuiltinType.BUFFER:
+        return "&'p [u8]"
+    if ty == BuiltinType.POSITION:
+        return "crate::protocol::de::Position"
+    return ty.value
+
+
+def deserialize_type(name, ty):
+    if is_array(ty):
+        out = deserialize_type("count_array", ty.count_type)
+        out += f'''let mut {name} = Vec::with_capacity(count_array as usize); for _ in 0..count_array {{'''
+        out += deserialize_type("x", ty.subtype)
+        out += f'''{name}.push(x);}}'''
+        return out
+
+    out = f"let {name} = "
+    if ty == BuiltinType.STRING or ty == BuiltinType.BUFFER:
+        out += "reader.read_range()?;"
+    elif ty == BuiltinType.VARINT:
+        out += "read_varint(&mut reader)?;"
+    else:
+        out += "MinecraftDeserialize::deserialize(&mut reader)?;"
+    return out
+
+
 class Generator:
     def __init__(self):
         self.out = "#![allow(unused_imports)] #![allow(unused_mut)]"
 
-    def gen_packet(self, p):
+    def gen_struct(self, struct):
         needs_lifetime = False
-        for i in p.fields:
-            if i.ty == Ty.STRING or i.ty == Ty.BUFFER:
+
+        for i in struct.fields:
+            if i.ty == BuiltinType.STRING or i.ty == BuiltinType.BUFFER:
                 needs_lifetime = True
                 break
 
         lifetime_simple = f'''{"'p" if needs_lifetime else ""}'''
         lifetime = f'''{"<'p>" if needs_lifetime else ""}'''
-        self.out += f'''#[derive(Debug)] pub struct {p.name} {lifetime} {{'''
-        for i in p.fields:
-            if i.ty == Ty.VARINT:
-                ty = "i32"
-            elif i.ty == Ty.STRING:
-                ty = "&'p str"
-            elif i.ty == Ty.BUFFER:
-                ty = "&'p [u8]"
-            elif i.ty == Ty.POSITION:
-                ty = "crate::protocol::de::Position"
-            else:
-                ty = i.ty.value
+        self.out += f'''#[derive(Debug)] pub struct {struct.name} {lifetime} {{'''
+        for i in struct.fields:
+            ty = get_type(i.ty)
             self.out += f"pub {i.name}: {ty},"
 
         self.out += "}"
-        underscore = "_" if len(p.fields) == 0 else ""
-        self.out += f'''pub(super) fn packet_{pascal_to_snake(p.name)}{lifetime}(mut {underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
-        -> Result<{p.name}{lifetime}> {{ '''
-        for i in p.fields:
-            self.out += f"let {i.name} = "
-            if i.ty == Ty.STRING or i.ty == Ty.BUFFER:
-                self.out += "reader.read_range()?;"
-            elif i.ty == Ty.VARINT:
-                self.out += "read_varint(&mut reader)?;"
-            else:
-                self.out += "MinecraftDeserialize::deserialize(&mut reader)?;"
+        underscore = "_" if len(struct.fields) == 0 else ""
+        self.out += f'''pub(super) fn packet_{pascal_to_snake(struct.name)}{lifetime}(mut {underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
+        -> Result<{struct.name}{lifetime}> {{ '''
+        for i in struct.fields:
+            self.out += deserialize_type(i.name, i.ty)
 
-        for i in p.fields:
-            if i.ty == Ty.STRING:
+        for i in struct.fields:
+            if i.ty == BuiltinType.STRING:
                 self.out += f"let {i.name} = "
                 self.out += f"reader.get_str_from({i.name})?;"
-            elif i.ty == Ty.BUFFER:
+            elif i.ty == BuiltinType.BUFFER:
                 self.out += f"let {i.name} = "
                 self.out += f"reader.get_buf_from({i.name})?;"
 
-        self.out += f"\n\nlet result = {p.name} {{"
-        for i in p.fields:
+        self.out += f"\n\nlet result = {struct.name} {{"
+        for i in struct.fields:
             self.out += f"{i.name},"
 
         self.out += "};"
         self.out += "Ok(result)"
         self.out += "}"
-
-    def gen_map(self, c2s, s2c):
-        pass
 
     def gen(self, states):
         for state in states:
@@ -261,8 +359,8 @@ use crate::protocol::varint::read_varint;
 
 '''
             for direction in state.directions:
-                for i in direction.packets:
-                    self.gen_packet(i)
+                for i in direction.structs:
+                    self.gen_struct(i)
 
             self.out += "}"
 
@@ -279,7 +377,10 @@ pub enum Packet<'p> {{
         for state in states:
             for direction in state.directions:
                 for i in direction.packets:
-                    self.out += f'''{i.name}({state.state.value}::{i.name}{"<'p>" if i.needs_lifetime else ""}),'''
+                    needs_lifetime = False
+                    if i.struct is not None:
+                        needs_lifetime = i.struct.needs_lifetime
+                    self.out += f'''{i.name}({state.state.value}::{i.name}{"<'p>" if needs_lifetime else ""}),'''
 
         self.out += '''
 }
