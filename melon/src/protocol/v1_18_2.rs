@@ -1,10 +1,12 @@
 #![allow(unused_imports)]
 #![allow(unused_mut)]
+#![allow(non_camel_case_types)]
 pub mod handshaking {
     use crate::protocol::de::MinecraftDeserialize;
     use crate::protocol::de::Reader;
     use crate::protocol::varint::read_varint;
     use anyhow::Result;
+    use core::marker::PhantomData;
 
     #[derive(Debug)]
     pub struct SetProtocolRequest<'p> {
@@ -12,6 +14,7 @@ pub mod handshaking {
         pub server_host: &'p str,
         pub server_port: u16,
         pub next_state: i32,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_set_protocol_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -27,19 +30,24 @@ pub mod handshaking {
             server_host,
             server_port,
             next_state,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LegacyServerListPingRequest {
+    pub struct LegacyServerListPingRequest<'p> {
         pub payload: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_legacy_server_list_ping_request(
-        mut reader: &mut Reader,
-    ) -> Result<LegacyServerListPingRequest> {
+    pub(super) fn packet_legacy_server_list_ping_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<LegacyServerListPingRequest<'p>> {
         let payload = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = LegacyServerListPingRequest { payload };
+        let result = LegacyServerListPingRequest {
+            payload,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
 }
@@ -48,26 +56,40 @@ pub mod status {
     use crate::protocol::de::Reader;
     use crate::protocol::varint::read_varint;
     use anyhow::Result;
+    use core::marker::PhantomData;
 
     #[derive(Debug)]
-    pub struct PingStartRequest {}
-    pub(super) fn packet_ping_start_request(mut _reader: &mut Reader) -> Result<PingStartRequest> {
-        let result = PingStartRequest {};
+    pub struct PingStartRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_ping_start_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<PingStartRequest<'p>> {
+        let result = PingStartRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PingRequest {
+    pub struct PingRequest<'p> {
         pub time: i64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_ping_request(mut reader: &mut Reader) -> Result<PingRequest> {
+    pub(super) fn packet_ping_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PingRequest<'p>> {
         let time = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = PingRequest { time };
+        let result = PingRequest {
+            time,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct ServerInfoResponse<'p> {
         pub response: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_server_info_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -75,17 +97,26 @@ pub mod status {
         let response = reader.read_range()?;
         let response = reader.get_str_from(response)?;
 
-        let result = ServerInfoResponse { response };
+        let result = ServerInfoResponse {
+            response,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PingResponse {
+    pub struct PingResponse<'p> {
         pub time: i64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_ping_response(mut reader: &mut Reader) -> Result<PingResponse> {
+    pub(super) fn packet_ping_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PingResponse<'p>> {
         let time = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = PingResponse { time };
+        let result = PingResponse {
+            time,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
 }
@@ -94,10 +125,12 @@ pub mod login {
     use crate::protocol::de::Reader;
     use crate::protocol::varint::read_varint;
     use anyhow::Result;
+    use core::marker::PhantomData;
 
     #[derive(Debug)]
     pub struct LoginStartRequest<'p> {
         pub username: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_login_start_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -105,13 +138,17 @@ pub mod login {
         let username = reader.read_range()?;
         let username = reader.get_str_from(username)?;
 
-        let result = LoginStartRequest { username };
+        let result = LoginStartRequest {
+            username,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct EncryptionBeginRequest<'p> {
         pub shared_secret: &'p [u8],
         pub verify_token: &'p [u8],
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_encryption_begin_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -124,20 +161,26 @@ pub mod login {
         let result = EncryptionBeginRequest {
             shared_secret,
             verify_token,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginPluginResponse {}
-    pub(super) fn packet_login_plugin_response(
-        mut _reader: &mut Reader,
-    ) -> Result<LoginPluginResponse> {
-        let result = LoginPluginResponse {};
+    pub struct LoginPluginResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_login_plugin_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<LoginPluginResponse<'p>> {
+        let result = LoginPluginResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct DisconnectResponse<'p> {
         pub reason: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_disconnect_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -145,7 +188,10 @@ pub mod login {
         let reason = reader.read_range()?;
         let reason = reader.get_str_from(reason)?;
 
-        let result = DisconnectResponse { reason };
+        let result = DisconnectResponse {
+            reason,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -153,6 +199,7 @@ pub mod login {
         pub server_id: &'p str,
         pub public_key: &'p [u8],
         pub verify_token: &'p [u8],
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_encryption_begin_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -168,6 +215,7 @@ pub mod login {
             server_id,
             public_key,
             verify_token,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -175,6 +223,7 @@ pub mod login {
     pub struct SuccessResponse<'p> {
         pub uuid: u128,
         pub username: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_success_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -183,25 +232,39 @@ pub mod login {
         let username = reader.read_range()?;
         let username = reader.get_str_from(username)?;
 
-        let result = SuccessResponse { uuid, username };
+        let result = SuccessResponse {
+            uuid,
+            username,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CompressResponse {
+    pub struct CompressResponse<'p> {
         pub threshold: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_compress_response(mut reader: &mut Reader) -> Result<CompressResponse> {
+    pub(super) fn packet_compress_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<CompressResponse<'p>> {
         let threshold = read_varint(&mut reader)?;
 
-        let result = CompressResponse { threshold };
+        let result = CompressResponse {
+            threshold,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginPluginRequest {}
-    pub(super) fn packet_login_plugin_request(
-        mut _reader: &mut Reader,
-    ) -> Result<LoginPluginRequest> {
-        let result = LoginPluginRequest {};
+    pub struct LoginPluginRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_login_plugin_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<LoginPluginRequest<'p>> {
+        let result = LoginPluginRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
 }
@@ -210,84 +273,110 @@ pub mod play {
     use crate::protocol::de::Reader;
     use crate::protocol::varint::read_varint;
     use anyhow::Result;
+    use core::marker::PhantomData;
 
     #[derive(Debug)]
-    pub struct TeleportConfirmRequest {
+    pub struct TeleportConfirmRequest<'p> {
         pub teleport_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_teleport_confirm_request(
-        mut reader: &mut Reader,
-    ) -> Result<TeleportConfirmRequest> {
+    pub(super) fn packet_teleport_confirm_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<TeleportConfirmRequest<'p>> {
         let teleport_id = read_varint(&mut reader)?;
 
-        let result = TeleportConfirmRequest { teleport_id };
+        let result = TeleportConfirmRequest {
+            teleport_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct QueryBlockNbtRequest {
+    pub struct QueryBlockNbtRequest<'p> {
         pub transaction_id: i32,
         pub location: crate::protocol::de::Position,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_query_block_nbt_request(
-        mut reader: &mut Reader,
-    ) -> Result<QueryBlockNbtRequest> {
+    pub(super) fn packet_query_block_nbt_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<QueryBlockNbtRequest<'p>> {
         let transaction_id = read_varint(&mut reader)?;
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = QueryBlockNbtRequest {
             transaction_id,
             location,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetDifficultyRequest {
+    pub struct SetDifficultyRequest<'p> {
         pub new_difficulty: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_set_difficulty_request(
-        mut reader: &mut Reader,
-    ) -> Result<SetDifficultyRequest> {
+    pub(super) fn packet_set_difficulty_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SetDifficultyRequest<'p>> {
         let new_difficulty = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = SetDifficultyRequest { new_difficulty };
+        let result = SetDifficultyRequest {
+            new_difficulty,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EditBookRequest {}
-    pub(super) fn packet_edit_book_request(mut _reader: &mut Reader) -> Result<EditBookRequest> {
-        let result = EditBookRequest {};
+    pub struct EditBookRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_edit_book_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<EditBookRequest<'p>> {
+        let result = EditBookRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct QueryEntityNbtRequest {
+    pub struct QueryEntityNbtRequest<'p> {
         pub transaction_id: i32,
         pub entity_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_query_entity_nbt_request(
-        mut reader: &mut Reader,
-    ) -> Result<QueryEntityNbtRequest> {
+    pub(super) fn packet_query_entity_nbt_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<QueryEntityNbtRequest<'p>> {
         let transaction_id = read_varint(&mut reader)?;
         let entity_id = read_varint(&mut reader)?;
 
         let result = QueryEntityNbtRequest {
             transaction_id,
             entity_id,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PickItemRequest {
+    pub struct PickItemRequest<'p> {
         pub slot: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_pick_item_request(mut reader: &mut Reader) -> Result<PickItemRequest> {
+    pub(super) fn packet_pick_item_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PickItemRequest<'p>> {
         let slot = read_varint(&mut reader)?;
 
-        let result = PickItemRequest { slot };
+        let result = PickItemRequest {
+            slot,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct NameItemRequest<'p> {
         pub name: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_name_item_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -295,35 +384,44 @@ pub mod play {
         let name = reader.read_range()?;
         let name = reader.get_str_from(name)?;
 
-        let result = NameItemRequest { name };
+        let result = NameItemRequest {
+            name,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SelectTradeRequest {
+    pub struct SelectTradeRequest<'p> {
         pub slot: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_select_trade_request(
-        mut reader: &mut Reader,
-    ) -> Result<SelectTradeRequest> {
+    pub(super) fn packet_select_trade_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SelectTradeRequest<'p>> {
         let slot = read_varint(&mut reader)?;
 
-        let result = SelectTradeRequest { slot };
+        let result = SelectTradeRequest {
+            slot,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetBeaconEffectRequest {
+    pub struct SetBeaconEffectRequest<'p> {
         pub primary_effect: i32,
         pub secondary_effect: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_set_beacon_effect_request(
-        mut reader: &mut Reader,
-    ) -> Result<SetBeaconEffectRequest> {
+    pub(super) fn packet_set_beacon_effect_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SetBeaconEffectRequest<'p>> {
         let primary_effect = read_varint(&mut reader)?;
         let secondary_effect = read_varint(&mut reader)?;
 
         let result = SetBeaconEffectRequest {
             primary_effect,
             secondary_effect,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -333,6 +431,7 @@ pub mod play {
         pub command: &'p str,
         pub mode: i32,
         pub flags: u8,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_update_command_block_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -348,6 +447,7 @@ pub mod play {
             command,
             mode,
             flags,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -356,6 +456,7 @@ pub mod play {
         pub entity_id: i32,
         pub command: &'p str,
         pub track_output: bool,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_update_command_block_minecart_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -369,6 +470,7 @@ pub mod play {
             entity_id,
             command,
             track_output,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -390,6 +492,7 @@ pub mod play {
         pub integrity: f32,
         pub seed: i32,
         pub flags: u8,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_update_structure_block_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -430,6 +533,7 @@ pub mod play {
             integrity,
             seed,
             flags,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -437,6 +541,7 @@ pub mod play {
     pub struct TabCompleteRequest<'p> {
         pub transaction_id: i32,
         pub text: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_tab_complete_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -448,12 +553,14 @@ pub mod play {
         let result = TabCompleteRequest {
             transaction_id,
             text,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct ChatRequest<'p> {
         pub message: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_chat_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -461,19 +568,26 @@ pub mod play {
         let message = reader.read_range()?;
         let message = reader.get_str_from(message)?;
 
-        let result = ChatRequest { message };
+        let result = ChatRequest {
+            message,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ClientCommandRequest {
+    pub struct ClientCommandRequest<'p> {
         pub action_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_client_command_request(
-        mut reader: &mut Reader,
-    ) -> Result<ClientCommandRequest> {
+    pub(super) fn packet_client_command_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ClientCommandRequest<'p>> {
         let action_id = read_varint(&mut reader)?;
 
-        let result = ClientCommandRequest { action_id };
+        let result = ClientCommandRequest {
+            action_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -486,6 +600,7 @@ pub mod play {
         pub main_hand: i32,
         pub enable_text_filtering: bool,
         pub enable_server_listing: bool,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_settings_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -509,69 +624,91 @@ pub mod play {
             main_hand,
             enable_text_filtering,
             enable_server_listing,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EnchantItemRequest {
+    pub struct EnchantItemRequest<'p> {
         pub window_id: i8,
         pub enchantment: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_enchant_item_request(
-        mut reader: &mut Reader,
-    ) -> Result<EnchantItemRequest> {
+    pub(super) fn packet_enchant_item_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EnchantItemRequest<'p>> {
         let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let enchantment = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EnchantItemRequest {
             window_id,
             enchantment,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WindowClickRequest {}
-    pub(super) fn packet_window_click_request(
-        mut _reader: &mut Reader,
-    ) -> Result<WindowClickRequest> {
-        let result = WindowClickRequest {};
+    pub struct WindowClickRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_window_click_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<WindowClickRequest<'p>> {
+        let result = WindowClickRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CloseWindowRequest {
+    pub struct CloseWindowRequest<'p> {
         pub window_id: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_close_window_request(
-        mut reader: &mut Reader,
-    ) -> Result<CloseWindowRequest> {
+    pub(super) fn packet_close_window_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<CloseWindowRequest<'p>> {
         let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = CloseWindowRequest { window_id };
+        let result = CloseWindowRequest {
+            window_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CustomPayloadRequest {}
-    pub(super) fn packet_custom_payload_request(
-        mut _reader: &mut Reader,
-    ) -> Result<CustomPayloadRequest> {
-        let result = CustomPayloadRequest {};
+    pub struct CustomPayloadRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_custom_payload_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<CustomPayloadRequest<'p>> {
+        let result = CustomPayloadRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UseEntityRequest {}
-    pub(super) fn packet_use_entity_request(mut _reader: &mut Reader) -> Result<UseEntityRequest> {
-        let result = UseEntityRequest {};
+    pub struct UseEntityRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_use_entity_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<UseEntityRequest<'p>> {
+        let result = UseEntityRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct GenerateStructureRequest {
+    pub struct GenerateStructureRequest<'p> {
         pub location: crate::protocol::de::Position,
         pub levels: i32,
         pub keep_jigsaws: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_generate_structure_request(
-        mut reader: &mut Reader,
-    ) -> Result<GenerateStructureRequest> {
+    pub(super) fn packet_generate_structure_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<GenerateStructureRequest<'p>> {
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let levels = read_varint(&mut reader)?;
         let keep_jigsaws = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -580,59 +717,80 @@ pub mod play {
             location,
             levels,
             keep_jigsaws,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct KeepAliveRequest {
+    pub struct KeepAliveRequest<'p> {
         pub keep_alive_id: i64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_keep_alive_request(mut reader: &mut Reader) -> Result<KeepAliveRequest> {
+    pub(super) fn packet_keep_alive_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<KeepAliveRequest<'p>> {
         let keep_alive_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = KeepAliveRequest { keep_alive_id };
+        let result = KeepAliveRequest {
+            keep_alive_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LockDifficultyRequest {
+    pub struct LockDifficultyRequest<'p> {
         pub locked: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_lock_difficulty_request(
-        mut reader: &mut Reader,
-    ) -> Result<LockDifficultyRequest> {
+    pub(super) fn packet_lock_difficulty_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<LockDifficultyRequest<'p>> {
         let locked = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = LockDifficultyRequest { locked };
+        let result = LockDifficultyRequest {
+            locked,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PositionRequest {
+    pub struct PositionRequest<'p> {
         pub x: f64,
         pub y: f64,
         pub z: f64,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_position_request(mut reader: &mut Reader) -> Result<PositionRequest> {
+    pub(super) fn packet_position_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PositionRequest<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
         let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = PositionRequest { x, y, z, on_ground };
+        let result = PositionRequest {
+            x,
+            y,
+            z,
+            on_ground,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PositionLookRequest {
+    pub struct PositionLookRequest<'p> {
         pub x: f64,
         pub y: f64,
         pub z: f64,
         pub yaw: f32,
         pub pitch: f32,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_position_look_request(
-        mut reader: &mut Reader,
-    ) -> Result<PositionLookRequest> {
+    pub(super) fn packet_position_look_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PositionLookRequest<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -647,16 +805,20 @@ pub mod play {
             yaw,
             pitch,
             on_ground,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LookRequest {
+    pub struct LookRequest<'p> {
         pub yaw: f32,
         pub pitch: f32,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_look_request(mut reader: &mut Reader) -> Result<LookRequest> {
+    pub(super) fn packet_look_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<LookRequest<'p>> {
         let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
         let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
         let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -665,30 +827,38 @@ pub mod play {
             yaw,
             pitch,
             on_ground,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct FlyingRequest {
+    pub struct FlyingRequest<'p> {
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_flying_request(mut reader: &mut Reader) -> Result<FlyingRequest> {
+    pub(super) fn packet_flying_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<FlyingRequest<'p>> {
         let on_ground = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = FlyingRequest { on_ground };
+        let result = FlyingRequest {
+            on_ground,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct VehicleMoveRequest {
+    pub struct VehicleMoveRequest<'p> {
         pub x: f64,
         pub y: f64,
         pub z: f64,
         pub yaw: f32,
         pub pitch: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_vehicle_move_request(
-        mut reader: &mut Reader,
-    ) -> Result<VehicleMoveRequest> {
+    pub(super) fn packet_vehicle_move_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<VehicleMoveRequest<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -701,21 +871,26 @@ pub mod play {
             z,
             yaw,
             pitch,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SteerBoatRequest {
+    pub struct SteerBoatRequest<'p> {
         pub left_paddle: bool,
         pub right_paddle: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_steer_boat_request(mut reader: &mut Reader) -> Result<SteerBoatRequest> {
+    pub(super) fn packet_steer_boat_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SteerBoatRequest<'p>> {
         let left_paddle = MinecraftDeserialize::deserialize(&mut reader)?;
         let right_paddle = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = SteerBoatRequest {
             left_paddle,
             right_paddle,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -724,6 +899,7 @@ pub mod play {
         pub window_id: i8,
         pub recipe: &'p str,
         pub make_all: bool,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_craft_recipe_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -737,26 +913,36 @@ pub mod play {
             window_id,
             recipe,
             make_all,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AbilitiesRequest {
+    pub struct AbilitiesRequest<'p> {
         pub flags: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_abilities_request(mut reader: &mut Reader) -> Result<AbilitiesRequest> {
+    pub(super) fn packet_abilities_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<AbilitiesRequest<'p>> {
         let flags = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = AbilitiesRequest { flags };
+        let result = AbilitiesRequest {
+            flags,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct BlockDigRequest {
+    pub struct BlockDigRequest<'p> {
         pub status: i8,
         pub location: crate::protocol::de::Position,
         pub face: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
+    pub(super) fn packet_block_dig_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<BlockDigRequest<'p>> {
         let status = MinecraftDeserialize::deserialize(&mut reader)?;
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let face = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -765,18 +951,20 @@ pub mod play {
             status,
             location,
             face,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityActionRequest {
+    pub struct EntityActionRequest<'p> {
         pub entity_id: i32,
         pub action_id: i32,
         pub jump_boost: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_action_request(
-        mut reader: &mut Reader,
-    ) -> Result<EntityActionRequest> {
+    pub(super) fn packet_entity_action_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityActionRequest<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let action_id = read_varint(&mut reader)?;
         let jump_boost = read_varint(&mut reader)?;
@@ -785,18 +973,20 @@ pub mod play {
             entity_id,
             action_id,
             jump_boost,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SteerVehicleRequest {
+    pub struct SteerVehicleRequest<'p> {
         pub sideways: f32,
         pub forward: f32,
         pub jump: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_steer_vehicle_request(
-        mut reader: &mut Reader,
-    ) -> Result<SteerVehicleRequest> {
+    pub(super) fn packet_steer_vehicle_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SteerVehicleRequest<'p>> {
         let sideways = MinecraftDeserialize::deserialize(&mut reader)?;
         let forward = MinecraftDeserialize::deserialize(&mut reader)?;
         let jump = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -805,12 +995,14 @@ pub mod play {
             sideways,
             forward,
             jump,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct DisplayedRecipeRequest<'p> {
         pub recipe_id: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_displayed_recipe_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -818,16 +1010,22 @@ pub mod play {
         let recipe_id = reader.read_range()?;
         let recipe_id = reader.get_str_from(recipe_id)?;
 
-        let result = DisplayedRecipeRequest { recipe_id };
+        let result = DisplayedRecipeRequest {
+            recipe_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct RecipeBookRequest {
+    pub struct RecipeBookRequest<'p> {
         pub book_id: i32,
         pub book_open: bool,
         pub filter_active: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_recipe_book_request(mut reader: &mut Reader) -> Result<RecipeBookRequest> {
+    pub(super) fn packet_recipe_book_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<RecipeBookRequest<'p>> {
         let book_id = read_varint(&mut reader)?;
         let book_open = MinecraftDeserialize::deserialize(&mut reader)?;
         let filter_active = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -836,39 +1034,52 @@ pub mod play {
             book_id,
             book_open,
             filter_active,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ResourcePackReceiveRequest {
+    pub struct ResourcePackReceiveRequest<'p> {
         pub result: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_resource_pack_receive_request(
-        mut reader: &mut Reader,
-    ) -> Result<ResourcePackReceiveRequest> {
+    pub(super) fn packet_resource_pack_receive_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ResourcePackReceiveRequest<'p>> {
         let result = read_varint(&mut reader)?;
 
-        let result = ResourcePackReceiveRequest { result };
+        let result = ResourcePackReceiveRequest {
+            result,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct HeldItemSlotRequest {
+    pub struct HeldItemSlotRequest<'p> {
         pub slot_id: i16,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_held_item_slot_request(
-        mut reader: &mut Reader,
-    ) -> Result<HeldItemSlotRequest> {
+    pub(super) fn packet_held_item_slot_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<HeldItemSlotRequest<'p>> {
         let slot_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = HeldItemSlotRequest { slot_id };
+        let result = HeldItemSlotRequest {
+            slot_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetCreativeSlotRequest {}
-    pub(super) fn packet_set_creative_slot_request(
-        mut _reader: &mut Reader,
-    ) -> Result<SetCreativeSlotRequest> {
-        let result = SetCreativeSlotRequest {};
+    pub struct SetCreativeSlotRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_set_creative_slot_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<SetCreativeSlotRequest<'p>> {
+        let result = SetCreativeSlotRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -879,6 +1090,7 @@ pub mod play {
         pub pool: &'p str,
         pub final_state: &'p str,
         pub joint_type: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_update_jigsaw_block_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -902,6 +1114,7 @@ pub mod play {
             pool,
             final_state,
             joint_type,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -912,6 +1125,7 @@ pub mod play {
         pub text2: &'p str,
         pub text3: &'p str,
         pub text4: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_update_sign_request<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -932,33 +1146,44 @@ pub mod play {
             text2,
             text3,
             text4,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ArmAnimationRequest {
+    pub struct ArmAnimationRequest<'p> {
         pub hand: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_arm_animation_request(
-        mut reader: &mut Reader,
-    ) -> Result<ArmAnimationRequest> {
+    pub(super) fn packet_arm_animation_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ArmAnimationRequest<'p>> {
         let hand = read_varint(&mut reader)?;
 
-        let result = ArmAnimationRequest { hand };
+        let result = ArmAnimationRequest {
+            hand,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SpectateRequest {
+    pub struct SpectateRequest<'p> {
         pub target: u128,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_spectate_request(mut reader: &mut Reader) -> Result<SpectateRequest> {
+    pub(super) fn packet_spectate_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SpectateRequest<'p>> {
         let target = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = SpectateRequest { target };
+        let result = SpectateRequest {
+            target,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct BlockPlaceRequest {
+    pub struct BlockPlaceRequest<'p> {
         pub hand: i32,
         pub location: crate::protocol::de::Position,
         pub direction: i32,
@@ -966,8 +1191,11 @@ pub mod play {
         pub cursor_y: f32,
         pub cursor_z: f32,
         pub inside_block: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_block_place_request(mut reader: &mut Reader) -> Result<BlockPlaceRequest> {
+    pub(super) fn packet_block_place_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<BlockPlaceRequest<'p>> {
         let hand = read_varint(&mut reader)?;
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let direction = read_varint(&mut reader)?;
@@ -984,39 +1212,56 @@ pub mod play {
             cursor_y,
             cursor_z,
             inside_block,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UseItemRequest {
+    pub struct UseItemRequest<'p> {
         pub hand: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_use_item_request(mut reader: &mut Reader) -> Result<UseItemRequest> {
+    pub(super) fn packet_use_item_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<UseItemRequest<'p>> {
         let hand = read_varint(&mut reader)?;
 
-        let result = UseItemRequest { hand };
+        let result = UseItemRequest {
+            hand,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AdvancementTabRequest {}
-    pub(super) fn packet_advancement_tab_request(
-        mut _reader: &mut Reader,
-    ) -> Result<AdvancementTabRequest> {
-        let result = AdvancementTabRequest {};
+    pub struct AdvancementTabRequest<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_advancement_tab_request<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<AdvancementTabRequest<'p>> {
+        let result = AdvancementTabRequest {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PongRequest {
+    pub struct PongRequest<'p> {
         pub id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_pong_request(mut reader: &mut Reader) -> Result<PongRequest> {
+    pub(super) fn packet_pong_request<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PongRequest<'p>> {
         let id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = PongRequest { id };
+        let result = PongRequest {
+            id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SpawnEntityResponse {
+    pub struct SpawnEntityResponse<'p> {
         pub entity_id: i32,
         pub object_uuid: u128,
         pub type_: i32,
@@ -1029,10 +1274,11 @@ pub mod play {
         pub velocity_x: i16,
         pub velocity_y: i16,
         pub velocity_z: i16,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_spawn_entity_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityResponse> {
+    pub(super) fn packet_spawn_entity_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SpawnEntityResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let object_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
         let type_ = read_varint(&mut reader)?;
@@ -1059,20 +1305,22 @@ pub mod play {
             velocity_x,
             velocity_y,
             velocity_z,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SpawnEntityExperienceOrbResponse {
+    pub struct SpawnEntityExperienceOrbResponse<'p> {
         pub entity_id: i32,
         pub x: f64,
         pub y: f64,
         pub z: f64,
         pub count: i16,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_spawn_entity_experience_orb_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityExperienceOrbResponse> {
+    pub(super) fn packet_spawn_entity_experience_orb_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SpawnEntityExperienceOrbResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1085,11 +1333,12 @@ pub mod play {
             y,
             z,
             count,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SpawnEntityLivingResponse {
+    pub struct SpawnEntityLivingResponse<'p> {
         pub entity_id: i32,
         pub entity_uuid: u128,
         pub type_: i32,
@@ -1102,10 +1351,11 @@ pub mod play {
         pub velocity_x: i16,
         pub velocity_y: i16,
         pub velocity_z: i16,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_spawn_entity_living_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityLivingResponse> {
+    pub(super) fn packet_spawn_entity_living_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SpawnEntityLivingResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let entity_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
         let type_ = read_varint(&mut reader)?;
@@ -1132,20 +1382,22 @@ pub mod play {
             velocity_x,
             velocity_y,
             velocity_z,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SpawnEntityPaintingResponse {
+    pub struct SpawnEntityPaintingResponse<'p> {
         pub entity_id: i32,
         pub entity_uuid: u128,
         pub title: i32,
         pub location: crate::protocol::de::Position,
         pub direction: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_spawn_entity_painting_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityPaintingResponse> {
+    pub(super) fn packet_spawn_entity_painting_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SpawnEntityPaintingResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let entity_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
         let title = read_varint(&mut reader)?;
@@ -1158,11 +1410,12 @@ pub mod play {
             title,
             location,
             direction,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct NamedEntitySpawnResponse {
+    pub struct NamedEntitySpawnResponse<'p> {
         pub entity_id: i32,
         pub player_uuid: u128,
         pub x: f64,
@@ -1170,10 +1423,11 @@ pub mod play {
         pub z: f64,
         pub yaw: i8,
         pub pitch: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_named_entity_spawn_response(
-        mut reader: &mut Reader,
-    ) -> Result<NamedEntitySpawnResponse> {
+    pub(super) fn packet_named_entity_spawn_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<NamedEntitySpawnResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let player_uuid = MinecraftDeserialize::deserialize(&mut reader)?;
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1190,49 +1444,94 @@ pub mod play {
             z,
             yaw,
             pitch,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AnimationResponse {
+    pub struct AnimationResponse<'p> {
         pub entity_id: i32,
         pub animation: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_animation_response(mut reader: &mut Reader) -> Result<AnimationResponse> {
+    pub(super) fn packet_animation_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<AnimationResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let animation = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AnimationResponse {
             entity_id,
             animation,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct StatisticsResponse {}
-    pub(super) fn packet_statistics_response(
-        mut _reader: &mut Reader,
-    ) -> Result<StatisticsResponse> {
-        let result = StatisticsResponse {};
+    pub struct StatisticsResponseCategory_IdStatistic_IdValue<'p> {
+        pub category_id: i32,
+        pub statistic_id: i32,
+        pub value: i32,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_statistics_response_category__id_statistic__id_value<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<StatisticsResponseCategory_IdStatistic_IdValue<'p>> {
+        let category_id = read_varint(&mut reader)?;
+        let statistic_id = read_varint(&mut reader)?;
+        let value = read_varint(&mut reader)?;
+
+        let result = StatisticsResponseCategory_IdStatistic_IdValue {
+            category_id,
+            statistic_id,
+            value,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AdvancementsResponse {}
-    pub(super) fn packet_advancements_response(
-        mut _reader: &mut Reader,
-    ) -> Result<AdvancementsResponse> {
-        let result = AdvancementsResponse {};
+    pub struct StatisticsResponse<'p> {
+        pub entries: Vec<StatisticsResponseCategory_IdStatistic_IdValue<'p>>,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_statistics_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<StatisticsResponse<'p>> {
+        let count_array = read_varint(&mut reader)?;
+        let mut entries = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x = packet_statistics_response_category__id_statistic__id_value(reader)?;
+            entries.push(x);
+        }
+
+        let result = StatisticsResponse {
+            entries,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct BlockBreakAnimationResponse {
+    pub struct AdvancementsResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_advancements_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<AdvancementsResponse<'p>> {
+        let result = AdvancementsResponse {
+            oof: PhantomData {},
+        };
+        Ok(result)
+    }
+    #[derive(Debug)]
+    pub struct BlockBreakAnimationResponse<'p> {
         pub entity_id: i32,
         pub location: crate::protocol::de::Position,
         pub destroy_stage: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_block_break_animation_response(
-        mut reader: &mut Reader,
-    ) -> Result<BlockBreakAnimationResponse> {
+    pub(super) fn packet_block_break_animation_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<BlockBreakAnimationResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let destroy_stage = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1241,27 +1540,33 @@ pub mod play {
             entity_id,
             location,
             destroy_stage,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TileEntityDataResponse {}
-    pub(super) fn packet_tile_entity_data_response(
-        mut _reader: &mut Reader,
-    ) -> Result<TileEntityDataResponse> {
-        let result = TileEntityDataResponse {};
+    pub struct TileEntityDataResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_tile_entity_data_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<TileEntityDataResponse<'p>> {
+        let result = TileEntityDataResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct BlockActionResponse {
+    pub struct BlockActionResponse<'p> {
         pub location: crate::protocol::de::Position,
         pub byte1: u8,
         pub byte2: u8,
         pub block_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_block_action_response(
-        mut reader: &mut Reader,
-    ) -> Result<BlockActionResponse> {
+    pub(super) fn packet_block_action_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<BlockActionResponse<'p>> {
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let byte1 = MinecraftDeserialize::deserialize(&mut reader)?;
         let byte2 = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1272,74 +1577,106 @@ pub mod play {
             byte1,
             byte2,
             block_id,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct BlockChangeResponse {
+    pub struct BlockChangeResponse<'p> {
         pub location: crate::protocol::de::Position,
         pub type_: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_block_change_response(
-        mut reader: &mut Reader,
-    ) -> Result<BlockChangeResponse> {
+    pub(super) fn packet_block_change_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<BlockChangeResponse<'p>> {
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let type_ = read_varint(&mut reader)?;
 
-        let result = BlockChangeResponse { location, type_ };
+        let result = BlockChangeResponse {
+            location,
+            type_,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct BossBarResponse {}
-    pub(super) fn packet_boss_bar_response(mut _reader: &mut Reader) -> Result<BossBarResponse> {
-        let result = BossBarResponse {};
+    pub struct BossBarResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_boss_bar_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<BossBarResponse<'p>> {
+        let result = BossBarResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct DifficultyResponse {
+    pub struct DifficultyResponse<'p> {
         pub difficulty: u8,
         pub difficulty_locked: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_difficulty_response(
-        mut reader: &mut Reader,
-    ) -> Result<DifficultyResponse> {
+    pub(super) fn packet_difficulty_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<DifficultyResponse<'p>> {
         let difficulty = MinecraftDeserialize::deserialize(&mut reader)?;
         let difficulty_locked = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = DifficultyResponse {
             difficulty,
             difficulty_locked,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TabCompleteResponse {}
-    pub(super) fn packet_tab_complete_response(
-        mut _reader: &mut Reader,
-    ) -> Result<TabCompleteResponse> {
-        let result = TabCompleteResponse {};
+    pub struct TabCompleteResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_tab_complete_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<TabCompleteResponse<'p>> {
+        let result = TabCompleteResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct DeclareCommandsResponse {}
-    pub(super) fn packet_declare_commands_response(
-        mut _reader: &mut Reader,
-    ) -> Result<DeclareCommandsResponse> {
-        let result = DeclareCommandsResponse {};
+    pub struct DeclareCommandsResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_declare_commands_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<DeclareCommandsResponse<'p>> {
+        let result = DeclareCommandsResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct FacePlayerResponse {}
-    pub(super) fn packet_face_player_response(
-        mut _reader: &mut Reader,
-    ) -> Result<FacePlayerResponse> {
-        let result = FacePlayerResponse {};
+    pub struct FacePlayerResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_face_player_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<FacePlayerResponse<'p>> {
+        let result = FacePlayerResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct NbtQueryResponse {}
-    pub(super) fn packet_nbt_query_response(mut _reader: &mut Reader) -> Result<NbtQueryResponse> {
-        let result = NbtQueryResponse {};
+    pub struct NbtQueryResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_nbt_query_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<NbtQueryResponse<'p>> {
+        let result = NbtQueryResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1347,6 +1684,7 @@ pub mod play {
         pub message: &'p str,
         pub position: i8,
         pub sender: u128,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_chat_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -1360,27 +1698,36 @@ pub mod play {
             message,
             position,
             sender,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct MultiBlockChangeResponse {}
-    pub(super) fn packet_multi_block_change_response(
-        mut _reader: &mut Reader,
-    ) -> Result<MultiBlockChangeResponse> {
-        let result = MultiBlockChangeResponse {};
+    pub struct MultiBlockChangeResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_multi_block_change_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<MultiBlockChangeResponse<'p>> {
+        let result = MultiBlockChangeResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CloseWindowResponse {
+    pub struct CloseWindowResponse<'p> {
         pub window_id: u8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_close_window_response(
-        mut reader: &mut Reader,
-    ) -> Result<CloseWindowResponse> {
+    pub(super) fn packet_close_window_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<CloseWindowResponse<'p>> {
         let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = CloseWindowResponse { window_id };
+        let result = CloseWindowResponse {
+            window_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1388,6 +1735,7 @@ pub mod play {
         pub window_id: i32,
         pub inventory_type: i32,
         pub window_title: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_open_window_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -1401,26 +1749,32 @@ pub mod play {
             window_id,
             inventory_type,
             window_title,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WindowItemsResponse {}
-    pub(super) fn packet_window_items_response(
-        mut _reader: &mut Reader,
-    ) -> Result<WindowItemsResponse> {
-        let result = WindowItemsResponse {};
+    pub struct WindowItemsResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_window_items_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<WindowItemsResponse<'p>> {
+        let result = WindowItemsResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CraftProgressBarResponse {
+    pub struct CraftProgressBarResponse<'p> {
         pub window_id: u8,
         pub property: i16,
         pub value: i16,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_craft_progress_bar_response(
-        mut reader: &mut Reader,
-    ) -> Result<CraftProgressBarResponse> {
+    pub(super) fn packet_craft_progress_bar_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<CraftProgressBarResponse<'p>> {
         let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let property = MinecraftDeserialize::deserialize(&mut reader)?;
         let value = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1429,38 +1783,51 @@ pub mod play {
             window_id,
             property,
             value,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetSlotResponse {}
-    pub(super) fn packet_set_slot_response(mut _reader: &mut Reader) -> Result<SetSlotResponse> {
-        let result = SetSlotResponse {};
+    pub struct SetSlotResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_set_slot_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<SetSlotResponse<'p>> {
+        let result = SetSlotResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetCooldownResponse {
+    pub struct SetCooldownResponse<'p> {
         pub item_id: i32,
         pub cooldown_ticks: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_set_cooldown_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetCooldownResponse> {
+    pub(super) fn packet_set_cooldown_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SetCooldownResponse<'p>> {
         let item_id = read_varint(&mut reader)?;
         let cooldown_ticks = read_varint(&mut reader)?;
 
         let result = SetCooldownResponse {
             item_id,
             cooldown_ticks,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CustomPayloadResponse {}
-    pub(super) fn packet_custom_payload_response(
-        mut _reader: &mut Reader,
-    ) -> Result<CustomPayloadResponse> {
-        let result = CustomPayloadResponse {};
+    pub struct CustomPayloadResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_custom_payload_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<CustomPayloadResponse<'p>> {
+        let result = CustomPayloadResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1472,6 +1839,7 @@ pub mod play {
         pub z: i32,
         pub volume: f32,
         pub pitch: f32,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_named_sound_effect_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -1493,12 +1861,14 @@ pub mod play {
             z,
             volume,
             pitch,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct KickDisconnectResponse<'p> {
         pub reason: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_kick_disconnect_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -1506,69 +1876,143 @@ pub mod play {
         let reason = reader.read_range()?;
         let reason = reader.get_str_from(reason)?;
 
-        let result = KickDisconnectResponse { reason };
+        let result = KickDisconnectResponse {
+            reason,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityStatusResponse {
+    pub struct EntityStatusResponse<'p> {
         pub entity_id: i32,
         pub entity_status: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_status_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityStatusResponse> {
+    pub(super) fn packet_entity_status_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityStatusResponse<'p>> {
         let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let entity_status = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityStatusResponse {
             entity_id,
             entity_status,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ExplosionResponse {}
-    pub(super) fn packet_explosion_response(mut _reader: &mut Reader) -> Result<ExplosionResponse> {
-        let result = ExplosionResponse {};
+    pub struct ExplosionResponseXYZ<'p> {
+        pub x: i8,
+        pub y: i8,
+        pub z: i8,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_explosion_response_xyz<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ExplosionResponseXYZ<'p>> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+
+        let result = ExplosionResponseXYZ {
+            x,
+            y,
+            z,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UnloadChunkResponse {
+    pub struct ExplosionResponse<'p> {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+        pub radius: f32,
+        pub affected_block_offsets: Vec<ExplosionResponseXYZ<'p>>,
+        pub player_motion_x: f32,
+        pub player_motion_y: f32,
+        pub player_motion_z: f32,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_explosion_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ExplosionResponse<'p>> {
+        let x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let z = MinecraftDeserialize::deserialize(&mut reader)?;
+        let radius = MinecraftDeserialize::deserialize(&mut reader)?;
+        let count_array = read_varint(&mut reader)?;
+        let mut affected_block_offsets = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x = packet_explosion_response_xyz(reader)?;
+            affected_block_offsets.push(x);
+        }
+        let player_motion_x = MinecraftDeserialize::deserialize(&mut reader)?;
+        let player_motion_y = MinecraftDeserialize::deserialize(&mut reader)?;
+        let player_motion_z = MinecraftDeserialize::deserialize(&mut reader)?;
+
+        let result = ExplosionResponse {
+            x,
+            y,
+            z,
+            radius,
+            affected_block_offsets,
+            player_motion_x,
+            player_motion_y,
+            player_motion_z,
+            oof: PhantomData {},
+        };
+        Ok(result)
+    }
+    #[derive(Debug)]
+    pub struct UnloadChunkResponse<'p> {
         pub chunk_x: i32,
         pub chunk_z: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_unload_chunk_response(
-        mut reader: &mut Reader,
-    ) -> Result<UnloadChunkResponse> {
+    pub(super) fn packet_unload_chunk_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<UnloadChunkResponse<'p>> {
         let chunk_x = MinecraftDeserialize::deserialize(&mut reader)?;
         let chunk_z = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = UnloadChunkResponse { chunk_x, chunk_z };
+        let result = UnloadChunkResponse {
+            chunk_x,
+            chunk_z,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct GameStateChangeResponse {
+    pub struct GameStateChangeResponse<'p> {
         pub reason: u8,
         pub game_mode: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_game_state_change_response(
-        mut reader: &mut Reader,
-    ) -> Result<GameStateChangeResponse> {
+    pub(super) fn packet_game_state_change_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<GameStateChangeResponse<'p>> {
         let reason = MinecraftDeserialize::deserialize(&mut reader)?;
         let game_mode = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = GameStateChangeResponse { reason, game_mode };
+        let result = GameStateChangeResponse {
+            reason,
+            game_mode,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct OpenHorseWindowResponse {
+    pub struct OpenHorseWindowResponse<'p> {
         pub window_id: u8,
         pub nb_slots: i32,
         pub entity_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_open_horse_window_response(
-        mut reader: &mut Reader,
-    ) -> Result<OpenHorseWindowResponse> {
+    pub(super) fn packet_open_horse_window_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<OpenHorseWindowResponse<'p>> {
         let window_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let nb_slots = read_varint(&mut reader)?;
         let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1577,35 +2021,49 @@ pub mod play {
             window_id,
             nb_slots,
             entity_id,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct KeepAliveResponse {
+    pub struct KeepAliveResponse<'p> {
         pub keep_alive_id: i64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_keep_alive_response(mut reader: &mut Reader) -> Result<KeepAliveResponse> {
+    pub(super) fn packet_keep_alive_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<KeepAliveResponse<'p>> {
         let keep_alive_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = KeepAliveResponse { keep_alive_id };
+        let result = KeepAliveResponse {
+            keep_alive_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct MapChunkResponse {}
-    pub(super) fn packet_map_chunk_response(mut _reader: &mut Reader) -> Result<MapChunkResponse> {
-        let result = MapChunkResponse {};
+    pub struct MapChunkResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_map_chunk_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<MapChunkResponse<'p>> {
+        let result = MapChunkResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldEventResponse {
+    pub struct WorldEventResponse<'p> {
         pub effect_id: i32,
         pub location: crate::protocol::de::Position,
         pub data: i32,
         pub global: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_world_event_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldEventResponse> {
+    pub(super) fn packet_world_event_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<WorldEventResponse<'p>> {
         let effect_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let data = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1616,56 +2074,82 @@ pub mod play {
             location,
             data,
             global,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldParticlesResponse {}
-    pub(super) fn packet_world_particles_response(
-        mut _reader: &mut Reader,
-    ) -> Result<WorldParticlesResponse> {
-        let result = WorldParticlesResponse {};
+    pub struct WorldParticlesResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_world_particles_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<WorldParticlesResponse<'p>> {
+        let result = WorldParticlesResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateLightResponse {}
-    pub(super) fn packet_update_light_response(
-        mut _reader: &mut Reader,
-    ) -> Result<UpdateLightResponse> {
-        let result = UpdateLightResponse {};
+    pub struct UpdateLightResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_update_light_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<UpdateLightResponse<'p>> {
+        let result = UpdateLightResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginResponse {}
-    pub(super) fn packet_login_response(mut _reader: &mut Reader) -> Result<LoginResponse> {
-        let result = LoginResponse {};
+    pub struct LoginResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_login_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<LoginResponse<'p>> {
+        let result = LoginResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct MapResponse {}
-    pub(super) fn packet_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
-        let result = MapResponse {};
+    pub struct MapResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_map_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<MapResponse<'p>> {
+        let result = MapResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TradeListResponse {}
-    pub(super) fn packet_trade_list_response(
-        mut _reader: &mut Reader,
-    ) -> Result<TradeListResponse> {
-        let result = TradeListResponse {};
+    pub struct TradeListResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_trade_list_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<TradeListResponse<'p>> {
+        let result = TradeListResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct RelEntityMoveResponse {
+    pub struct RelEntityMoveResponse<'p> {
         pub entity_id: i32,
         pub d_x: i16,
         pub d_y: i16,
         pub d_z: i16,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_rel_entity_move_response(
-        mut reader: &mut Reader,
-    ) -> Result<RelEntityMoveResponse> {
+    pub(super) fn packet_rel_entity_move_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<RelEntityMoveResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let d_x = MinecraftDeserialize::deserialize(&mut reader)?;
         let d_y = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1678,11 +2162,12 @@ pub mod play {
             d_y,
             d_z,
             on_ground,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityMoveLookResponse {
+    pub struct EntityMoveLookResponse<'p> {
         pub entity_id: i32,
         pub d_x: i16,
         pub d_y: i16,
@@ -1690,10 +2175,11 @@ pub mod play {
         pub yaw: i8,
         pub pitch: i8,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_move_look_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityMoveLookResponse> {
+    pub(super) fn packet_entity_move_look_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityMoveLookResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let d_x = MinecraftDeserialize::deserialize(&mut reader)?;
         let d_y = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1710,19 +2196,21 @@ pub mod play {
             yaw,
             pitch,
             on_ground,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityLookResponse {
+    pub struct EntityLookResponse<'p> {
         pub entity_id: i32,
         pub yaw: i8,
         pub pitch: i8,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_look_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityLookResponse> {
+    pub(super) fn packet_entity_look_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityLookResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let yaw = MinecraftDeserialize::deserialize(&mut reader)?;
         let pitch = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1733,20 +2221,22 @@ pub mod play {
             yaw,
             pitch,
             on_ground,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct VehicleMoveResponse {
+    pub struct VehicleMoveResponse<'p> {
         pub x: f64,
         pub y: f64,
         pub z: f64,
         pub yaw: f32,
         pub pitch: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_vehicle_move_response(
-        mut reader: &mut Reader,
-    ) -> Result<VehicleMoveResponse> {
+    pub(super) fn packet_vehicle_move_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<VehicleMoveResponse<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1759,35 +2249,47 @@ pub mod play {
             z,
             yaw,
             pitch,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct OpenBookResponse {
+    pub struct OpenBookResponse<'p> {
         pub hand: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_open_book_response(mut reader: &mut Reader) -> Result<OpenBookResponse> {
+    pub(super) fn packet_open_book_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<OpenBookResponse<'p>> {
         let hand = read_varint(&mut reader)?;
 
-        let result = OpenBookResponse { hand };
+        let result = OpenBookResponse {
+            hand,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct OpenSignEntityResponse {
+    pub struct OpenSignEntityResponse<'p> {
         pub location: crate::protocol::de::Position,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_open_sign_entity_response(
-        mut reader: &mut Reader,
-    ) -> Result<OpenSignEntityResponse> {
+    pub(super) fn packet_open_sign_entity_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<OpenSignEntityResponse<'p>> {
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = OpenSignEntityResponse { location };
+        let result = OpenSignEntityResponse {
+            location,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct CraftRecipeResponse<'p> {
         pub window_id: i8,
         pub recipe: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_craft_recipe_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -1796,16 +2298,23 @@ pub mod play {
         let recipe = reader.read_range()?;
         let recipe = reader.get_str_from(recipe)?;
 
-        let result = CraftRecipeResponse { window_id, recipe };
+        let result = CraftRecipeResponse {
+            window_id,
+            recipe,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AbilitiesResponse {
+    pub struct AbilitiesResponse<'p> {
         pub flags: i8,
         pub flying_speed: f32,
         pub walking_speed: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_abilities_response(mut reader: &mut Reader) -> Result<AbilitiesResponse> {
+    pub(super) fn packet_abilities_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<AbilitiesResponse<'p>> {
         let flags = MinecraftDeserialize::deserialize(&mut reader)?;
         let flying_speed = MinecraftDeserialize::deserialize(&mut reader)?;
         let walking_speed = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1814,32 +2323,39 @@ pub mod play {
             flags,
             flying_speed,
             walking_speed,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EndCombatEventResponse {
+    pub struct EndCombatEventResponse<'p> {
         pub duration: i32,
         pub entity_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_end_combat_event_response(
-        mut reader: &mut Reader,
-    ) -> Result<EndCombatEventResponse> {
+    pub(super) fn packet_end_combat_event_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EndCombatEventResponse<'p>> {
         let duration = read_varint(&mut reader)?;
         let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EndCombatEventResponse {
             duration,
             entity_id,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EnterCombatEventResponse {}
-    pub(super) fn packet_enter_combat_event_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EnterCombatEventResponse> {
-        let result = EnterCombatEventResponse {};
+    pub struct EnterCombatEventResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_enter_combat_event_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<EnterCombatEventResponse<'p>> {
+        let result = EnterCombatEventResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1847,6 +2363,7 @@ pub mod play {
         pub player_id: i32,
         pub entity_id: i32,
         pub message: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_death_combat_event_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -1860,19 +2377,24 @@ pub mod play {
             player_id,
             entity_id,
             message,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PlayerInfoResponse {}
-    pub(super) fn packet_player_info_response(
-        mut _reader: &mut Reader,
-    ) -> Result<PlayerInfoResponse> {
-        let result = PlayerInfoResponse {};
+    pub struct PlayerInfoResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_player_info_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<PlayerInfoResponse<'p>> {
+        let result = PlayerInfoResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PositionResponse {
+    pub struct PositionResponse<'p> {
         pub x: f64,
         pub y: f64,
         pub z: f64,
@@ -1881,8 +2403,11 @@ pub mod play {
         pub flags: i8,
         pub teleport_id: i32,
         pub dismount_vehicle: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_position_response(mut reader: &mut Reader) -> Result<PositionResponse> {
+    pub(super) fn packet_position_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PositionResponse<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -1901,125 +2426,168 @@ pub mod play {
             flags,
             teleport_id,
             dismount_vehicle,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UnlockRecipesResponse {}
-    pub(super) fn packet_unlock_recipes_response(
-        mut _reader: &mut Reader,
-    ) -> Result<UnlockRecipesResponse> {
-        let result = UnlockRecipesResponse {};
+    pub struct UnlockRecipesResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_unlock_recipes_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<UnlockRecipesResponse<'p>> {
+        let result = UnlockRecipesResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityDestroyResponse {}
-    pub(super) fn packet_entity_destroy_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EntityDestroyResponse> {
-        let result = EntityDestroyResponse {};
+    pub struct EntityDestroyResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_entity_destroy_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<EntityDestroyResponse<'p>> {
+        let result = EntityDestroyResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct RemoveEntityEffectResponse {
+    pub struct RemoveEntityEffectResponse<'p> {
         pub entity_id: i32,
         pub effect_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_remove_entity_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<RemoveEntityEffectResponse> {
+    pub(super) fn packet_remove_entity_effect_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<RemoveEntityEffectResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let effect_id = read_varint(&mut reader)?;
 
         let result = RemoveEntityEffectResponse {
             entity_id,
             effect_id,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ResourcePackSendResponse {}
-    pub(super) fn packet_resource_pack_send_response(
-        mut _reader: &mut Reader,
-    ) -> Result<ResourcePackSendResponse> {
-        let result = ResourcePackSendResponse {};
+    pub struct ResourcePackSendResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_resource_pack_send_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<ResourcePackSendResponse<'p>> {
+        let result = ResourcePackSendResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct RespawnResponse {}
-    pub(super) fn packet_respawn_response(mut _reader: &mut Reader) -> Result<RespawnResponse> {
-        let result = RespawnResponse {};
+    pub struct RespawnResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_respawn_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<RespawnResponse<'p>> {
+        let result = RespawnResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityHeadRotationResponse {
+    pub struct EntityHeadRotationResponse<'p> {
         pub entity_id: i32,
         pub head_yaw: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_head_rotation_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityHeadRotationResponse> {
+    pub(super) fn packet_entity_head_rotation_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityHeadRotationResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let head_yaw = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = EntityHeadRotationResponse {
             entity_id,
             head_yaw,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CameraResponse {
+    pub struct CameraResponse<'p> {
         pub camera_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_camera_response(mut reader: &mut Reader) -> Result<CameraResponse> {
+    pub(super) fn packet_camera_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<CameraResponse<'p>> {
         let camera_id = read_varint(&mut reader)?;
 
-        let result = CameraResponse { camera_id };
+        let result = CameraResponse {
+            camera_id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct HeldItemSlotResponse {
+    pub struct HeldItemSlotResponse<'p> {
         pub slot: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_held_item_slot_response(
-        mut reader: &mut Reader,
-    ) -> Result<HeldItemSlotResponse> {
+    pub(super) fn packet_held_item_slot_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<HeldItemSlotResponse<'p>> {
         let slot = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = HeldItemSlotResponse { slot };
+        let result = HeldItemSlotResponse {
+            slot,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateViewPositionResponse {
+    pub struct UpdateViewPositionResponse<'p> {
         pub chunk_x: i32,
         pub chunk_z: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_update_view_position_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateViewPositionResponse> {
+    pub(super) fn packet_update_view_position_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<UpdateViewPositionResponse<'p>> {
         let chunk_x = read_varint(&mut reader)?;
         let chunk_z = read_varint(&mut reader)?;
 
-        let result = UpdateViewPositionResponse { chunk_x, chunk_z };
+        let result = UpdateViewPositionResponse {
+            chunk_x,
+            chunk_z,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateViewDistanceResponse {
+    pub struct UpdateViewDistanceResponse<'p> {
         pub view_distance: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_update_view_distance_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateViewDistanceResponse> {
+    pub(super) fn packet_update_view_distance_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<UpdateViewDistanceResponse<'p>> {
         let view_distance = read_varint(&mut reader)?;
 
-        let result = UpdateViewDistanceResponse { view_distance };
+        let result = UpdateViewDistanceResponse {
+            view_distance,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct ScoreboardDisplayObjectiveResponse<'p> {
         pub position: i8,
         pub name: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_scoreboard_display_objective_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -2028,44 +2596,55 @@ pub mod play {
         let name = reader.read_range()?;
         let name = reader.get_str_from(name)?;
 
-        let result = ScoreboardDisplayObjectiveResponse { position, name };
+        let result = ScoreboardDisplayObjectiveResponse {
+            position,
+            name,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityMetadataResponse {}
-    pub(super) fn packet_entity_metadata_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EntityMetadataResponse> {
-        let result = EntityMetadataResponse {};
+    pub struct EntityMetadataResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_entity_metadata_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<EntityMetadataResponse<'p>> {
+        let result = EntityMetadataResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AttachEntityResponse {
+    pub struct AttachEntityResponse<'p> {
         pub entity_id: i32,
         pub vehicle_id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_attach_entity_response(
-        mut reader: &mut Reader,
-    ) -> Result<AttachEntityResponse> {
+    pub(super) fn packet_attach_entity_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<AttachEntityResponse<'p>> {
         let entity_id = MinecraftDeserialize::deserialize(&mut reader)?;
         let vehicle_id = MinecraftDeserialize::deserialize(&mut reader)?;
 
         let result = AttachEntityResponse {
             entity_id,
             vehicle_id,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityVelocityResponse {
+    pub struct EntityVelocityResponse<'p> {
         pub entity_id: i32,
         pub velocity_x: i16,
         pub velocity_y: i16,
         pub velocity_z: i16,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_velocity_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityVelocityResponse> {
+    pub(super) fn packet_entity_velocity_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityVelocityResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let velocity_x = MinecraftDeserialize::deserialize(&mut reader)?;
         let velocity_y = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2076,26 +2655,32 @@ pub mod play {
             velocity_x,
             velocity_y,
             velocity_z,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityEquipmentResponse {}
-    pub(super) fn packet_entity_equipment_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EntityEquipmentResponse> {
-        let result = EntityEquipmentResponse {};
+    pub struct EntityEquipmentResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_entity_equipment_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<EntityEquipmentResponse<'p>> {
+        let result = EntityEquipmentResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ExperienceResponse {
+    pub struct ExperienceResponse<'p> {
         pub experience_bar: f32,
         pub level: i32,
         pub total_experience: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_experience_response(
-        mut reader: &mut Reader,
-    ) -> Result<ExperienceResponse> {
+    pub(super) fn packet_experience_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ExperienceResponse<'p>> {
         let experience_bar = MinecraftDeserialize::deserialize(&mut reader)?;
         let level = read_varint(&mut reader)?;
         let total_experience = read_varint(&mut reader)?;
@@ -2104,18 +2689,20 @@ pub mod play {
             experience_bar,
             level,
             total_experience,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateHealthResponse {
+    pub struct UpdateHealthResponse<'p> {
         pub health: f32,
         pub food: i32,
         pub food_saturation: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_update_health_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateHealthResponse> {
+    pub(super) fn packet_update_health_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<UpdateHealthResponse<'p>> {
         let health = MinecraftDeserialize::deserialize(&mut reader)?;
         let food = read_varint(&mut reader)?;
         let food_saturation = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2124,78 +2711,108 @@ pub mod play {
             health,
             food,
             food_saturation,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ScoreboardObjectiveResponse {}
-    pub(super) fn packet_scoreboard_objective_response(
-        mut _reader: &mut Reader,
-    ) -> Result<ScoreboardObjectiveResponse> {
-        let result = ScoreboardObjectiveResponse {};
+    pub struct ScoreboardObjectiveResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_scoreboard_objective_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<ScoreboardObjectiveResponse<'p>> {
+        let result = ScoreboardObjectiveResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetPassengersResponse {}
-    pub(super) fn packet_set_passengers_response(
-        mut _reader: &mut Reader,
-    ) -> Result<SetPassengersResponse> {
-        let result = SetPassengersResponse {};
+    pub struct SetPassengersResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_set_passengers_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<SetPassengersResponse<'p>> {
+        let result = SetPassengersResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TeamsResponse {}
-    pub(super) fn packet_teams_response(mut _reader: &mut Reader) -> Result<TeamsResponse> {
-        let result = TeamsResponse {};
+    pub struct TeamsResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_teams_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<TeamsResponse<'p>> {
+        let result = TeamsResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ScoreboardScoreResponse {}
-    pub(super) fn packet_scoreboard_score_response(
-        mut _reader: &mut Reader,
-    ) -> Result<ScoreboardScoreResponse> {
-        let result = ScoreboardScoreResponse {};
+    pub struct ScoreboardScoreResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_scoreboard_score_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<ScoreboardScoreResponse<'p>> {
+        let result = ScoreboardScoreResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SpawnPositionResponse {
+    pub struct SpawnPositionResponse<'p> {
         pub location: crate::protocol::de::Position,
         pub angle: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_spawn_position_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnPositionResponse> {
+    pub(super) fn packet_spawn_position_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SpawnPositionResponse<'p>> {
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let angle = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = SpawnPositionResponse { location, angle };
+        let result = SpawnPositionResponse {
+            location,
+            angle,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateTimeResponse {
+    pub struct UpdateTimeResponse<'p> {
         pub age: i64,
         pub time: i64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_update_time_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateTimeResponse> {
+    pub(super) fn packet_update_time_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<UpdateTimeResponse<'p>> {
         let age = MinecraftDeserialize::deserialize(&mut reader)?;
         let time = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = UpdateTimeResponse { age, time };
+        let result = UpdateTimeResponse {
+            age,
+            time,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntitySoundEffectResponse {
+    pub struct EntitySoundEffectResponse<'p> {
         pub sound_id: i32,
         pub sound_category: i32,
         pub entity_id: i32,
         pub volume: f32,
         pub pitch: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_sound_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntitySoundEffectResponse> {
+    pub(super) fn packet_entity_sound_effect_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntitySoundEffectResponse<'p>> {
         let sound_id = read_varint(&mut reader)?;
         let sound_category = read_varint(&mut reader)?;
         let entity_id = read_varint(&mut reader)?;
@@ -2208,19 +2825,24 @@ pub mod play {
             entity_id,
             volume,
             pitch,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct StopSoundResponse {}
-    pub(super) fn packet_stop_sound_response(
-        mut _reader: &mut Reader,
-    ) -> Result<StopSoundResponse> {
-        let result = StopSoundResponse {};
+    pub struct StopSoundResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_stop_sound_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<StopSoundResponse<'p>> {
+        let result = StopSoundResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SoundEffectResponse {
+    pub struct SoundEffectResponse<'p> {
         pub sound_id: i32,
         pub sound_category: i32,
         pub x: i32,
@@ -2228,10 +2850,11 @@ pub mod play {
         pub z: i32,
         pub volume: f32,
         pub pitch: f32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_sound_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<SoundEffectResponse> {
+    pub(super) fn packet_sound_effect_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SoundEffectResponse<'p>> {
         let sound_id = read_varint(&mut reader)?;
         let sound_category = read_varint(&mut reader)?;
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2248,6 +2871,7 @@ pub mod play {
             z,
             volume,
             pitch,
+            oof: PhantomData {},
         };
         Ok(result)
     }
@@ -2255,6 +2879,7 @@ pub mod play {
     pub struct PlayerlistHeaderResponse<'p> {
         pub header: &'p str,
         pub footer: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_playerlist_header_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -2264,16 +2889,23 @@ pub mod play {
         let header = reader.get_str_from(header)?;
         let footer = reader.get_str_from(footer)?;
 
-        let result = PlayerlistHeaderResponse { header, footer };
+        let result = PlayerlistHeaderResponse {
+            header,
+            footer,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CollectResponse {
+    pub struct CollectResponse<'p> {
         pub collected_entity_id: i32,
         pub collector_entity_id: i32,
         pub pickup_item_count: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_collect_response(mut reader: &mut Reader) -> Result<CollectResponse> {
+    pub(super) fn packet_collect_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<CollectResponse<'p>> {
         let collected_entity_id = read_varint(&mut reader)?;
         let collector_entity_id = read_varint(&mut reader)?;
         let pickup_item_count = read_varint(&mut reader)?;
@@ -2282,11 +2914,12 @@ pub mod play {
             collected_entity_id,
             collector_entity_id,
             pickup_item_count,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityTeleportResponse {
+    pub struct EntityTeleportResponse<'p> {
         pub entity_id: i32,
         pub x: f64,
         pub y: f64,
@@ -2294,10 +2927,11 @@ pub mod play {
         pub yaw: i8,
         pub pitch: i8,
         pub on_ground: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_teleport_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityTeleportResponse> {
+    pub(super) fn packet_entity_teleport_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityTeleportResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let y = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2314,28 +2948,96 @@ pub mod play {
             yaw,
             pitch,
             on_ground,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityUpdateAttributesResponse {}
-    pub(super) fn packet_entity_update_attributes_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EntityUpdateAttributesResponse> {
-        let result = EntityUpdateAttributesResponse {};
+    pub struct EntityUpdateAttributesResponseUuidAmountOperation<'p> {
+        pub uuid: u128,
+        pub amount: f64,
+        pub operation: i8,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_entity_update_attributes_response_uuid_amount_operation<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityUpdateAttributesResponseUuidAmountOperation<'p>> {
+        let uuid = MinecraftDeserialize::deserialize(&mut reader)?;
+        let amount = MinecraftDeserialize::deserialize(&mut reader)?;
+        let operation = MinecraftDeserialize::deserialize(&mut reader)?;
+
+        let result = EntityUpdateAttributesResponseUuidAmountOperation {
+            uuid,
+            amount,
+            operation,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityEffectResponse {
+    pub struct EntityUpdateAttributesResponseKeyValueModifiers<'p> {
+        pub key: &'p str,
+        pub value: f64,
+        pub modifiers: Vec<EntityUpdateAttributesResponseUuidAmountOperation<'p>>,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_entity_update_attributes_response_key_value_modifiers<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityUpdateAttributesResponseKeyValueModifiers<'p>> {
+        let key = reader.read_range()?;
+        let value = MinecraftDeserialize::deserialize(&mut reader)?;
+        let count_array = read_varint(&mut reader)?;
+        let mut modifiers = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x = packet_entity_update_attributes_response_uuid_amount_operation(reader)?;
+            modifiers.push(x);
+        }
+        let key = reader.get_str_from(key)?;
+
+        let result = EntityUpdateAttributesResponseKeyValueModifiers {
+            key,
+            value,
+            modifiers,
+            oof: PhantomData {},
+        };
+        Ok(result)
+    }
+    #[derive(Debug)]
+    pub struct EntityUpdateAttributesResponse<'p> {
+        pub entity_id: i32,
+        pub properties: Vec<EntityUpdateAttributesResponseKeyValueModifiers<'p>>,
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_entity_update_attributes_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityUpdateAttributesResponse<'p>> {
+        let entity_id = read_varint(&mut reader)?;
+        let count_array = read_varint(&mut reader)?;
+        let mut properties = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x = packet_entity_update_attributes_response_key_value_modifiers(reader)?;
+            properties.push(x);
+        }
+
+        let result = EntityUpdateAttributesResponse {
+            entity_id,
+            properties,
+            oof: PhantomData {},
+        };
+        Ok(result)
+    }
+    #[derive(Debug)]
+    pub struct EntityEffectResponse<'p> {
         pub entity_id: i32,
         pub effect_id: i32,
         pub amplifier: i8,
         pub duration: i32,
         pub hide_particles: i8,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_entity_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityEffectResponse> {
+    pub(super) fn packet_entity_effect_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<EntityEffectResponse<'p>> {
         let entity_id = read_varint(&mut reader)?;
         let effect_id = read_varint(&mut reader)?;
         let amplifier = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2348,41 +3050,57 @@ pub mod play {
             amplifier,
             duration,
             hide_particles,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SelectAdvancementTabResponse {}
-    pub(super) fn packet_select_advancement_tab_response(
-        mut _reader: &mut Reader,
-    ) -> Result<SelectAdvancementTabResponse> {
-        let result = SelectAdvancementTabResponse {};
+    pub struct SelectAdvancementTabResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_select_advancement_tab_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<SelectAdvancementTabResponse<'p>> {
+        let result = SelectAdvancementTabResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct DeclareRecipesResponse {}
-    pub(super) fn packet_declare_recipes_response(
-        mut _reader: &mut Reader,
-    ) -> Result<DeclareRecipesResponse> {
-        let result = DeclareRecipesResponse {};
+    pub struct DeclareRecipesResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_declare_recipes_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<DeclareRecipesResponse<'p>> {
+        let result = DeclareRecipesResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TagsResponse {}
-    pub(super) fn packet_tags_response(mut _reader: &mut Reader) -> Result<TagsResponse> {
-        let result = TagsResponse {};
+    pub struct TagsResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_tags_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<TagsResponse<'p>> {
+        let result = TagsResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct AcknowledgePlayerDiggingResponse {
+    pub struct AcknowledgePlayerDiggingResponse<'p> {
         pub location: crate::protocol::de::Position,
         pub block: i32,
         pub status: i32,
         pub successful: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_acknowledge_player_digging_response(
-        mut reader: &mut Reader,
-    ) -> Result<AcknowledgePlayerDiggingResponse> {
+    pub(super) fn packet_acknowledge_player_digging_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<AcknowledgePlayerDiggingResponse<'p>> {
         let location = MinecraftDeserialize::deserialize(&mut reader)?;
         let block = read_varint(&mut reader)?;
         let status = read_varint(&mut reader)?;
@@ -2393,31 +3111,40 @@ pub mod play {
             block,
             status,
             successful,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SculkVibrationSignalResponse {}
-    pub(super) fn packet_sculk_vibration_signal_response(
-        mut _reader: &mut Reader,
-    ) -> Result<SculkVibrationSignalResponse> {
-        let result = SculkVibrationSignalResponse {};
+    pub struct SculkVibrationSignalResponse<'p> {
+        pub oof: PhantomData<&'p ()>,
+    }
+    pub(super) fn packet_sculk_vibration_signal_response<'p>(
+        mut _reader: &'p mut Reader<'p>,
+    ) -> Result<SculkVibrationSignalResponse<'p>> {
+        let result = SculkVibrationSignalResponse {
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ClearTitlesResponse {
+    pub struct ClearTitlesResponse<'p> {
         pub reset: bool,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_clear_titles_response(
-        mut reader: &mut Reader,
-    ) -> Result<ClearTitlesResponse> {
+    pub(super) fn packet_clear_titles_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<ClearTitlesResponse<'p>> {
         let reset = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = ClearTitlesResponse { reset };
+        let result = ClearTitlesResponse {
+            reset,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct InitializeWorldBorderResponse {
+    pub struct InitializeWorldBorderResponse<'p> {
         pub x: f64,
         pub z: f64,
         pub old_diameter: f64,
@@ -2426,10 +3153,11 @@ pub mod play {
         pub portal_teleport_boundary: i32,
         pub warning_blocks: i32,
         pub warning_time: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_initialize_world_border_response(
-        mut reader: &mut Reader,
-    ) -> Result<InitializeWorldBorderResponse> {
+    pub(super) fn packet_initialize_world_border_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<InitializeWorldBorderResponse<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
         let old_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2448,12 +3176,14 @@ pub mod play {
             portal_teleport_boundary,
             warning_blocks,
             warning_time,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct ActionBarResponse<'p> {
         pub text: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_action_bar_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -2461,32 +3191,41 @@ pub mod play {
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
 
-        let result = ActionBarResponse { text };
+        let result = ActionBarResponse {
+            text,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldBorderCenterResponse {
+    pub struct WorldBorderCenterResponse<'p> {
         pub x: f64,
         pub z: f64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_world_border_center_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderCenterResponse> {
+    pub(super) fn packet_world_border_center_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<WorldBorderCenterResponse<'p>> {
         let x = MinecraftDeserialize::deserialize(&mut reader)?;
         let z = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = WorldBorderCenterResponse { x, z };
+        let result = WorldBorderCenterResponse {
+            x,
+            z,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldBorderLerpSizeResponse {
+    pub struct WorldBorderLerpSizeResponse<'p> {
         pub old_diameter: f64,
         pub new_diameter: f64,
         pub speed: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_world_border_lerp_size_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderLerpSizeResponse> {
+    pub(super) fn packet_world_border_lerp_size_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<WorldBorderLerpSizeResponse<'p>> {
         let old_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
         let new_diameter = MinecraftDeserialize::deserialize(&mut reader)?;
         let speed = read_varint(&mut reader)?;
@@ -2495,58 +3234,78 @@ pub mod play {
             old_diameter,
             new_diameter,
             speed,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldBorderSizeResponse {
+    pub struct WorldBorderSizeResponse<'p> {
         pub diameter: f64,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_world_border_size_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderSizeResponse> {
+    pub(super) fn packet_world_border_size_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<WorldBorderSizeResponse<'p>> {
         let diameter = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = WorldBorderSizeResponse { diameter };
+        let result = WorldBorderSizeResponse {
+            diameter,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldBorderWarningDelayResponse {
+    pub struct WorldBorderWarningDelayResponse<'p> {
         pub warning_time: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_world_border_warning_delay_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderWarningDelayResponse> {
+    pub(super) fn packet_world_border_warning_delay_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<WorldBorderWarningDelayResponse<'p>> {
         let warning_time = read_varint(&mut reader)?;
 
-        let result = WorldBorderWarningDelayResponse { warning_time };
+        let result = WorldBorderWarningDelayResponse {
+            warning_time,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldBorderWarningReachResponse {
+    pub struct WorldBorderWarningReachResponse<'p> {
         pub warning_blocks: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_world_border_warning_reach_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderWarningReachResponse> {
+    pub(super) fn packet_world_border_warning_reach_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<WorldBorderWarningReachResponse<'p>> {
         let warning_blocks = read_varint(&mut reader)?;
 
-        let result = WorldBorderWarningReachResponse { warning_blocks };
+        let result = WorldBorderWarningReachResponse {
+            warning_blocks,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct PlayPingResponse {
+    pub struct PlayPingResponse<'p> {
         pub id: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_play_ping_response(mut reader: &mut Reader) -> Result<PlayPingResponse> {
+    pub(super) fn packet_play_ping_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<PlayPingResponse<'p>> {
         let id = MinecraftDeserialize::deserialize(&mut reader)?;
 
-        let result = PlayPingResponse { id };
+        let result = PlayPingResponse {
+            id,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct SetTitleSubtitleResponse<'p> {
         pub text: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_set_title_subtitle_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -2554,12 +3313,16 @@ pub mod play {
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
 
-        let result = SetTitleSubtitleResponse { text };
+        let result = SetTitleSubtitleResponse {
+            text,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct SetTitleTextResponse<'p> {
         pub text: &'p str,
+        pub oof: PhantomData<&'p ()>,
     }
     pub(super) fn packet_set_title_text_response<'p>(
         mut reader: &'p mut Reader<'p>,
@@ -2567,18 +3330,22 @@ pub mod play {
         let text = reader.read_range()?;
         let text = reader.get_str_from(text)?;
 
-        let result = SetTitleTextResponse { text };
+        let result = SetTitleTextResponse {
+            text,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetTitleTimeResponse {
+    pub struct SetTitleTimeResponse<'p> {
         pub fade_in: i32,
         pub stay: i32,
         pub fade_out: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_set_title_time_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetTitleTimeResponse> {
+    pub(super) fn packet_set_title_time_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SetTitleTimeResponse<'p>> {
         let fade_in = MinecraftDeserialize::deserialize(&mut reader)?;
         let stay = MinecraftDeserialize::deserialize(&mut reader)?;
         let fade_out = MinecraftDeserialize::deserialize(&mut reader)?;
@@ -2587,19 +3354,24 @@ pub mod play {
             fade_in,
             stay,
             fade_out,
+            oof: PhantomData {},
         };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SimulationDistanceResponse {
+    pub struct SimulationDistanceResponse<'p> {
         pub distance: i32,
+        pub oof: PhantomData<&'p ()>,
     }
-    pub(super) fn packet_simulation_distance_response(
-        mut reader: &mut Reader,
-    ) -> Result<SimulationDistanceResponse> {
+    pub(super) fn packet_simulation_distance_response<'p>(
+        mut reader: &'p mut Reader<'p>,
+    ) -> Result<SimulationDistanceResponse<'p>> {
         let distance = read_varint(&mut reader)?;
 
-        let result = SimulationDistanceResponse { distance };
+        let result = SimulationDistanceResponse {
+            distance,
+            oof: PhantomData {},
+        };
         Ok(result)
     }
 }
@@ -2611,171 +3383,171 @@ use anyhow::{anyhow, Result};
 #[derive(Debug)]
 pub enum Packet<'p> {
     SetProtocolRequest(handshaking::SetProtocolRequest<'p>),
-    LegacyServerListPingRequest(handshaking::LegacyServerListPingRequest),
-    PingStartRequest(status::PingStartRequest),
-    PingRequest(status::PingRequest),
+    LegacyServerListPingRequest(handshaking::LegacyServerListPingRequest<'p>),
+    PingStartRequest(status::PingStartRequest<'p>),
+    PingRequest(status::PingRequest<'p>),
     ServerInfoResponse(status::ServerInfoResponse<'p>),
-    PingResponse(status::PingResponse),
+    PingResponse(status::PingResponse<'p>),
     LoginStartRequest(login::LoginStartRequest<'p>),
     EncryptionBeginRequest(login::EncryptionBeginRequest<'p>),
-    LoginPluginResponse(login::LoginPluginResponse),
+    LoginPluginResponse(login::LoginPluginResponse<'p>),
     DisconnectResponse(login::DisconnectResponse<'p>),
     EncryptionBeginResponse(login::EncryptionBeginResponse<'p>),
     SuccessResponse(login::SuccessResponse<'p>),
-    CompressResponse(login::CompressResponse),
-    LoginPluginRequest(login::LoginPluginRequest),
-    TeleportConfirmRequest(play::TeleportConfirmRequest),
-    QueryBlockNbtRequest(play::QueryBlockNbtRequest),
-    SetDifficultyRequest(play::SetDifficultyRequest),
-    EditBookRequest(play::EditBookRequest),
-    QueryEntityNbtRequest(play::QueryEntityNbtRequest),
-    PickItemRequest(play::PickItemRequest),
+    CompressResponse(login::CompressResponse<'p>),
+    LoginPluginRequest(login::LoginPluginRequest<'p>),
+    TeleportConfirmRequest(play::TeleportConfirmRequest<'p>),
+    QueryBlockNbtRequest(play::QueryBlockNbtRequest<'p>),
+    SetDifficultyRequest(play::SetDifficultyRequest<'p>),
+    EditBookRequest(play::EditBookRequest<'p>),
+    QueryEntityNbtRequest(play::QueryEntityNbtRequest<'p>),
+    PickItemRequest(play::PickItemRequest<'p>),
     NameItemRequest(play::NameItemRequest<'p>),
-    SelectTradeRequest(play::SelectTradeRequest),
-    SetBeaconEffectRequest(play::SetBeaconEffectRequest),
+    SelectTradeRequest(play::SelectTradeRequest<'p>),
+    SetBeaconEffectRequest(play::SetBeaconEffectRequest<'p>),
     UpdateCommandBlockRequest(play::UpdateCommandBlockRequest<'p>),
     UpdateCommandBlockMinecartRequest(play::UpdateCommandBlockMinecartRequest<'p>),
     UpdateStructureBlockRequest(play::UpdateStructureBlockRequest<'p>),
     TabCompleteRequest(play::TabCompleteRequest<'p>),
     ChatRequest(play::ChatRequest<'p>),
-    ClientCommandRequest(play::ClientCommandRequest),
+    ClientCommandRequest(play::ClientCommandRequest<'p>),
     SettingsRequest(play::SettingsRequest<'p>),
-    EnchantItemRequest(play::EnchantItemRequest),
-    WindowClickRequest(play::WindowClickRequest),
-    CloseWindowRequest(play::CloseWindowRequest),
-    CustomPayloadRequest(play::CustomPayloadRequest),
-    UseEntityRequest(play::UseEntityRequest),
-    GenerateStructureRequest(play::GenerateStructureRequest),
-    KeepAliveRequest(play::KeepAliveRequest),
-    LockDifficultyRequest(play::LockDifficultyRequest),
-    PositionRequest(play::PositionRequest),
-    PositionLookRequest(play::PositionLookRequest),
-    LookRequest(play::LookRequest),
-    FlyingRequest(play::FlyingRequest),
-    VehicleMoveRequest(play::VehicleMoveRequest),
-    SteerBoatRequest(play::SteerBoatRequest),
+    EnchantItemRequest(play::EnchantItemRequest<'p>),
+    WindowClickRequest(play::WindowClickRequest<'p>),
+    CloseWindowRequest(play::CloseWindowRequest<'p>),
+    CustomPayloadRequest(play::CustomPayloadRequest<'p>),
+    UseEntityRequest(play::UseEntityRequest<'p>),
+    GenerateStructureRequest(play::GenerateStructureRequest<'p>),
+    KeepAliveRequest(play::KeepAliveRequest<'p>),
+    LockDifficultyRequest(play::LockDifficultyRequest<'p>),
+    PositionRequest(play::PositionRequest<'p>),
+    PositionLookRequest(play::PositionLookRequest<'p>),
+    LookRequest(play::LookRequest<'p>),
+    FlyingRequest(play::FlyingRequest<'p>),
+    VehicleMoveRequest(play::VehicleMoveRequest<'p>),
+    SteerBoatRequest(play::SteerBoatRequest<'p>),
     CraftRecipeRequest(play::CraftRecipeRequest<'p>),
-    AbilitiesRequest(play::AbilitiesRequest),
-    BlockDigRequest(play::BlockDigRequest),
-    EntityActionRequest(play::EntityActionRequest),
-    SteerVehicleRequest(play::SteerVehicleRequest),
+    AbilitiesRequest(play::AbilitiesRequest<'p>),
+    BlockDigRequest(play::BlockDigRequest<'p>),
+    EntityActionRequest(play::EntityActionRequest<'p>),
+    SteerVehicleRequest(play::SteerVehicleRequest<'p>),
     DisplayedRecipeRequest(play::DisplayedRecipeRequest<'p>),
-    RecipeBookRequest(play::RecipeBookRequest),
-    ResourcePackReceiveRequest(play::ResourcePackReceiveRequest),
-    HeldItemSlotRequest(play::HeldItemSlotRequest),
-    SetCreativeSlotRequest(play::SetCreativeSlotRequest),
+    RecipeBookRequest(play::RecipeBookRequest<'p>),
+    ResourcePackReceiveRequest(play::ResourcePackReceiveRequest<'p>),
+    HeldItemSlotRequest(play::HeldItemSlotRequest<'p>),
+    SetCreativeSlotRequest(play::SetCreativeSlotRequest<'p>),
     UpdateJigsawBlockRequest(play::UpdateJigsawBlockRequest<'p>),
     UpdateSignRequest(play::UpdateSignRequest<'p>),
-    ArmAnimationRequest(play::ArmAnimationRequest),
-    SpectateRequest(play::SpectateRequest),
-    BlockPlaceRequest(play::BlockPlaceRequest),
-    UseItemRequest(play::UseItemRequest),
-    AdvancementTabRequest(play::AdvancementTabRequest),
-    PongRequest(play::PongRequest),
-    SpawnEntityResponse(play::SpawnEntityResponse),
-    SpawnEntityExperienceOrbResponse(play::SpawnEntityExperienceOrbResponse),
-    SpawnEntityLivingResponse(play::SpawnEntityLivingResponse),
-    SpawnEntityPaintingResponse(play::SpawnEntityPaintingResponse),
-    NamedEntitySpawnResponse(play::NamedEntitySpawnResponse),
-    AnimationResponse(play::AnimationResponse),
-    StatisticsResponse(play::StatisticsResponse),
-    AdvancementsResponse(play::AdvancementsResponse),
-    BlockBreakAnimationResponse(play::BlockBreakAnimationResponse),
-    TileEntityDataResponse(play::TileEntityDataResponse),
-    BlockActionResponse(play::BlockActionResponse),
-    BlockChangeResponse(play::BlockChangeResponse),
-    BossBarResponse(play::BossBarResponse),
-    DifficultyResponse(play::DifficultyResponse),
-    TabCompleteResponse(play::TabCompleteResponse),
-    DeclareCommandsResponse(play::DeclareCommandsResponse),
-    FacePlayerResponse(play::FacePlayerResponse),
-    NbtQueryResponse(play::NbtQueryResponse),
+    ArmAnimationRequest(play::ArmAnimationRequest<'p>),
+    SpectateRequest(play::SpectateRequest<'p>),
+    BlockPlaceRequest(play::BlockPlaceRequest<'p>),
+    UseItemRequest(play::UseItemRequest<'p>),
+    AdvancementTabRequest(play::AdvancementTabRequest<'p>),
+    PongRequest(play::PongRequest<'p>),
+    SpawnEntityResponse(play::SpawnEntityResponse<'p>),
+    SpawnEntityExperienceOrbResponse(play::SpawnEntityExperienceOrbResponse<'p>),
+    SpawnEntityLivingResponse(play::SpawnEntityLivingResponse<'p>),
+    SpawnEntityPaintingResponse(play::SpawnEntityPaintingResponse<'p>),
+    NamedEntitySpawnResponse(play::NamedEntitySpawnResponse<'p>),
+    AnimationResponse(play::AnimationResponse<'p>),
+    StatisticsResponse(play::StatisticsResponse<'p>),
+    AdvancementsResponse(play::AdvancementsResponse<'p>),
+    BlockBreakAnimationResponse(play::BlockBreakAnimationResponse<'p>),
+    TileEntityDataResponse(play::TileEntityDataResponse<'p>),
+    BlockActionResponse(play::BlockActionResponse<'p>),
+    BlockChangeResponse(play::BlockChangeResponse<'p>),
+    BossBarResponse(play::BossBarResponse<'p>),
+    DifficultyResponse(play::DifficultyResponse<'p>),
+    TabCompleteResponse(play::TabCompleteResponse<'p>),
+    DeclareCommandsResponse(play::DeclareCommandsResponse<'p>),
+    FacePlayerResponse(play::FacePlayerResponse<'p>),
+    NbtQueryResponse(play::NbtQueryResponse<'p>),
     ChatResponse(play::ChatResponse<'p>),
-    MultiBlockChangeResponse(play::MultiBlockChangeResponse),
-    CloseWindowResponse(play::CloseWindowResponse),
+    MultiBlockChangeResponse(play::MultiBlockChangeResponse<'p>),
+    CloseWindowResponse(play::CloseWindowResponse<'p>),
     OpenWindowResponse(play::OpenWindowResponse<'p>),
-    WindowItemsResponse(play::WindowItemsResponse),
-    CraftProgressBarResponse(play::CraftProgressBarResponse),
-    SetSlotResponse(play::SetSlotResponse),
-    SetCooldownResponse(play::SetCooldownResponse),
-    CustomPayloadResponse(play::CustomPayloadResponse),
+    WindowItemsResponse(play::WindowItemsResponse<'p>),
+    CraftProgressBarResponse(play::CraftProgressBarResponse<'p>),
+    SetSlotResponse(play::SetSlotResponse<'p>),
+    SetCooldownResponse(play::SetCooldownResponse<'p>),
+    CustomPayloadResponse(play::CustomPayloadResponse<'p>),
     NamedSoundEffectResponse(play::NamedSoundEffectResponse<'p>),
     KickDisconnectResponse(play::KickDisconnectResponse<'p>),
-    EntityStatusResponse(play::EntityStatusResponse),
-    ExplosionResponse(play::ExplosionResponse),
-    UnloadChunkResponse(play::UnloadChunkResponse),
-    GameStateChangeResponse(play::GameStateChangeResponse),
-    OpenHorseWindowResponse(play::OpenHorseWindowResponse),
-    KeepAliveResponse(play::KeepAliveResponse),
-    MapChunkResponse(play::MapChunkResponse),
-    WorldEventResponse(play::WorldEventResponse),
-    WorldParticlesResponse(play::WorldParticlesResponse),
-    UpdateLightResponse(play::UpdateLightResponse),
-    LoginResponse(play::LoginResponse),
-    MapResponse(play::MapResponse),
-    TradeListResponse(play::TradeListResponse),
-    RelEntityMoveResponse(play::RelEntityMoveResponse),
-    EntityMoveLookResponse(play::EntityMoveLookResponse),
-    EntityLookResponse(play::EntityLookResponse),
-    VehicleMoveResponse(play::VehicleMoveResponse),
-    OpenBookResponse(play::OpenBookResponse),
-    OpenSignEntityResponse(play::OpenSignEntityResponse),
+    EntityStatusResponse(play::EntityStatusResponse<'p>),
+    ExplosionResponse(play::ExplosionResponse<'p>),
+    UnloadChunkResponse(play::UnloadChunkResponse<'p>),
+    GameStateChangeResponse(play::GameStateChangeResponse<'p>),
+    OpenHorseWindowResponse(play::OpenHorseWindowResponse<'p>),
+    KeepAliveResponse(play::KeepAliveResponse<'p>),
+    MapChunkResponse(play::MapChunkResponse<'p>),
+    WorldEventResponse(play::WorldEventResponse<'p>),
+    WorldParticlesResponse(play::WorldParticlesResponse<'p>),
+    UpdateLightResponse(play::UpdateLightResponse<'p>),
+    LoginResponse(play::LoginResponse<'p>),
+    MapResponse(play::MapResponse<'p>),
+    TradeListResponse(play::TradeListResponse<'p>),
+    RelEntityMoveResponse(play::RelEntityMoveResponse<'p>),
+    EntityMoveLookResponse(play::EntityMoveLookResponse<'p>),
+    EntityLookResponse(play::EntityLookResponse<'p>),
+    VehicleMoveResponse(play::VehicleMoveResponse<'p>),
+    OpenBookResponse(play::OpenBookResponse<'p>),
+    OpenSignEntityResponse(play::OpenSignEntityResponse<'p>),
     CraftRecipeResponse(play::CraftRecipeResponse<'p>),
-    AbilitiesResponse(play::AbilitiesResponse),
-    EndCombatEventResponse(play::EndCombatEventResponse),
-    EnterCombatEventResponse(play::EnterCombatEventResponse),
+    AbilitiesResponse(play::AbilitiesResponse<'p>),
+    EndCombatEventResponse(play::EndCombatEventResponse<'p>),
+    EnterCombatEventResponse(play::EnterCombatEventResponse<'p>),
     DeathCombatEventResponse(play::DeathCombatEventResponse<'p>),
-    PlayerInfoResponse(play::PlayerInfoResponse),
-    PositionResponse(play::PositionResponse),
-    UnlockRecipesResponse(play::UnlockRecipesResponse),
-    EntityDestroyResponse(play::EntityDestroyResponse),
-    RemoveEntityEffectResponse(play::RemoveEntityEffectResponse),
-    ResourcePackSendResponse(play::ResourcePackSendResponse),
-    RespawnResponse(play::RespawnResponse),
-    EntityHeadRotationResponse(play::EntityHeadRotationResponse),
-    CameraResponse(play::CameraResponse),
-    HeldItemSlotResponse(play::HeldItemSlotResponse),
-    UpdateViewPositionResponse(play::UpdateViewPositionResponse),
-    UpdateViewDistanceResponse(play::UpdateViewDistanceResponse),
+    PlayerInfoResponse(play::PlayerInfoResponse<'p>),
+    PositionResponse(play::PositionResponse<'p>),
+    UnlockRecipesResponse(play::UnlockRecipesResponse<'p>),
+    EntityDestroyResponse(play::EntityDestroyResponse<'p>),
+    RemoveEntityEffectResponse(play::RemoveEntityEffectResponse<'p>),
+    ResourcePackSendResponse(play::ResourcePackSendResponse<'p>),
+    RespawnResponse(play::RespawnResponse<'p>),
+    EntityHeadRotationResponse(play::EntityHeadRotationResponse<'p>),
+    CameraResponse(play::CameraResponse<'p>),
+    HeldItemSlotResponse(play::HeldItemSlotResponse<'p>),
+    UpdateViewPositionResponse(play::UpdateViewPositionResponse<'p>),
+    UpdateViewDistanceResponse(play::UpdateViewDistanceResponse<'p>),
     ScoreboardDisplayObjectiveResponse(play::ScoreboardDisplayObjectiveResponse<'p>),
-    EntityMetadataResponse(play::EntityMetadataResponse),
-    AttachEntityResponse(play::AttachEntityResponse),
-    EntityVelocityResponse(play::EntityVelocityResponse),
-    EntityEquipmentResponse(play::EntityEquipmentResponse),
-    ExperienceResponse(play::ExperienceResponse),
-    UpdateHealthResponse(play::UpdateHealthResponse),
-    ScoreboardObjectiveResponse(play::ScoreboardObjectiveResponse),
-    SetPassengersResponse(play::SetPassengersResponse),
-    TeamsResponse(play::TeamsResponse),
-    ScoreboardScoreResponse(play::ScoreboardScoreResponse),
-    SpawnPositionResponse(play::SpawnPositionResponse),
-    UpdateTimeResponse(play::UpdateTimeResponse),
-    EntitySoundEffectResponse(play::EntitySoundEffectResponse),
-    StopSoundResponse(play::StopSoundResponse),
-    SoundEffectResponse(play::SoundEffectResponse),
+    EntityMetadataResponse(play::EntityMetadataResponse<'p>),
+    AttachEntityResponse(play::AttachEntityResponse<'p>),
+    EntityVelocityResponse(play::EntityVelocityResponse<'p>),
+    EntityEquipmentResponse(play::EntityEquipmentResponse<'p>),
+    ExperienceResponse(play::ExperienceResponse<'p>),
+    UpdateHealthResponse(play::UpdateHealthResponse<'p>),
+    ScoreboardObjectiveResponse(play::ScoreboardObjectiveResponse<'p>),
+    SetPassengersResponse(play::SetPassengersResponse<'p>),
+    TeamsResponse(play::TeamsResponse<'p>),
+    ScoreboardScoreResponse(play::ScoreboardScoreResponse<'p>),
+    SpawnPositionResponse(play::SpawnPositionResponse<'p>),
+    UpdateTimeResponse(play::UpdateTimeResponse<'p>),
+    EntitySoundEffectResponse(play::EntitySoundEffectResponse<'p>),
+    StopSoundResponse(play::StopSoundResponse<'p>),
+    SoundEffectResponse(play::SoundEffectResponse<'p>),
     PlayerlistHeaderResponse(play::PlayerlistHeaderResponse<'p>),
-    CollectResponse(play::CollectResponse),
-    EntityTeleportResponse(play::EntityTeleportResponse),
-    EntityUpdateAttributesResponse(play::EntityUpdateAttributesResponse),
-    EntityEffectResponse(play::EntityEffectResponse),
-    SelectAdvancementTabResponse(play::SelectAdvancementTabResponse),
-    DeclareRecipesResponse(play::DeclareRecipesResponse),
-    TagsResponse(play::TagsResponse),
-    AcknowledgePlayerDiggingResponse(play::AcknowledgePlayerDiggingResponse),
-    SculkVibrationSignalResponse(play::SculkVibrationSignalResponse),
-    ClearTitlesResponse(play::ClearTitlesResponse),
-    InitializeWorldBorderResponse(play::InitializeWorldBorderResponse),
+    CollectResponse(play::CollectResponse<'p>),
+    EntityTeleportResponse(play::EntityTeleportResponse<'p>),
+    EntityUpdateAttributesResponse(play::EntityUpdateAttributesResponse<'p>),
+    EntityEffectResponse(play::EntityEffectResponse<'p>),
+    SelectAdvancementTabResponse(play::SelectAdvancementTabResponse<'p>),
+    DeclareRecipesResponse(play::DeclareRecipesResponse<'p>),
+    TagsResponse(play::TagsResponse<'p>),
+    AcknowledgePlayerDiggingResponse(play::AcknowledgePlayerDiggingResponse<'p>),
+    SculkVibrationSignalResponse(play::SculkVibrationSignalResponse<'p>),
+    ClearTitlesResponse(play::ClearTitlesResponse<'p>),
+    InitializeWorldBorderResponse(play::InitializeWorldBorderResponse<'p>),
     ActionBarResponse(play::ActionBarResponse<'p>),
-    WorldBorderCenterResponse(play::WorldBorderCenterResponse),
-    WorldBorderLerpSizeResponse(play::WorldBorderLerpSizeResponse),
-    WorldBorderSizeResponse(play::WorldBorderSizeResponse),
-    WorldBorderWarningDelayResponse(play::WorldBorderWarningDelayResponse),
-    WorldBorderWarningReachResponse(play::WorldBorderWarningReachResponse),
-    PlayPingResponse(play::PlayPingResponse),
+    WorldBorderCenterResponse(play::WorldBorderCenterResponse<'p>),
+    WorldBorderLerpSizeResponse(play::WorldBorderLerpSizeResponse<'p>),
+    WorldBorderSizeResponse(play::WorldBorderSizeResponse<'p>),
+    WorldBorderWarningDelayResponse(play::WorldBorderWarningDelayResponse<'p>),
+    WorldBorderWarningReachResponse(play::WorldBorderWarningReachResponse<'p>),
+    PlayPingResponse(play::PlayPingResponse<'p>),
     SetTitleSubtitleResponse(play::SetTitleSubtitleResponse<'p>),
     SetTitleTextResponse(play::SetTitleTextResponse<'p>),
-    SetTitleTimeResponse(play::SetTitleTimeResponse),
-    SimulationDistanceResponse(play::SimulationDistanceResponse),
+    SetTitleTimeResponse(play::SetTitleTimeResponse<'p>),
+    SimulationDistanceResponse(play::SimulationDistanceResponse<'p>),
 }
 
 pub fn de_packets<'r>(

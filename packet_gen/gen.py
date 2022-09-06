@@ -118,6 +118,8 @@ def parse_array(ty, parent_name, structs):
 
 def parse_option(ty, parent_name, structs):
     subtype = parse_type(ty, parent_name, structs)
+    if subtype == BuiltinType.STRING:
+        raise Exception("option with str not supported")
     return OptionType(subtype)
 
 
@@ -167,7 +169,7 @@ def parse_type(ty, parent_name, structs):
 
 
 def parse_container(j, struct_name, structs, root=False):
-    if struct_name == "TradeListResponse":
+    if struct_name == "LoginPluginResponse":
         pass
     if struct_name in ["UpdateLightResponse", "EntityDestroyResponse", "SetPassengersResponse", "EditBookRequest",
                        "ResourcePackSendResponse", "SelectAdvancementTabResponse"]:
@@ -175,7 +177,7 @@ def parse_container(j, struct_name, structs, root=False):
 
     fields = []
 
-    needs_lifetime = False
+    needs_lifetime = True
     for i in j:
         name = i["name"]
         name = pascal_to_snake(name)
@@ -247,6 +249,7 @@ class Parser:
                     p = Packet(packet_name, struct, True)
                     packets.append(p)
                 except:
+                    structs.append(StructType(packet_name, [], False))
                     packets.append(Packet(packet_name, None, False))
             else:
                 unreachable()
@@ -275,7 +278,7 @@ def get_type(ty):
     if is_option(ty):
         return f"Option<{get_type(ty.subtype)}>"
     if is_struct(ty):
-        return ty.name
+        return f"{ty.name}<'p>"
 
     if ty == BuiltinType.VARINT:
         return "i32"
@@ -295,9 +298,10 @@ def deserialize_type(name, ty):
         out += deserialize_type("x", ty.subtype)
         out += f'''{name}.push(x);}}'''
         return out
-
     out = f"let {name} = "
-    if ty == BuiltinType.STRING or ty == BuiltinType.BUFFER:
+    if is_struct(ty):
+        out += f"packet_{pascal_to_snake(ty.name)}(reader)?;"
+    elif ty == BuiltinType.STRING or ty == BuiltinType.BUFFER:
         out += "reader.read_range()?;"
     elif ty == BuiltinType.VARINT:
         out += "read_varint(&mut reader)?;"
@@ -308,10 +312,10 @@ def deserialize_type(name, ty):
 
 class Generator:
     def __init__(self):
-        self.out = "#![allow(unused_imports)] #![allow(unused_mut)]"
+        self.out = "#![allow(unused_imports)] #![allow(unused_mut)] #![allow(non_camel_case_types)]"
 
     def gen_struct(self, struct):
-        needs_lifetime = False
+        needs_lifetime = True
 
         for i in struct.fields:
             if i.ty == BuiltinType.STRING or i.ty == BuiltinType.BUFFER:
@@ -324,6 +328,8 @@ class Generator:
         for i in struct.fields:
             ty = get_type(i.ty)
             self.out += f"pub {i.name}: {ty},"
+
+        self.out += "pub oof: PhantomData<&'p ()>"
 
         self.out += "}"
         underscore = "_" if len(struct.fields) == 0 else ""
@@ -343,6 +349,7 @@ class Generator:
         self.out += f"\n\nlet result = {struct.name} {{"
         for i in struct.fields:
             self.out += f"{i.name},"
+        self.out += "oof: PhantomData {}"
 
         self.out += "};"
         self.out += "Ok(result)"
@@ -356,6 +363,7 @@ use anyhow::Result;
 use crate::protocol::de::MinecraftDeserialize;
 use crate::protocol::de::Reader;
 use crate::protocol::varint::read_varint;
+use core::marker::PhantomData;
 
 '''
             for direction in state.directions:
@@ -377,7 +385,7 @@ pub enum Packet<'p> {{
         for state in states:
             for direction in state.directions:
                 for i in direction.packets:
-                    needs_lifetime = False
+                    needs_lifetime = True
                     if i.struct is not None:
                         needs_lifetime = i.struct.needs_lifetime
                     self.out += f'''{i.name}({state.state.value}::{i.name}{"<'p>" if needs_lifetime else ""}),'''

@@ -14,6 +14,7 @@ use serde_derive::Serialize;
 use sha1::Digest;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
+use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
 
 type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
@@ -208,6 +209,7 @@ impl Proxy {
                 let response = EncryptionBeginRequest {
                     shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
                     verify_token: &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
+                    oof: PhantomData {}
                 };
                 let buf = Proxy::serialize_enc_response(response)?;
                 src_session.write(&buf);
