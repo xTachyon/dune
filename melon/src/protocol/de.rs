@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::ops::Range;
 
-use super::{IndexedString, IndexedBuffer};
+use super::{IndexedBuffer, IndexedString};
 
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> Result<Self>
@@ -144,7 +144,10 @@ impl<'r> Reader<'r> {
     pub fn read_indexed_string(&mut self) -> Result<IndexedString> {
         let size = read_varint(&mut self.cursor)? as usize;
         let r = self.read_range_size(size)?;
-        Ok(IndexedString { start: r.start, end: r.end })
+        Ok(IndexedString {
+            start: r.start,
+            end: r.end,
+        })
     }
 
     pub fn read_indexed_buffer(&mut self) -> Result<IndexedBuffer> {
@@ -154,7 +157,10 @@ impl<'r> Reader<'r> {
 
     pub fn read_indexed_buffer_size(&mut self, size: usize) -> Result<IndexedBuffer> {
         let r = self.read_range_size(size)?;
-        Ok(IndexedBuffer { start: r.start, end: r.end })
+        Ok(IndexedBuffer {
+            start: r.start,
+            end: r.end,
+        })
     }
 
     pub fn get(&self) -> &[u8] {

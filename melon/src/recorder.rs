@@ -6,6 +6,7 @@ use anyhow::Result;
 use byteorder::WriteBytesExt;
 use cfb8::cipher::AsyncStreamCipher;
 use cfb8::cipher::NewCipher;
+use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use polling::{Event, Poller};
 use rsa::pkcs8::DecodePublicKey;
@@ -15,7 +16,6 @@ use sha1::Digest;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use flate2::write::ZlibEncoder;
 
 type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
@@ -207,8 +207,9 @@ impl Proxy {
                     return Err(anyhow::Error::msg("bad mojang auth"));
                 }
 
-                let buf = Proxy::serialize_enc_response(&Proxy::rsa_crypt(packet.public_key.get(data), &aes_key)?,
-                                                                 &Proxy::rsa_crypt(packet.public_key.get(data), packet.verify_token.get(data))?,
+                let buf = Proxy::serialize_enc_response(
+                    &Proxy::rsa_crypt(packet.public_key.get(data), &aes_key)?,
+                    &Proxy::rsa_crypt(packet.public_key.get(data), packet.verify_token.get(data))?,
                 )?;
                 src_session.write(&buf);
 

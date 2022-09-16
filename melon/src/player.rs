@@ -44,7 +44,8 @@ impl TrafficPlayer {
             }
             Packet::SuccessResponse(p) => {
                 self.state = ConnectionState::Play;
-                self.handler.player_info(p.username.get(disk_packet.data), p.uuid)?;
+                self.handler
+                    .player_info(p.username.get(disk_packet.data), p.uuid)?;
             }
             Packet::ChatResponse(p) => self.handler.on_chat(p.message.get(disk_packet.data))?,
             Packet::PositionRequest(p) => self.handler.position(Position {
