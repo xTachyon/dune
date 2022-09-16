@@ -45,6 +45,10 @@ impl EventSubscriber for EventHandler {
 }
 
 fn get_access_token() -> Result<AuthData> {
+    return Ok(AuthData {
+        selected_profile: "".to_string(),
+        access_token: "".to_string(),
+    });
     let path = env::var("appdata")? + "/.minecraft/TlauncherProfiles.json";
     let file = File::open(path)?;
     let value: serde_json::Value = serde_json::from_reader(file)?;
@@ -61,11 +65,11 @@ fn get_access_token() -> Result<AuthData> {
 }
 
 fn main() -> Result<()> {
-    let file = std::fs::read(r#"C:\Users\andre\Downloads\bigtest.nbt"#).unwrap();
-    let mut data = file.as_slice();
-    let p = melon::nbt::read(&mut data).unwrap();
-    println!("{}", melon::nbt::pretty_print(&p)?);
-    return Ok(());
+    // let file = std::fs::read(r#"C:\Users\andre\Downloads\bigtest.nbt"#).unwrap();
+    // let mut data = file.as_slice();
+    // let p = melon::nbt::read(&mut data).unwrap();
+    // println!("{}", melon::nbt::pretty_print(&p)?);
+    // return Ok(());
     let args: Vec<String> = env::args().collect();
     if args.len() == 1 {
         println!("no args supplied");
@@ -75,7 +79,7 @@ fn main() -> Result<()> {
     match args[1].as_str() {
         "record" => {
             let auth_data = get_access_token()?;
-            let server_address = "127.0.0.1:25565";
+            let server_address = "127.0.0.1:25566";
 
             record_to_file(server_address, auth_data, "packets.dune")?;
         }

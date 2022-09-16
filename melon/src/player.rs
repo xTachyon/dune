@@ -44,9 +44,9 @@ impl TrafficPlayer {
             }
             Packet::SuccessResponse(p) => {
                 self.state = ConnectionState::Play;
-                self.handler.player_info(p.username, p.uuid)?;
+                self.handler.player_info(p.username.get(disk_packet.data), p.uuid)?;
             }
-            Packet::ChatResponse(p) => self.handler.on_chat(p.message)?,
+            Packet::ChatResponse(p) => self.handler.on_chat(p.message.get(disk_packet.data))?,
             Packet::PositionRequest(p) => self.handler.position(Position {
                 x: p.x,
                 y: p.y,
@@ -74,7 +74,8 @@ impl TrafficPlayer {
             buffer.extend_from_slice(&tmp[..read]);
 
             let mut cursor = Reader::new(&buffer);
-            while DiskPacket::has_enough_bytes(&buffer[cursor.offset()..]) {
+            let b = &buffer[cursor.offset()..];
+            while DiskPacket::has_enough_bytes(b) {
                 let disk_packet = DiskPacket::read(&mut cursor)?;
                 self.do_packet(disk_packet)?;
             }

@@ -1,5 +1,4 @@
 use crate::protocol::de::Reader;
-use crate::protocol::v1_18_2::login::EncryptionBeginRequest;
 use crate::protocol::varint::write_varint;
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use crate::{protocol, DiskPacket};
@@ -7,6 +6,7 @@ use anyhow::Result;
 use byteorder::WriteBytesExt;
 use cfb8::cipher::AsyncStreamCipher;
 use cfb8::cipher::NewCipher;
+use flate2::Compression;
 use polling::{Event, Poller};
 use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
@@ -14,8 +14,8 @@ use serde_derive::Serialize;
 use sha1::Digest;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
-use std::marker::PhantomData;
 use std::net::{TcpListener, TcpStream};
+use flate2::write::ZlibEncoder;
 
 type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
@@ -71,7 +71,7 @@ struct Proxy {
     start_done: bool,
     auth_data: Option<AuthData>,
     tmp: Vec<u8>,
-    out_file: File,
+    out_file: ZlibEncoder<File>,
 }
 
 struct OnStartResult {
@@ -81,13 +81,14 @@ struct OnStartResult {
 
 impl Proxy {
     fn new(auth_data: AuthData, out_path: &str) -> Result<Proxy> {
+        let file = File::create(out_path)?;
         Ok(Proxy {
             state: ConnectionState::Handshaking,
             compression: false,
             start_done: false,
             auth_data: Some(auth_data),
             tmp: vec![],
-            out_file: File::create(out_path)?,
+            out_file: ZlibEncoder::new(file, Compression::best()),
         })
     }
 
@@ -99,25 +100,25 @@ impl Proxy {
         Ok(res)
     }
 
-    fn serialize_enc_response(packet: EncryptionBeginRequest) -> Result<Vec<u8>> {
+    fn serialize_enc_response(shared_secret: &[u8], verify_token: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(Vec::new());
 
         // id = 1
         cursor.write_u8(1)?;
 
         // Shared Secret Length
-        let (buf, size) = write_varint(packet.shared_secret.len() as u32);
+        let (buf, size) = write_varint(shared_secret.len() as u32);
         cursor.write_all(&buf[..size])?;
 
         // Shared Secret
-        cursor.write_all(packet.shared_secret)?;
+        cursor.write_all(shared_secret)?;
 
         // Verify Token Length
-        let (buf, size) = write_varint(packet.verify_token.len() as u32);
+        let (buf, size) = write_varint(verify_token.len() as u32);
         cursor.write_all(&buf[..size])?;
 
         // Verify Token
-        cursor.write_all(packet.verify_token)?;
+        cursor.write_all(verify_token)?;
 
         let mut result = Vec::new();
 
@@ -172,9 +173,9 @@ impl Proxy {
 
                 let hash = {
                     let mut sha1 = sha1::Sha1::new();
-                    sha1.update(packet.server_id);
+                    sha1.update(packet.server_id.get(data));
                     sha1.update(aes_key);
-                    sha1.update(&packet.public_key);
+                    sha1.update(&packet.public_key.get(data));
                     let hash = sha1.finalize();
 
                     num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
@@ -206,12 +207,9 @@ impl Proxy {
                     return Err(anyhow::Error::msg("bad mojang auth"));
                 }
 
-                let response = EncryptionBeginRequest {
-                    shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
-                    verify_token: &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
-                    oof: PhantomData {}
-                };
-                let buf = Proxy::serialize_enc_response(response)?;
+                let buf = Proxy::serialize_enc_response(&Proxy::rsa_crypt(packet.public_key.get(data), &aes_key)?,
+                                                                 &Proxy::rsa_crypt(packet.public_key.get(data), packet.verify_token.get(data))?,
+                )?;
                 src_session.write(&buf);
 
                 let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
@@ -357,7 +355,7 @@ fn run(
 }
 
 pub fn record_to_file(server_address: &str, auth_data: AuthData, out_path: &str) -> Result<()> {
-    let addr = "0.0.0.0:25566";
+    let addr = "0.0.0.0:25565";
     let (client, client_addr) = {
         let incoming = TcpListener::bind(addr)?;
         println!("listening on {}", addr);

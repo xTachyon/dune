@@ -189,7 +189,7 @@ def parse_container(j, struct_name, structs, root=False):
         try:
             ty = parse_type(ty, struct_name, structs)
         except:
-            print(f"couldn't parse name=`{name}`,type=`{ty}` in packet `{struct_name}`")
+            print(f"couldn't parse name=`{name}`,type=`{str(ty)[:15]}` in packet `{struct_name}`")
             raise
 
         needs_lifetime = needs_lifetime or ty == BuiltinType.STRING or ty == BuiltinType.BUFFER
@@ -278,14 +278,14 @@ def get_type(ty):
     if is_option(ty):
         return f"Option<{get_type(ty.subtype)}>"
     if is_struct(ty):
-        return f"{ty.name}<'p>"
+        return ty.name
 
     if ty == BuiltinType.VARINT:
         return "i32"
     if ty == BuiltinType.STRING:
-        return "&'p str"
+        return "IndexedString"
     if ty == BuiltinType.BUFFER:
-        return "&'p [u8]"
+        return "IndexedBuffer"
     if ty == BuiltinType.POSITION:
         return "crate::protocol::de::Position"
     return ty.value
@@ -301,8 +301,10 @@ def deserialize_type(name, ty):
     out = f"let {name} = "
     if is_struct(ty):
         out += f"packet_{pascal_to_snake(ty.name)}(reader)?;"
-    elif ty == BuiltinType.STRING or ty == BuiltinType.BUFFER:
-        out += "reader.read_range()?;"
+    elif ty == BuiltinType.STRING:
+        out += "reader.read_indexed_string()?;"
+    elif ty == BuiltinType.BUFFER:
+        out += "reader.read_indexed_buffer()?;"
     elif ty == BuiltinType.VARINT:
         out += "read_varint(&mut reader)?;"
     else:
@@ -312,7 +314,7 @@ def deserialize_type(name, ty):
 
 class Generator:
     def __init__(self):
-        self.out = "#![allow(unused_imports)] #![allow(unused_mut)] #![allow(non_camel_case_types)]"
+        self.out = "#![allow(unused_imports)] #![allow(unused_mut)] #![allow(non_camel_case_types)] #![allow(non_snake_case)]"
 
     def gen_struct(self, struct):
         needs_lifetime = True
@@ -321,6 +323,7 @@ class Generator:
             if i.ty == BuiltinType.STRING or i.ty == BuiltinType.BUFFER:
                 needs_lifetime = True
                 break
+        needs_lifetime = False
 
         lifetime_simple = f'''{"'p" if needs_lifetime else ""}'''
         lifetime = f'''{"<'p>" if needs_lifetime else ""}'''
@@ -329,8 +332,6 @@ class Generator:
             ty = get_type(i.ty)
             self.out += f"pub {i.name}: {ty},"
 
-        self.out += "pub oof: PhantomData<&'p ()>"
-
         self.out += "}"
         underscore = "_" if len(struct.fields) == 0 else ""
         self.out += f'''pub(super) fn packet_{pascal_to_snake(struct.name)}{lifetime}(mut {underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
@@ -338,18 +339,17 @@ class Generator:
         for i in struct.fields:
             self.out += deserialize_type(i.name, i.ty)
 
-        for i in struct.fields:
-            if i.ty == BuiltinType.STRING:
-                self.out += f"let {i.name} = "
-                self.out += f"reader.get_str_from({i.name})?;"
-            elif i.ty == BuiltinType.BUFFER:
-                self.out += f"let {i.name} = "
-                self.out += f"reader.get_buf_from({i.name})?;"
+        # for i in struct.fields:
+        #     if i.ty == BuiltinType.STRING:
+        #         self.out += f"let {i.name} = "
+        #         self.out += f"reader.get_str_from({i.name})?;"
+        #     elif i.ty == BuiltinType.BUFFER:
+        #         self.out += f"let {i.name} = "
+        #         self.out += f"reader.get_buf_from({i.name})?;"
 
         self.out += f"\n\nlet result = {struct.name} {{"
         for i in struct.fields:
             self.out += f"{i.name},"
-        self.out += "oof: PhantomData {}"
 
         self.out += "};"
         self.out += "Ok(result)"
@@ -360,6 +360,8 @@ class Generator:
             self.out += f'''
 pub mod {state.state.value} {{
 use anyhow::Result;
+use crate::protocol::IndexedBuffer;
+use crate::protocol::IndexedString;
 use crate::protocol::de::MinecraftDeserialize;
 use crate::protocol::de::Reader;
 use crate::protocol::varint::read_varint;
@@ -379,7 +381,7 @@ use crate::protocol::PacketDirection as D;
 use crate::protocol::de::Reader;
 
 #[derive(Debug)]
-pub enum Packet<'p> {{
+pub enum Packet {{
 '''
 
         for state in states:
@@ -388,6 +390,7 @@ pub enum Packet<'p> {{
                     needs_lifetime = True
                     if i.struct is not None:
                         needs_lifetime = i.struct.needs_lifetime
+                    needs_lifetime = False
                     self.out += f'''{i.name}({state.state.value}::{i.name}{"<'p>" if needs_lifetime else ""}),'''
 
         self.out += '''

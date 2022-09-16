@@ -33,7 +33,7 @@ impl<'p> DiskPacket<'p> {
         let direction: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
         let direction = PacketDirection::try_from(direction)?;
         let data = reader.read_range_size(size as usize - 4 - 1)?;
-        let data = reader.get_buf_from(data)?;
+        let data = reader.get_buf_from(data.start as usize..data.end as usize)?;
 
         Ok(DiskPacket {
             id,

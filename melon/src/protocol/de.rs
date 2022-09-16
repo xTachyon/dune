@@ -6,6 +6,8 @@ use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::ops::Range;
 
+use super::{IndexedString, IndexedBuffer};
+
 pub(crate) trait MinecraftDeserialize {
     fn deserialize<R: Read>(reader: R) -> Result<Self>
     where
@@ -116,33 +118,43 @@ impl<'r> Reader<'r> {
         }
     }
 
-    pub fn read_range(&mut self) -> Result<Range<usize>> {
+    pub fn get_buf_from(&self, r: Range<usize>) -> Result<&[u8]> {
+        let bytes = &self.get()[r];
+        Ok(bytes)
+    }
+
+    pub fn read_range(&mut self) -> Result<Range<u32>> {
         let size = read_varint(&mut self.cursor)? as usize;
         self.read_range_size(size)
     }
 
-    pub fn read_range_size(&mut self, size: usize) -> Result<Range<usize>> {
+    pub fn read_range_size(&mut self, size: usize) -> Result<Range<u32>> {
         let start = self.offset();
         let end = start + size;
         let vec_len = self.get().len();
 
         if end <= vec_len {
             self.cursor.set_position(end as u64);
-            Ok(start..end)
+            Ok(start as u32..end as u32)
         } else {
             Err(anyhow!("not enough bytes for str"))
         }
     }
 
-    pub fn get_str_from(&self, r: Range<usize>) -> Result<&str> {
-        let bytes = &self.get()[r];
-        let result = std::str::from_utf8(bytes)?;
-        Ok(result)
+    pub fn read_indexed_string(&mut self) -> Result<IndexedString> {
+        let size = read_varint(&mut self.cursor)? as usize;
+        let r = self.read_range_size(size)?;
+        Ok(IndexedString { start: r.start, end: r.end })
     }
 
-    pub fn get_buf_from(&self, r: Range<usize>) -> Result<&[u8]> {
-        let bytes = &self.get()[r];
-        Ok(bytes)
+    pub fn read_indexed_buffer(&mut self) -> Result<IndexedBuffer> {
+        let size = read_varint(&mut self.cursor)? as usize;
+        self.read_indexed_buffer_size(size)
+    }
+
+    pub fn read_indexed_buffer_size(&mut self, size: usize) -> Result<IndexedBuffer> {
+        let r = self.read_range_size(size)?;
+        Ok(IndexedBuffer { start: r.start, end: r.end })
     }
 
     pub fn get(&self) -> &[u8] {

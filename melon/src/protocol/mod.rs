@@ -27,6 +27,40 @@ pub enum PacketDirection {
     ServerToClient,
 }
 
+#[derive(Debug)]
+pub struct IndexedString {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl IndexedString {
+    pub fn len(&self) -> u32 {
+        self.end - self.start
+    }
+
+    pub fn get<'s>(&self, x: &'s [u8]) -> &'s str {
+        let b = &x[self.start as usize..self.end as usize];
+        std::str::from_utf8(b).unwrap()
+        // this unwrap is legit, it shouldn't ever fail
+    }
+}
+
+#[derive(Debug)]
+pub struct IndexedBuffer {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl IndexedBuffer {
+    pub fn len(&self) -> u32 {
+        self.end - self.start
+    }
+
+    pub fn get<'b>(&self, x: &'b [u8]) -> &'b [u8] {
+        &x[self.start as usize..self.end as usize]
+    }
+}
+
 pub struct PacketData {
     pub id: u32,
     pub total_size_original: usize,
@@ -89,7 +123,7 @@ pub fn just_deserialize<'r>(
     state: ConnectionState,
     id: u32,
     reader: &'r mut Reader<'r>,
-) -> Result<Packet<'r>> {
+) -> Result<Packet> {
     let packet = de_packets(state, direction, id, reader)?;
     Ok(packet)
 }
