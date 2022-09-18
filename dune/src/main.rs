@@ -2,6 +2,7 @@ use anyhow::Result;
 use melon::events::{EventSubscriber, Position};
 use melon::player::play;
 use melon::recorder::{record_to_file, AuthData};
+use serde_derive::Deserialize;
 use std::env;
 use std::fs::File;
 
@@ -44,11 +45,7 @@ impl EventSubscriber for EventHandler {
     }
 }
 
-fn get_access_token() -> Result<AuthData> {
-    return Ok(AuthData {
-        selected_profile: "".to_string(),
-        access_token: "".to_string(),
-    });
+fn get_access_token_tlauncher() -> Result<AuthData> {
     let path = env::var("appdata")? + "/.minecraft/TlauncherProfiles.json";
     let file = File::open(path)?;
     let value: serde_json::Value = serde_json::from_reader(file)?;
@@ -62,6 +59,46 @@ fn get_access_token() -> Result<AuthData> {
         selected_profile: selected_acc.to_string(),
         access_token: token.to_string(),
     })
+}
+
+#[derive(Deserialize)]
+struct PolyProfile<'x> {
+    id: &'x str,
+}
+#[derive(Deserialize)]
+struct PolyYgg<'x> {
+    token: &'x str,
+}
+#[derive(Deserialize)]
+struct PolyAccount<'x> {
+    #[serde(borrow)]
+    profile: PolyProfile<'x>,
+    #[serde(borrow)]
+    ygg: PolyYgg<'x>,
+}
+#[derive(Deserialize)]
+struct PolyJson<'x> {
+    #[serde(borrow)]
+    accounts: Vec<PolyAccount<'x>>,
+}
+
+fn get_access_token_polymc() -> Result<AuthData> {
+    let path = env::var("appdata")? + "/PolyMC/accounts.json";
+    let content = std::fs::read_to_string(path)?;
+    let value: PolyJson = serde_json::from_str(&content)?;
+    let acc = &value.accounts[0];
+
+    Ok(AuthData {
+        selected_profile: acc.profile.id.to_string(),
+        access_token: acc.ygg.token.to_string(),
+    })
+}
+
+fn get_access_token() -> Result<AuthData> {
+    if let Ok(x) = get_access_token_polymc() {
+        return Ok(x);
+    }
+    get_access_token_tlauncher()
 }
 
 fn main() -> Result<()> {

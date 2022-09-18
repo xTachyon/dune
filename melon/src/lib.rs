@@ -30,8 +30,10 @@ impl<'p> DiskPacket<'p> {
     fn read(mut reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
         let size: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
         let id: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
+       
         let direction: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
         let direction = PacketDirection::try_from(direction)?;
+       
         let data = reader.read_range_size(size as usize - 4 - 1)?;
         let data = reader.get_buf_from(data.start as usize..data.end as usize)?;
 

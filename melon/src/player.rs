@@ -6,9 +6,10 @@ use anyhow::Result;
 use std::fs::File;
 use std::io::Read;
 use std::time::Duration;
+use flate2::read::ZlibDecoder;
 
 struct TrafficPlayer {
-    reader: File,
+    reader: ZlibDecoder<File>,
     handler: Box<dyn EventSubscriber>,
     state: ConnectionState,
 }
@@ -16,6 +17,7 @@ struct TrafficPlayer {
 impl TrafficPlayer {
     fn new(in_path: &str, handler: Box<dyn EventSubscriber>) -> Result<TrafficPlayer> {
         let reader = File::open(in_path)?;
+        let reader = ZlibDecoder::new(reader);
 
         Ok(TrafficPlayer {
             reader,
@@ -33,7 +35,7 @@ impl TrafficPlayer {
             &mut reader,
         )?;
 
-        // println!("{:?}", packet);
+        println!("{:?}", packet);
         match packet {
             Packet::SetProtocolRequest(p) => {
                 self.state = match p.next_state {
