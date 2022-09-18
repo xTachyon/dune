@@ -65,13 +65,12 @@ impl TrafficPlayer {
     }
 
     fn run(&mut self) -> Result<()> {
-        
         let mut buffer = Vec::with_capacity(64 * 1024);
         let mut tmp = [0; 64 * 1024];
         loop {
             let read = self.reader.read(&mut tmp)?;
             if read == 0 {
-                return Ok(())
+                return Ok(());
 
                 // const SLEEP_DURATION: Duration = Duration::from_millis(20);
                 // std::thread::sleep(SLEEP_DURATION);

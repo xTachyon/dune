@@ -3,6 +3,7 @@ use crate::protocol::PacketDirection;
 use anyhow::Result;
 use std::io::Write;
 
+pub mod chat;
 pub mod events;
 mod game;
 pub mod nbt;

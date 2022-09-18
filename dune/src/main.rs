@@ -1,4 +1,5 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use melon::chat::parse_chat;
 use melon::events::{EventSubscriber, Position};
 use melon::play::play;
 use melon::record::{record_to_file, AuthData};
@@ -29,7 +30,8 @@ impl EventHandler {
 
 impl EventSubscriber for EventHandler {
     fn on_chat(&mut self, message: &str) -> Result<()> {
-        println!("chat: {}", message);
+        let c = parse_chat(message)?;
+        println!("chat: {} => \n{:?}\n{}\n", message, c, c.to_string());
         Ok(())
     }
     fn player_info(&mut self, name: &str, uuid: u128) -> Result<()> {
@@ -86,7 +88,7 @@ fn get_access_token_polymc() -> Result<AuthData> {
     let value: PolyJson = serde_json::from_str(&content)?;
     let acc = match value.accounts.first() {
         Some(x) => x,
-        None => return Err(anyhow!("there should be at least an account"))
+        None => return Err(anyhow!("there should be at least an account")),
     };
 
     Ok(AuthData {
