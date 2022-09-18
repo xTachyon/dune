@@ -5,6 +5,6 @@ authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.26"
+anyhow = "1.0.65"
+serde_json = "1.0.85"
 melon = { path = "../melon" }
-serde_json = "1.0.79"
