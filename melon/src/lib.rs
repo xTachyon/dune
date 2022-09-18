@@ -6,9 +6,9 @@ use std::io::Write;
 pub mod events;
 mod game;
 pub mod nbt;
-pub mod player;
+pub mod play;
 mod protocol;
-pub mod recorder;
+pub mod record;
 
 struct DiskPacket<'p> {
     pub id: u32,

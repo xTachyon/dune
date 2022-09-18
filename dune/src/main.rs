@@ -1,10 +1,11 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use melon::events::{EventSubscriber, Position};
-use melon::player::play;
-use melon::recorder::{record_to_file, AuthData};
+use melon::play::play;
+use melon::record::{record_to_file, AuthData};
 use serde_derive::Deserialize;
 use std::env;
 use std::fs::File;
+use std::time::Instant;
 
 struct EventHandler {
     player_name: String,
@@ -37,9 +38,6 @@ impl EventSubscriber for EventHandler {
         Ok(())
     }
     fn position(&mut self, pos: Position) -> Result<()> {
-        if pos != self.player_position {
-            println!("{:?}", pos);
-        }
         self.player_position = pos;
         Ok(())
     }
@@ -86,7 +84,10 @@ fn get_access_token_polymc() -> Result<AuthData> {
     let path = env::var("appdata")? + "/PolyMC/accounts.json";
     let content = std::fs::read_to_string(path)?;
     let value: PolyJson = serde_json::from_str(&content)?;
-    let acc = &value.accounts[0];
+    let acc = match value.accounts.first() {
+        Some(x) => x,
+        None => return Err(anyhow!("there should be at least an account"))
+    };
 
     Ok(AuthData {
         selected_profile: acc.profile.id.to_string(),
@@ -101,7 +102,7 @@ fn get_access_token() -> Result<AuthData> {
     get_access_token_tlauncher()
 }
 
-fn main() -> Result<()> {
+fn main_impl() -> Result<()> {
     // let file = std::fs::read(r#"C:\Users\andre\Downloads\bigtest.nbt"#).unwrap();
     // let mut data = file.as_slice();
     // let p = melon::nbt::read(&mut data).unwrap();
@@ -128,4 +129,11 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn main() -> Result<()> {
+    let start = Instant::now();
+    let result = main_impl();
+    println!("execution took {:?}", start.elapsed());
+    result
 }
