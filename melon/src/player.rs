@@ -3,10 +3,10 @@ use crate::protocol::de::Reader;
 use crate::protocol::{ConnectionState, Packet};
 use crate::{protocol, DiskPacket};
 use anyhow::Result;
+use flate2::read::ZlibDecoder;
 use std::fs::File;
 use std::io::Read;
 use std::time::Duration;
-use flate2::read::ZlibDecoder;
 
 struct TrafficPlayer {
     reader: ZlibDecoder<File>,
@@ -66,19 +66,20 @@ impl TrafficPlayer {
     }
 
     fn run(&mut self) -> Result<()> {
-        let mut buffer = Vec::new();
+        const SLEEP_DURATION: Duration = Duration::from_millis(20);
+
+        let mut buffer = Vec::with_capacity(64 * 1024);
         let mut tmp = [0; 64 * 1024];
         loop {
             let read = self.reader.read(&mut tmp)?;
             if read == 0 {
-                std::thread::sleep(Duration::from_millis(20));
+                std::thread::sleep(SLEEP_DURATION);
                 continue;
             }
             buffer.extend_from_slice(&tmp[..read]);
 
             let mut cursor = Reader::new(&buffer);
-            let b = &buffer[cursor.offset()..];
-            while DiskPacket::has_enough_bytes(b) {
+            while DiskPacket::has_enough_bytes(&buffer[cursor.offset()..]) {
                 let disk_packet = DiskPacket::read(&mut cursor)?;
                 self.do_packet(disk_packet)?;
             }

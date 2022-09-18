@@ -19,6 +19,8 @@ struct DiskPacket<'p> {
 impl<'p> DiskPacket<'p> {
     fn write<W: Write>(&self, mut writer: W) -> Result<()> {
         let size = 4 + 1 + self.data.len() as u32;
+        // id + direction + size
+
         writer.write_all(&size.to_be_bytes())?;
         writer.write_all(&self.id.to_be_bytes())?;
         writer.write_all(&[self.direction as u8])?;
@@ -30,10 +32,10 @@ impl<'p> DiskPacket<'p> {
     fn read(mut reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
         let size: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
         let id: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
-       
+
         let direction: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
         let direction = PacketDirection::try_from(direction)?;
-       
+
         let data = reader.read_range_size(size as usize - 4 - 1)?;
         let data = reader.get_buf_from(data.start as usize..data.end as usize)?;
 
@@ -45,10 +47,12 @@ impl<'p> DiskPacket<'p> {
     }
 
     fn has_enough_bytes(buf: &[u8]) -> bool {
-        if buf.len() < 4 {
+        const SIZEOF_U32: usize = std::mem::size_of::<u32>();
+
+        if buf.len() < SIZEOF_U32 {
             return false;
         }
         let size = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
-        size + 4 <= buf.len()
+        size + SIZEOF_U32 <= buf.len()
     }
 }

@@ -124,7 +124,7 @@ fn main() -> Result<()> {
             let handler = Box::new(EventHandler::new());
             play("packets.dune", handler)?;
         }
-        _ => {}
+        _ => eprintln!("unknown command"),
     }
 
     Ok(())

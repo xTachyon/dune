@@ -12,8 +12,7 @@ pub fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
         bytes_read += 1;
 
         if bytes_read > 5 {
-            let mut buffer = vec![0; 3513451345];
-            reader.read_exact(&mut buffer)?;
+            return Err(anyhow::anyhow!("varint can't be bigger than 5 bytes"));
         }
         if read & 0b1000_0000 == 0 {
             break;
