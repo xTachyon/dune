@@ -189,7 +189,7 @@ pub fn pretty_print(root: &RootTag) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::nbt::{read, pretty_print, read_option};
+    use crate::nbt::{pretty_print, read, read_option};
 
     #[test]
     fn hello_world() {

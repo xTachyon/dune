@@ -62,6 +62,7 @@ fn main_impl() -> Result<()> {
         "record" => {
             let auth_data = get_access_token()?;
             let server_address = "127.0.0.1:25566";
+            // let server_address = "play.runic-paradise.com:25565";
 
             record_to_file(server_address, auth_data, "packets.dune")?;
         }

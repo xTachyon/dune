@@ -33,6 +33,7 @@ struct PolyAccount<'x> {
     profile: PolyProfile<'x>,
     #[serde(borrow)]
     ygg: PolyYgg<'x>,
+    active: Option<bool>,
 }
 #[derive(Deserialize)]
 struct PolyJson<'x> {
@@ -44,7 +45,8 @@ fn get_access_token_polymc() -> Result<AuthData> {
     let path = env::var("appdata")? + "/PolyMC/accounts.json";
     let content = std::fs::read_to_string(path)?;
     let value: PolyJson = serde_json::from_str(&content)?;
-    let acc = match value.accounts.first() {
+    let acc = value.accounts.iter().find(|x| x.active.unwrap_or(false));
+    let acc = match acc {
         Some(x) => x,
         None => bail!("there should be at least an account"),
     };
@@ -56,8 +58,8 @@ fn get_access_token_polymc() -> Result<AuthData> {
 }
 
 pub fn get_access_token() -> Result<AuthData> {
-    if let Ok(x) = get_access_token_polymc() {
+    if let Ok(x) = get_access_token_tlauncher() {
         return Ok(x);
     }
-    get_access_token_tlauncher()
+    get_access_token_polymc()
 }

@@ -200,7 +200,9 @@ impl Proxy {
                 let response =
                     ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
                         .set("Content-Type", "application/json; charset=utf-8")
-                        .send_string(&req)?;
+                        .send_string(&req);
+                // println!("{:?}", response);
+                let response = response?;
 
                 // 204 No Content = Ok
                 if response.status() != 204 {
