@@ -34,7 +34,7 @@ impl TrafficPlayer {
             &mut reader,
         )?;
 
-        println!("{:?}", packet);
+        // println!("{:?}", packet);
         match packet {
             Packet::SetProtocolRequest(p) => {
                 self.state = match p.next_state {

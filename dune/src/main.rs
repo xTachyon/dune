@@ -31,8 +31,9 @@ impl EventHandler {
 
 impl EventSubscriber for EventHandler {
     fn on_chat(&mut self, message: &str) -> Result<()> {
+        println!("chat: {}", message);
         let c = parse_chat(message)?;
-        println!("chat: {} => \n{:?}\n{}\n", message, c, c.to_string());
+        println!(" => \n{:?}\n{}\n", c, c.to_string());
         Ok(())
     }
     fn player_info(&mut self, name: &str, uuid: u128) -> Result<()> {
@@ -61,8 +62,8 @@ fn main_impl() -> Result<()> {
     match args[1].as_str() {
         "record" => {
             let auth_data = get_access_token()?;
-            let server_address = "127.0.0.1:25566";
-            // let server_address = "play.runic-paradise.com:25565";
+            // let server_address = "127.0.0.1:25566";
+            let server_address = "play.runic-paradise.com:25565";
 
             record_to_file(server_address, auth_data, "packets.dune")?;
         }

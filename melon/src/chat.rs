@@ -19,6 +19,16 @@ const LANG_ENG: &[LangFormat] = &[
         format: "%s joined the game",
         no_of_captures: 1,
     },
+    LangFormat {
+        name: "block.minecraft.set_spawn",
+        format: "Respawn point set",
+        no_of_captures: 0,
+    },
+    LangFormat {
+        name: "sleep.skipping_night",
+        format: "Sleeping through this night",
+        no_of_captures: 0,
+    },
 ];
 
 #[derive(Debug)]

@@ -303,7 +303,7 @@ def deserialize_type(name, ty):
         out += deserialize_type("x", ty.subtype)
         out += f'''{name}.push(x);}}'''
         return out
-    out = f"let {name} = "
+    out = f"let {name}: {get_type(ty)} = "
     if is_struct(ty):
         out += f"packet_{pascal_to_snake(ty.name)}(reader)?;"
     elif ty == BuiltinType.STRING:
