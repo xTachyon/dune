@@ -12,7 +12,7 @@ use polling::{Event, Poller};
 use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
-use sha1::Digest;
+use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -172,10 +172,10 @@ impl Proxy {
                 let aes_key: [u8; 16] = rand::random();
 
                 let hash = {
-                    let mut sha1 = sha1::Sha1::new();
+                    let mut sha1 = Sha1::new();
                     sha1.update(packet.server_id.get(data));
                     sha1.update(aes_key);
-                    sha1.update(&packet.public_key.get(data));
+                    sha1.update(packet.public_key.get(data));
                     let hash = sha1.finalize();
 
                     num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
