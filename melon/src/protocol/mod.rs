@@ -2,6 +2,7 @@ pub mod de;
 pub mod v1_18_2;
 pub mod varint;
 
+use crate::nbt::RootTag;
 use crate::protocol::varint::{read_varint, read_varint_with_size};
 use anyhow::Result;
 use de::Reader;
@@ -65,7 +66,7 @@ impl IndexedBuffer {
 pub struct InventorySlotData {
     pub item_id: i32,
     pub count: u8,
-    pub nbt: Option<IndexedBuffer>,
+    pub nbt: Option<RootTag>,
 }
 
 #[derive(Debug)]

@@ -1,6 +1,7 @@
 use crate::game::GameMode;
+use crate::nbt;
 use crate::protocol::varint::read_varint;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
@@ -92,12 +93,7 @@ impl MD for InventorySlot {
         let data = if present {
             let item_id = read_varint(&mut reader)?;
             let count = MD::deserialize(&mut reader)?;
-            let nbt = reader.read_rest_buffer();
-            if nbt.len() == 0 {
-                bail!("nbt must have at least one byte");
-            }
-            let nbt_buf = nbt.get(reader.get());
-            let nbt = if nbt_buf[0] == 0 { None } else { Some(nbt) };
+            let nbt = nbt::read_option(reader)?;
 
             Some(InventorySlotData {
                 item_id,

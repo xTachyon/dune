@@ -93,8 +93,8 @@ fn read_impl<R: Read>(mut reader: &mut R, tag: u8) -> Result<Tag> {
     Ok(result)
 }
 
-pub fn read<R: Read>(reader: &mut R) -> Result<RootTag> {
-    let tag = reader.read_u8()?;
+fn read_start<R: Read>(mut reader: R, tag: u8) -> Result<RootTag> {
+    let reader = &mut reader;
     if tag != 10 {
         return Err(anyhow!(
             "expected the stream to start with a compound tag, found {}",
@@ -104,6 +104,23 @@ pub fn read<R: Read>(reader: &mut R) -> Result<RootTag> {
     let name = read_string(reader)?;
     let tag = read_impl(reader, tag)?;
     Ok(RootTag { name, tag })
+}
+
+pub fn read_option<R: Read>(mut reader: R) -> Result<Option<RootTag>> {
+    let reader = &mut reader;
+    let tag = reader.read_u8()?;
+    if tag == 0 {
+        Ok(None)
+    } else {
+        let t = read_start(reader, tag)?;
+        Ok(Some(t))
+    }
+}
+
+pub fn read<R: Read>(mut reader: R) -> Result<RootTag> {
+    let reader = &mut reader;
+    let tag = reader.read_u8()?;
+    read_start(reader, tag)
 }
 
 fn print_indent(output: &mut String, indent: usize) {
@@ -168,4 +185,23 @@ pub fn pretty_print(root: &RootTag) -> Result<String> {
     let mut result = String::new();
     print_compound(&mut result, &root.tag, Some(&root.name), 0)?;
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::nbt::{read, pretty_print, read_option};
+
+    #[test]
+    fn hello_world() {
+        const DATA: &[u8] = include_bytes!("../../tests/hello_world.nbt");
+        let tag = read(DATA).unwrap();
+        pretty_print(&tag).unwrap();
+    }
+
+    #[test]
+    fn option() {
+        const DATA: &[u8] = &[0];
+        let tag = read_option(DATA).unwrap();
+        assert!(tag.is_none());
+    }
 }
