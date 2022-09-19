@@ -1,4 +1,4 @@
-use crate::protocol::de::{MinecraftDeserialize, Reader};
+use crate::protocol::de::{Reader, MD};
 use crate::protocol::PacketDirection;
 use anyhow::Result;
 use std::io::Write;
@@ -31,10 +31,10 @@ impl<'p> DiskPacket<'p> {
     }
 
     fn read(mut reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
-        let size: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
-        let id: u32 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let size: u32 = MD::deserialize(&mut reader)?;
+        let id: u32 = MD::deserialize(&mut reader)?;
 
-        let direction: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let direction: u8 = MD::deserialize(&mut reader)?;
         let direction = PacketDirection::try_from(direction)?;
 
         let data = reader.read_range_size(size as usize - 4 - 1)?;

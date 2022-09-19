@@ -61,6 +61,18 @@ impl IndexedBuffer {
     }
 }
 
+#[derive(Debug)]
+pub struct InventorySlotData {
+    pub item_id: i32,
+    pub count: u8,
+    pub nbt: Option<IndexedBuffer>,
+}
+
+#[derive(Debug)]
+pub struct InventorySlot {
+    pub data: Option<InventorySlotData>,
+}
+
 pub struct PacketData {
     pub id: u32,
     pub total_size_original: usize,

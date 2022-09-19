@@ -1,15 +1,15 @@
 use crate::game::GameMode;
 use crate::protocol::varint::read_varint;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use byteorder::ReadBytesExt;
 use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::ops::Range;
 
-use super::{IndexedBuffer, IndexedString};
+use super::{IndexedBuffer, IndexedString, InventorySlot, InventorySlotData};
 
-pub(crate) trait MinecraftDeserialize {
-    fn deserialize<R: Read>(reader: R) -> Result<Self>
+pub(crate) trait MD {
+    fn deserialize(reader: &mut Reader) -> Result<Self>
     where
         Self: Sized;
 }
@@ -17,8 +17,8 @@ pub(crate) trait MinecraftDeserialize {
 macro_rules! impl_for_numbers {
     ($($number:ident)*) => {
         $(
-            impl MinecraftDeserialize for $number {
-                fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
+            impl MD for $number {
+                fn deserialize(mut reader: &mut Reader) -> Result<Self> {
                     let mut buffer = [0u8; std::mem::size_of::<$number>()];
                     reader.read_exact(&mut buffer)?;
                     let value = $number::from_be_bytes(buffer.into());
@@ -31,23 +31,23 @@ macro_rules! impl_for_numbers {
 
 impl_for_numbers!(u16 u32 u64 u128 i16 i32 i64 f32 f64);
 
-impl MinecraftDeserialize for u8 {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
+impl MD for u8 {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
         let value = reader.read_u8()?;
         Ok(value)
     }
 }
 
-impl MinecraftDeserialize for i8 {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
+impl MD for i8 {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
         let value = reader.read_i8()?;
         Ok(value)
     }
 }
 
-impl MinecraftDeserialize for bool {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self> where {
-        let value: u8 = MinecraftDeserialize::deserialize(&mut reader)?;
+impl MD for bool {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> where {
+        let value: u8 = MD::deserialize(&mut reader)?;
         let result = value != 0;
         Ok(result)
     }
@@ -55,8 +55,8 @@ impl MinecraftDeserialize for bool {
 
 const MAX_DATA_SIZE: usize = 5 * 1024 * 1024;
 
-impl MinecraftDeserialize for String {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
+impl MD for String {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
         let size = read_varint(&mut reader)? as usize;
         if size > MAX_DATA_SIZE {
             return Err(anyhow!("string size too big"));
@@ -67,8 +67,8 @@ impl MinecraftDeserialize for String {
     }
 }
 
-impl MinecraftDeserialize for Vec<u8> {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Self> {
+impl MD for Vec<u8> {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
         let size = read_varint(&mut reader)? as usize;
         if size > MAX_DATA_SIZE {
             return Err(anyhow!("buffer size too big"));
@@ -79,14 +79,47 @@ impl MinecraftDeserialize for Vec<u8> {
     }
 }
 
-impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Option<T>>
+impl MD for IndexedBuffer {
+    fn deserialize(reader: &mut Reader) -> Result<Self> {
+        reader.read_indexed_buffer()
+    }
+}
+
+impl MD for InventorySlot {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
+        let present: bool = MD::deserialize(reader)?;
+
+        let data = if present {
+            let item_id = read_varint(&mut reader)?;
+            let count = MD::deserialize(&mut reader)?;
+            let nbt = reader.read_rest_buffer();
+            if nbt.len() == 0 {
+                bail!("nbt must have at least one byte");
+            }
+            let nbt_buf = nbt.get(reader.get());
+            let nbt = if nbt_buf[0] == 0 { None } else { Some(nbt) };
+
+            Some(InventorySlotData {
+                item_id,
+                count,
+                nbt,
+            })
+        } else {
+            None
+        };
+
+        Ok(InventorySlot { data })
+    }
+}
+
+impl<T: MD> MD for Option<T> {
+    fn deserialize(mut reader: &mut Reader) -> Result<Option<T>>
     where
         Self: Sized,
     {
-        let b = MinecraftDeserialize::deserialize(&mut reader)?;
+        let b = MD::deserialize(&mut reader)?;
         let result = if b {
-            Some(MinecraftDeserialize::deserialize(&mut reader)?)
+            Some(MD::deserialize(&mut reader)?)
         } else {
             None
         };
@@ -96,8 +129,8 @@ impl<T: MinecraftDeserialize> MinecraftDeserialize for Option<T> {
 
 macro_rules! impl_with_varint {
     ($enu:ident) => {
-        impl MinecraftDeserialize for $enu {
-            fn deserialize<R: Read>(reader: R) -> Result<Self> {
+        impl MD for $enu {
+            fn deserialize(reader: &mut Reader) -> Result<Self> {
                 let value = read_varint(reader)?;
                 Ok($enu::try_from(value as u8)?)
             }
@@ -163,6 +196,15 @@ impl<'r> Reader<'r> {
         })
     }
 
+    pub fn read_rest_buffer(&mut self) -> IndexedBuffer {
+        let r = self.offset() as u32..self.get().len() as u32;
+        self.cursor.set_position(r.end as u64);
+        IndexedBuffer {
+            start: r.start,
+            end: r.end,
+        }
+    }
+
     pub fn get(&self) -> &[u8] {
         self.cursor.get_ref()
     }
@@ -185,12 +227,12 @@ pub struct Position {
     pub z: i32,
 }
 
-impl MinecraftDeserialize for Position {
-    fn deserialize<R: Read>(mut reader: R) -> Result<Position>
+impl MD for Position {
+    fn deserialize(mut reader: &mut Reader) -> Result<Position>
     where
         Self: Sized,
     {
-        let val: u64 = MinecraftDeserialize::deserialize(&mut reader)?;
+        let val: u64 = MD::deserialize(&mut reader)?;
         let x = (val >> 38) as i32;
         let y = (val & 0xFFF) as i32;
         let z = ((val >> 12) & 0x3FFFFFF) as i32;

@@ -1,5 +1,5 @@
-use anyhow::{Result, bail};
-use melon::record::{AuthData};
+use anyhow::{bail, Result};
+use melon::record::AuthData;
 use serde_derive::Deserialize;
 use std::{env, fs::File};
 

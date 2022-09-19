@@ -20,6 +20,7 @@ def snake_to_pascal(name):
 class BuiltinType(enum.Enum):
     STRING = "string"
     BUFFER = "buffer"
+    SLOT = "slot"
     VARINT = "varint"
     POSITION = "position"
     BOOL = "bool"
@@ -151,6 +152,8 @@ def parse_type(ty, parent_name, structs):
             return BuiltinType.UUID
         if ty == "string":
             return BuiltinType.STRING
+        if ty == "slot":
+            return BuiltinType.SLOT
         if ty == "varint":
             return BuiltinType.VARINT
         if ty == "position":
@@ -282,6 +285,8 @@ def get_type(ty):
 
     if ty == BuiltinType.VARINT:
         return "i32"
+    if ty == BuiltinType.SLOT:
+        return "InventorySlot"
     if ty == BuiltinType.STRING:
         return "IndexedString"
     if ty == BuiltinType.BUFFER:
@@ -308,7 +313,7 @@ def deserialize_type(name, ty):
     elif ty == BuiltinType.VARINT:
         out += "read_varint(&mut reader)?;"
     else:
-        out += "MinecraftDeserialize::deserialize(&mut reader)?;"
+        out += "MD::deserialize(&mut reader)?;"
     return out
 
 
@@ -339,14 +344,6 @@ class Generator:
         for i in struct.fields:
             self.out += deserialize_type(i.name, i.ty)
 
-        # for i in struct.fields:
-        #     if i.ty == BuiltinType.STRING:
-        #         self.out += f"let {i.name} = "
-        #         self.out += f"reader.get_str_from({i.name})?;"
-        #     elif i.ty == BuiltinType.BUFFER:
-        #         self.out += f"let {i.name} = "
-        #         self.out += f"reader.get_buf_from({i.name})?;"
-
         self.out += f"\n\nlet result = {struct.name} {{"
         for i in struct.fields:
             self.out += f"{i.name},"
@@ -362,10 +359,10 @@ pub mod {state.state.value} {{
 use anyhow::Result;
 use crate::protocol::IndexedBuffer;
 use crate::protocol::IndexedString;
-use crate::protocol::de::MinecraftDeserialize;
+use crate::protocol::InventorySlot;
+use crate::protocol::de::MD;
 use crate::protocol::de::Reader;
 use crate::protocol::varint::read_varint;
-use core::marker::PhantomData;
 
 '''
             for direction in state.directions:

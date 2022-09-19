@@ -1,11 +1,11 @@
 mod launchers;
 
-use anyhow::{Result};
+use anyhow::Result;
 use launchers::get_access_token;
 use melon::chat::parse_chat;
 use melon::events::{EventSubscriber, Position};
 use melon::play::play;
-use melon::record::{record_to_file};
+use melon::record::record_to_file;
 use std::env;
 use std::time::Instant;
 
