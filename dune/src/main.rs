@@ -32,9 +32,9 @@ impl EventHandler {
 
 impl EventSubscriber for EventHandler {
     fn on_chat(&mut self, message: &str) -> Result<()> {
-        println!("chat: {}", message);
+        // println!("chat: {}", message);
         let c = parse_chat(message)?;
-        println!(" => \n{:?}\n{}\n", c, c.to_string());
+        println!("{}", c.to_string());
         Ok(())
     }
     fn player_info(&mut self, name: &str, uuid: u128) -> Result<()> {

@@ -13,6 +13,11 @@ struct TrafficPlayer {
     state: ConnectionState,
 }
 
+struct Stats {
+    uncompressed: u64,
+    compressed: u64
+}
+
 impl TrafficPlayer {
     fn new(in_path: &str, handler: Box<dyn EventSubscriber>) -> Result<TrafficPlayer> {
         let reader = File::open(in_path)?;
@@ -64,13 +69,15 @@ impl TrafficPlayer {
         Ok(())
     }
 
-    fn run(&mut self) -> Result<()> {
+    fn run(&mut self) -> Result<Stats> {
         let mut buffer = Vec::with_capacity(64 * 1024);
         let mut tmp = [0; 64 * 1024];
+        let mut uncompressed = 0;
         loop {
             let read = self.reader.read(&mut tmp)?;
+            uncompressed += read as u64;
             if read == 0 {
-                return Ok(());
+                break;
 
                 // const SLEEP_DURATION: Duration = Duration::from_millis(20);
                 // std::thread::sleep(SLEEP_DURATION);
@@ -86,11 +93,16 @@ impl TrafficPlayer {
 
             buffer.drain(..cursor.offset());
         }
+
+        let compressed = self.reader.get_ref().metadata()?.len();
+        Ok(Stats {compressed, uncompressed})
     }
 }
 
 pub fn play(in_path: &str, handler: Box<dyn EventSubscriber>) -> Result<()> {
     let mut player = TrafficPlayer::new(in_path, handler)?;
-    player.run()?;
+    let stats = player.run()?;
+    let rate = stats.uncompressed as f64 / stats.compressed as f64;
+    println!("compressed: {}, uncompressed: {}, rate: {:.2}%", stats.compressed, stats.uncompressed, rate);
     Ok(())
 }
