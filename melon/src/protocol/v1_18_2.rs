@@ -368,62 +368,11 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateStructureBlockRequest {
-        pub location: crate::protocol::de::Position,
-        pub action: i32,
-        pub mode: i32,
-        pub name: IndexedString,
-        pub offset_x: u8,
-        pub offset_y: u8,
-        pub offset_z: u8,
-        pub size_x: u8,
-        pub size_y: u8,
-        pub size_z: u8,
-        pub mirror: i32,
-        pub rotation: i32,
-        pub metadata: IndexedString,
-        pub integrity: f32,
-        pub seed: i32,
-        pub flags: u8,
-    }
+    pub struct UpdateStructureBlockRequest {}
     pub(super) fn packet_update_structure_block_request(
-        mut reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<UpdateStructureBlockRequest> {
-        let location: crate::protocol::de::Position = MD::deserialize(&mut reader)?;
-        let action: i32 = read_varint(&mut reader)?;
-        let mode: i32 = read_varint(&mut reader)?;
-        let name: IndexedString = reader.read_indexed_string()?;
-        let offset_x: u8 = MD::deserialize(&mut reader)?;
-        let offset_y: u8 = MD::deserialize(&mut reader)?;
-        let offset_z: u8 = MD::deserialize(&mut reader)?;
-        let size_x: u8 = MD::deserialize(&mut reader)?;
-        let size_y: u8 = MD::deserialize(&mut reader)?;
-        let size_z: u8 = MD::deserialize(&mut reader)?;
-        let mirror: i32 = read_varint(&mut reader)?;
-        let rotation: i32 = read_varint(&mut reader)?;
-        let metadata: IndexedString = reader.read_indexed_string()?;
-        let integrity: f32 = MD::deserialize(&mut reader)?;
-        let seed: i32 = read_varint(&mut reader)?;
-        let flags: u8 = MD::deserialize(&mut reader)?;
-
-        let result = UpdateStructureBlockRequest {
-            location,
-            action,
-            mode,
-            name,
-            offset_x,
-            offset_y,
-            offset_z,
-            size_x,
-            size_y,
-            size_z,
-            mirror,
-            rotation,
-            metadata,
-            integrity,
-            seed,
-            flags,
-        };
+        let result = UpdateStructureBlockRequest {};
         Ok(result)
     }
     #[derive(Debug)]
@@ -781,12 +730,12 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct BlockDigRequest {
-        pub status: i8,
+        pub status: i32,
         pub location: crate::protocol::de::Position,
         pub face: i8,
     }
     pub(super) fn packet_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
-        let status: i8 = MD::deserialize(&mut reader)?;
+        let status: i32 = read_varint(&mut reader)?;
         let location: crate::protocol::de::Position = MD::deserialize(&mut reader)?;
         let face: i8 = MD::deserialize(&mut reader)?;
 
@@ -2649,38 +2598,11 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct InitializeWorldBorderResponse {
-        pub x: f64,
-        pub z: f64,
-        pub old_diameter: f64,
-        pub new_diameter: f64,
-        pub speed: i32,
-        pub portal_teleport_boundary: i32,
-        pub warning_blocks: i32,
-        pub warning_time: i32,
-    }
+    pub struct InitializeWorldBorderResponse {}
     pub(super) fn packet_initialize_world_border_response(
-        mut reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<InitializeWorldBorderResponse> {
-        let x: f64 = MD::deserialize(&mut reader)?;
-        let z: f64 = MD::deserialize(&mut reader)?;
-        let old_diameter: f64 = MD::deserialize(&mut reader)?;
-        let new_diameter: f64 = MD::deserialize(&mut reader)?;
-        let speed: i32 = read_varint(&mut reader)?;
-        let portal_teleport_boundary: i32 = read_varint(&mut reader)?;
-        let warning_blocks: i32 = read_varint(&mut reader)?;
-        let warning_time: i32 = read_varint(&mut reader)?;
-
-        let result = InitializeWorldBorderResponse {
-            x,
-            z,
-            old_diameter,
-            new_diameter,
-            speed,
-            portal_teleport_boundary,
-            warning_blocks,
-            warning_time,
-        };
+        let result = InitializeWorldBorderResponse {};
         Ok(result)
     }
     #[derive(Debug)]
@@ -2708,23 +2630,11 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WorldBorderLerpSizeResponse {
-        pub old_diameter: f64,
-        pub new_diameter: f64,
-        pub speed: i32,
-    }
+    pub struct WorldBorderLerpSizeResponse {}
     pub(super) fn packet_world_border_lerp_size_response(
-        mut reader: &mut Reader,
+        mut _reader: &mut Reader,
     ) -> Result<WorldBorderLerpSizeResponse> {
-        let old_diameter: f64 = MD::deserialize(&mut reader)?;
-        let new_diameter: f64 = MD::deserialize(&mut reader)?;
-        let speed: i32 = read_varint(&mut reader)?;
-
-        let result = WorldBorderLerpSizeResponse {
-            old_diameter,
-            new_diameter,
-            speed,
-        };
+        let result = WorldBorderLerpSizeResponse {};
         Ok(result)
     }
     #[derive(Debug)]
