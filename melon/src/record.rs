@@ -357,21 +357,30 @@ fn run(
     }
 }
 
-pub fn record_to_file(server_address: &str, auth_data: AuthData, out_path: &str) -> Result<()> {
-    let addr = "0.0.0.0:25565";
+pub fn record_to_file(
+    listen_addr: &str,
+    server_address: &str,
+    auth_data: AuthData,
+    out_path: &str,
+) -> Result<()> {
     let (client, client_addr) = {
-        let incoming = TcpListener::bind(addr)?;
-        println!("listening on {}", addr);
+        let incoming = TcpListener::bind(listen_addr)?;
+        println!("waiting for connection..");
 
         incoming.accept()?
     };
-    println!("got connection from {}", client_addr);
+    println!("got a connection from {}", client_addr);
 
     let server = TcpStream::connect(server_address)?;
-    println!("connected to {}", server_address);
+    println!("connected to server");
 
     let mut stats = RunStats { read: 0, write: 0 };
-    println!("{:?}", run(client, server, auth_data, out_path, &mut stats));
-    println!("total read: {}\ntotal write: {}", stats.read, stats.write);
+    let res = run(client, server, auth_data, out_path, &mut stats);
+    println!("{:?}", res);
+    println!(
+        "total read: {}\ntotal write: {}",
+        stats.read / 2,
+        stats.write / 2
+    );
     Ok(())
 }
