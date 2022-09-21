@@ -141,6 +141,25 @@ fn parse_translate(input: &Value) -> Result<ChatComponent> {
     })
 }
 
+fn strip_old_control(x: &str) -> String {
+    let mut res = String::with_capacity(x.len());
+
+    let mut last_is_control = false;
+    for c in x.chars() {
+        if last_is_control {
+            last_is_control = false;
+            continue;
+        }
+        if c == '§' {
+            last_is_control = true;
+        } else {
+            res.push(c);
+        }
+    }
+
+    res
+}
+
 fn parse_text(input: &Value) -> Result<ChatComponent> {
     let text = get_str!(input, "text");
     let arr = match input.get("extra") {
@@ -157,7 +176,7 @@ fn parse_text(input: &Value) -> Result<ChatComponent> {
     }
 
     Ok(ChatComponent::Text {
-        text: text.to_string(),
+        text: strip_old_control(text),
         extra,
     })
 }
@@ -168,6 +187,12 @@ fn parse_component(input: &Value) -> Result<ChatComponent> {
     }
     if input.get("text").is_some() {
         return parse_text(input);
+    }
+    if let Some(text) = input.as_str() {
+        return Ok(ChatComponent::Text {
+            text: strip_old_control(text),
+            extra: vec![],
+        });
     }
 
     unimplemented!()

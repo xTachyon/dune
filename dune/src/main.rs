@@ -2,12 +2,14 @@ mod launchers;
 
 use ansi_term::Color::{Cyan, Green, Purple};
 use anyhow::{bail, Result};
+use chrono::Local;
 use launchers::get_access_token;
 use melon::chat::parse_chat;
 use melon::events::{EventSubscriber, Position};
 use melon::play::play;
 use melon::record::record_to_file;
 use std::env;
+use std::fs;
 use std::time::Instant;
 
 struct EventHandler {
@@ -48,9 +50,43 @@ impl EventSubscriber for EventHandler {
     }
 }
 
-fn main_impl() -> Result<()> {
-    const DEFAULT_PACKET_FILE: &str = "packets.dune";
+fn record() -> Result<()> {
+    loop {
+        // let server_address = "127.0.0.1:25566";
+        // let server_address = "play.runic-paradise.com:25565";
+        let server_address = "eu.mineplex.com:25565";
+        let listen_addr = "0.0.0.0:25565";
+        let auth_data_ext = get_access_token()?;
 
+        let online_str = if auth_data_ext.online {
+            "online"
+        } else {
+            "offline"
+        };
+        println!(
+            "{}: {} ({})\n{}: {}\n{}: {}\n",
+            Green.paint("minecraft profile"),
+            Cyan.paint(auth_data_ext.name),
+            Purple.paint(online_str),
+            Green.paint("listening address"),
+            Cyan.paint(listen_addr),
+            Green.paint("server address   "),
+            Cyan.paint(server_address)
+        );
+
+        let packet_file = Local::now().format("%Y-%m-%d_%H-%M-%S.dune").to_string();
+        fs::write("last.txt", &packet_file)?;
+
+        record_to_file(
+            listen_addr,
+            server_address,
+            auth_data_ext.data,
+            &packet_file,
+        )?;
+    }
+}
+
+fn main_impl() -> Result<()> {
     let _ = ansi_term::enable_ansi_support();
 
     let args: Vec<String> = env::args().collect();
@@ -59,38 +95,15 @@ fn main_impl() -> Result<()> {
     }
 
     match args[1].as_str() {
-        "record" => {
-            // let server_address = "127.0.0.1:25566";
-            let server_address = "play.runic-paradise.com:25565";
-            let listen_addr = "0.0.0.0:25565";
-            let auth_data_ext = get_access_token()?;
-
-            let online_str = if auth_data_ext.online {
-                "online"
-            } else {
-                "offline"
-            };
-            println!(
-                "{}: {} ({})\n{}: {}\n{}: {}\n",
-                Green.paint("minecraft profile"),
-                Cyan.paint(auth_data_ext.name),
-                Purple.paint(online_str),
-                Green.paint("listening address"),
-                Cyan.paint(listen_addr),
-                Green.paint("server address   "),
-                Cyan.paint(server_address)
-            );
-
-            record_to_file(
-                listen_addr,
-                server_address,
-                auth_data_ext.data,
-                DEFAULT_PACKET_FILE,
-            )?;
-        }
+        "record" => record()?,
         "play" => {
+            const DEFAULT_PACKET_FILE: &str = "packets.dune";
+            let packet_file = args
+                .get(2)
+                .map(|x| x.as_str())
+                .unwrap_or(DEFAULT_PACKET_FILE);
             let handler = Box::new(EventHandler::new());
-            play(DEFAULT_PACKET_FILE, handler)?;
+            play(packet_file, handler)?;
         }
         _ => bail!("unknown command"),
     }

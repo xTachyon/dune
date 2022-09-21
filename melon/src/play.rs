@@ -15,7 +15,7 @@ struct TrafficPlayer {
 
 struct Stats {
     uncompressed: u64,
-    compressed: u64
+    compressed: u64,
 }
 
 impl TrafficPlayer {
@@ -95,7 +95,10 @@ impl TrafficPlayer {
         }
 
         let compressed = self.reader.get_ref().metadata()?.len();
-        Ok(Stats {compressed, uncompressed})
+        Ok(Stats {
+            compressed,
+            uncompressed,
+        })
     }
 }
 
@@ -103,6 +106,9 @@ pub fn play(in_path: &str, handler: Box<dyn EventSubscriber>) -> Result<()> {
     let mut player = TrafficPlayer::new(in_path, handler)?;
     let stats = player.run()?;
     let rate = stats.uncompressed as f64 / stats.compressed as f64;
-    println!("compressed: {}, uncompressed: {}, rate: {:.2}%", stats.compressed, stats.uncompressed, rate);
+    println!(
+        "compressed: {}, uncompressed: {}, rate: {:.2}%",
+        stats.compressed, stats.uncompressed, rate
+    );
     Ok(())
 }
