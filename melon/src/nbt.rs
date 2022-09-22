@@ -3,7 +3,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec;
 use byteorder::{ReadBytesExt, BE};
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{Write, Display};
 use std::io::Read;
 use std::str;
 
@@ -28,6 +28,12 @@ pub enum Tag<'n> {
 pub struct RootTag<'n> {
     pub name: &'n str,
     pub tag: Tag<'n>,
+}
+
+impl<'n> Display for RootTag<'n> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult<()> {
+        f.write_str(&pretty_print(self)?)
+    }
 }
 
 // read
@@ -226,7 +232,7 @@ fn skip_start<R: Read>(mut reader: R, tag: u8) -> Result<()> {
     Ok(())
 }
 
-pub fn skip_option<R: Read>(mut reader: R) -> Result<bool> {
+pub(crate) fn skip_option<R: Read>(mut reader: R) -> Result<bool> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     let r = if tag == 0 {
@@ -246,7 +252,9 @@ fn print_indent(output: &mut String, indent: usize) {
     // maybe don't have more than 64 spaces of indentation?
 }
 
-fn print_compound(output: &mut String, tag: &Tag, name: Option<&str>, indent: usize) -> Result<()> {
+type FmtResult<T> = std::result::Result<T, std::fmt::Error>;
+
+fn print_compound(output: &mut String, tag: &Tag, name: Option<&str>, indent: usize) -> FmtResult<()> {
     let map = match tag {
         Tag::Compound(x) => x,
         _ => unreachable!(),
@@ -271,7 +279,7 @@ fn print_compound(output: &mut String, tag: &Tag, name: Option<&str>, indent: us
     Ok(())
 }
 
-fn print_impl(output: &mut String, tag: &Tag, indent: usize) -> Result<()> {
+fn print_impl(output: &mut String, tag: &Tag, indent: usize) -> FmtResult<()> {
     match tag {
         Tag::Byte(x) => write!(output, "{}b", x)?,
         Tag::Short(x) => write!(output, "{}s", x)?,
@@ -298,7 +306,7 @@ fn print_impl(output: &mut String, tag: &Tag, indent: usize) -> Result<()> {
     Ok(())
 }
 
-pub fn pretty_print(root: &RootTag) -> Result<String> {
+fn pretty_print(root: &RootTag) -> FmtResult<String> {
     let mut result = String::new();
     print_compound(&mut result, &root.tag, Some(&root.name), 0)?;
     Ok(result)
@@ -306,7 +314,7 @@ pub fn pretty_print(root: &RootTag) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::nbt::{pretty_print, read, read_option};
+    use crate::nbt::{read, read_option};
     use bumpalo::Bump;
 
     #[test]
@@ -315,7 +323,7 @@ mod tests {
         let bump = Bump::new();
 
         let tag = read(DATA, &bump).unwrap();
-        pretty_print(&tag).unwrap();
+        let _ = tag.to_string();
     }
 
     #[test]
