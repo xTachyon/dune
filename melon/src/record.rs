@@ -15,7 +15,7 @@ use serde_derive::Serialize;
 use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 
 type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
@@ -60,6 +60,7 @@ impl Session {
     }
 }
 
+#[derive(Clone)]
 pub struct AuthData {
     pub selected_profile: String,
     pub access_token: String,
@@ -359,7 +360,7 @@ fn run(
 
 pub fn record_to_file(
     listen_addr: &str,
-    server_address: &str,
+    server_address: SocketAddr,
     auth_data: AuthData,
     out_path: &str,
 ) -> Result<()> {

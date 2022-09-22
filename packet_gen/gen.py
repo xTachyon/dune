@@ -313,7 +313,7 @@ def deserialize_type(name, ty):
     elif ty == BuiltinType.VARINT:
         out += "read_varint(&mut reader)?;"
     else:
-        out += "MD::deserialize(&mut reader)?;"
+        out += "MD::deserialize(reader)?;"
     return out
 
 

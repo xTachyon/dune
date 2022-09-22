@@ -47,8 +47,8 @@ impl MD for i8 {
 }
 
 impl MD for bool {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> where {
-        let value: u8 = MD::deserialize(&mut reader)?;
+    fn deserialize(reader: &mut Reader) -> Result<Self> where {
+        let value: u8 = MD::deserialize(reader)?;
         let result = value != 0;
         Ok(result)
     }
@@ -92,7 +92,7 @@ impl MD for InventorySlot {
 
         let data = if present {
             let item_id = read_varint(&mut reader)?;
-            let count = MD::deserialize(&mut reader)?;
+            let count = MD::deserialize(reader)?;
             let start = reader.offset() as u32;
 
             let nbt = if nbt::skip_option(&mut reader)? {
@@ -116,13 +116,13 @@ impl MD for InventorySlot {
 }
 
 impl<T: MD> MD for Option<T> {
-    fn deserialize(mut reader: &mut Reader) -> Result<Option<T>>
+    fn deserialize(reader: &mut Reader) -> Result<Option<T>>
     where
         Self: Sized,
     {
-        let b = MD::deserialize(&mut reader)?;
+        let b = MD::deserialize(reader)?;
         let result = if b {
-            Some(MD::deserialize(&mut reader)?)
+            Some(MD::deserialize(reader)?)
         } else {
             None
         };
@@ -148,7 +148,7 @@ pub struct Reader<'r> {
 }
 
 impl<'r> Reader<'r> {
-    pub fn new<'b>(buffer: &'b [u8]) -> Reader<'b> {
+    pub fn new(buffer: &[u8]) -> Reader {
         Reader {
             cursor: Cursor::new(buffer),
         }
@@ -231,11 +231,11 @@ pub struct Position {
 }
 
 impl MD for Position {
-    fn deserialize(mut reader: &mut Reader) -> Result<Position>
+    fn deserialize(reader: &mut Reader) -> Result<Position>
     where
         Self: Sized,
     {
-        let val: u64 = MD::deserialize(&mut reader)?;
+        let val: u64 = MD::deserialize(reader)?;
         let x = (val >> 38) as i32;
         let y = (val & 0xFFF) as i32;
         let z = ((val >> 12) & 0x3FFFFFF) as i32;

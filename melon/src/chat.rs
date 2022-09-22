@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
@@ -43,44 +45,45 @@ pub enum ChatComponent {
     },
 }
 
-impl ChatComponent {
-    fn to_string_impl(&self, out: &mut String) {
-        match self {
-            ChatComponent::Text { text, extra } => {
-                *out += text;
-                for i in extra {
-                    i.to_string_impl(out);
-                }
+fn to_string_impl(input: &ChatComponent, out: &mut String) {
+    match input {
+        ChatComponent::Text { text, extra } => {
+            *out += text;
+            for i in extra {
+                to_string_impl(i, out);
             }
-            ChatComponent::Translate { format, with } => {
-                let mut offset = 0;
-                let mut last_percent = false;
+        }
+        ChatComponent::Translate { format, with } => {
+            let mut offset = 0;
+            let mut last_percent = false;
 
-                for c in format.chars() {
-                    if last_percent {
-                        if c == '%' {
-                            out.push('%');
-                        } else if c == 's' {
-                            with[offset].to_string_impl(out);
-                            offset += 1;
-                        } else {
-                            unimplemented!();
-                        }
-
-                        last_percent = false;
-                    } else if c == '%' {
-                        last_percent = true;
+            for c in format.chars() {
+                if last_percent {
+                    if c == '%' {
+                        out.push('%');
+                    } else if c == 's' {
+                        to_string_impl(&with[offset], out);
+                        offset += 1;
                     } else {
-                        out.push(c);
+                        unimplemented!();
                     }
+
+                    last_percent = false;
+                } else if c == '%' {
+                    last_percent = true;
+                } else {
+                    out.push(c);
                 }
             }
         }
     }
-    pub fn to_string(&self) -> String {
+}
+
+impl Display for ChatComponent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
-        self.to_string_impl(&mut s);
-        s
+        to_string_impl(self, &mut s);
+        f.write_str(&s)
     }
 }
 

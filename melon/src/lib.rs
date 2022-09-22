@@ -30,11 +30,11 @@ impl<'p> DiskPacket<'p> {
         Ok(())
     }
 
-    fn read(mut reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
-        let size: u32 = MD::deserialize(&mut reader)?;
-        let id: u32 = MD::deserialize(&mut reader)?;
+    fn read(reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
+        let size: u32 = MD::deserialize(reader)?;
+        let id: u32 = MD::deserialize(reader)?;
 
-        let direction: u8 = MD::deserialize(&mut reader)?;
+        let direction: u8 = MD::deserialize(reader)?;
         let direction = PacketDirection::try_from(direction)?;
 
         let data = reader.read_range_size(size as usize - 4 - 1)?;

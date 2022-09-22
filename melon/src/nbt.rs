@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
-use bumpalo::Bump;
 use bumpalo::collections::Vec;
+use bumpalo::Bump;
 use byteorder::{ReadBytesExt, BE};
 use std::collections::HashMap;
-use std::fmt::{Write, Display};
+use std::fmt::{Display, Write};
 use std::io::Read;
 use std::str;
 
@@ -119,13 +119,13 @@ fn read_start<R: Read>(mut reader: R, tag: u8, bump: &Bump) -> Result<RootTag> {
     Ok(RootTag { name, tag })
 }
 
-pub fn read_option<'n, R: Read>(mut reader: R, bump: &'n Bump) -> Result<Option<RootTag<'n>>> {
+pub fn read_option<R: Read>(mut reader: R, bump: &Bump) -> Result<Option<RootTag>> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     if tag == 0 {
         Ok(None)
     } else {
-        let t = read_start(reader, tag, &bump)?;
+        let t = read_start(reader, tag, bump)?;
         Ok(Some(t))
     }
 }
@@ -215,8 +215,7 @@ impl<'r, R: Read> Skipper<'r, R> {
     }
 }
 
-fn skip_start<R: Read>(mut reader: R, tag: u8) -> Result<()> {
-    let reader = &mut reader;
+fn skip_start<R: Read>(reader: &mut R, tag: u8) -> Result<()> {
     if tag != 10 {
         return Err(anyhow!(
             "expected the stream to start with a compound tag, found {}",
@@ -254,7 +253,12 @@ fn print_indent(output: &mut String, indent: usize) {
 
 type FmtResult<T> = std::result::Result<T, std::fmt::Error>;
 
-fn print_compound(output: &mut String, tag: &Tag, name: Option<&str>, indent: usize) -> FmtResult<()> {
+fn print_compound(
+    output: &mut String,
+    tag: &Tag,
+    name: Option<&str>,
+    indent: usize,
+) -> FmtResult<()> {
     let map = match tag {
         Tag::Compound(x) => x,
         _ => unreachable!(),
@@ -308,7 +312,7 @@ fn print_impl(output: &mut String, tag: &Tag, indent: usize) -> FmtResult<()> {
 
 fn pretty_print(root: &RootTag) -> FmtResult<String> {
     let mut result = String::new();
-    print_compound(&mut result, &root.tag, Some(&root.name), 0)?;
+    print_compound(&mut result, &root.tag, Some(root.name), 0)?;
     Ok(result)
 }
 
