@@ -93,7 +93,14 @@ impl MD for InventorySlot {
         let data = if present {
             let item_id = read_varint(&mut reader)?;
             let count = MD::deserialize(&mut reader)?;
-            let nbt = nbt::read_option(reader)?;
+            let start = reader.offset() as u32;
+
+            let nbt = if nbt::skip_option(&mut reader)? {
+                let end = reader.offset() as u32;
+                Some(IndexedBuffer { start, end })
+            } else {
+                None
+            };
 
             Some(InventorySlotData {
                 item_id,
@@ -141,7 +148,7 @@ pub struct Reader<'r> {
 }
 
 impl<'r> Reader<'r> {
-    pub fn new(buffer: &[u8]) -> Reader {
+    pub fn new<'b>(buffer: &'b [u8]) -> Reader<'b> {
         Reader {
             cursor: Cursor::new(buffer),
         }
