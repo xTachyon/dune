@@ -1,8 +1,8 @@
 use anyhow::Result;
 use byteorder::ReadBytesExt;
-use std::io::Read;
+use std::io::{Read, Write};
 
-pub fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
+pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
@@ -47,21 +47,19 @@ pub fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
     Ok(result as i64)
 }
 
-pub fn write_varint(mut value: u32) -> ([u8; 10], usize) {
-    let mut result = [0; 10];
-    let mut index = 0;
+pub fn write_varint<W: Write>(mut writer: W, mut value: u32) -> Result<()> {
     loop {
         let mut temp = (value & 0b01111111) as u8;
         value >>= 7;
         if value != 0 {
             temp |= 0b10000000;
         }
-        result[index] = temp;
-        index += 1;
+        writer.write_all(&[temp])?;
+
         if value == 0 {
             break;
         }
     }
 
-    (result, index)
+    Ok(())
 }

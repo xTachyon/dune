@@ -108,15 +108,13 @@ impl Proxy {
         cursor.write_u8(1)?;
 
         // Shared Secret Length
-        let (buf, size) = write_varint(shared_secret.len() as u32);
-        cursor.write_all(&buf[..size])?;
+        write_varint(&mut cursor, shared_secret.len() as u32)?;
 
         // Shared Secret
         cursor.write_all(shared_secret)?;
 
         // Verify Token Length
-        let (buf, size) = write_varint(verify_token.len() as u32);
-        cursor.write_all(&buf[..size])?;
+        write_varint(&mut cursor, verify_token.len() as u32)?;
 
         // Verify Token
         cursor.write_all(verify_token)?;
@@ -124,8 +122,7 @@ impl Proxy {
         let mut result = Vec::new();
 
         // size
-        let (buf, size) = write_varint(cursor.get_ref().len() as u32);
-        result.extend_from_slice(&buf[..size]);
+        write_varint(&mut result, cursor.get_ref().len() as u32)?;
         result.extend_from_slice(cursor.get_ref());
 
         Ok(result)

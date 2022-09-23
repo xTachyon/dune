@@ -52,8 +52,16 @@ impl EventSubscriber for EventHandler {
     }
 }
 
-fn record(config: Config, auth_data_ext: AuthDataExt) -> Result<()> {
-    let server = &config.servers[config.default_server];
+fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<&String>) -> Result<()> {
+    let server = match server {
+        Some(name) => {
+            match config.servers.iter().find(|x| x.name == name) {
+                Some(x) => x,
+                None => bail!("unknown server {}", name)
+            }
+        }
+        None => &config.servers[config.default_server]
+    };
     loop {
         let listen_addr = "0.0.0.0:25565";
 
@@ -87,6 +95,8 @@ fn record(config: Config, auth_data_ext: AuthDataExt) -> Result<()> {
             auth_data_ext.data.clone(),
             &packet_file,
         )?;
+
+        println!("saved to {}", packet_file);
     }
 }
 
@@ -164,7 +174,7 @@ fn main_impl() -> Result<()> {
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
     match args[1].as_str() {
-        "record" => record(config, auth_data_ext)?,
+        "record" => record(config, auth_data_ext, args.get(2))?,
         "playold" => {
             const DEFAULT_PACKET_FILE: &str = "packets.dune";
             let packet_file = args
