@@ -4,7 +4,7 @@ use std::io::Read;
 
 pub fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
     let mut result = 0;
-    let mut bytes_read = 0;
+    let mut bytes_read = 0usize;
     loop {
         let read = reader.read_u8()?;
         let value = read & 0b01111111;
@@ -25,6 +25,26 @@ pub fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
 pub fn read_varint<R: Read>(reader: R) -> Result<i32> {
     let (value, _) = read_varint_with_size(reader)?;
     Ok(value)
+}
+
+pub fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
+    let mut result = 0;
+    let mut bytes_read = 0usize;
+    loop {
+        let read = reader.read_u8()?;
+        let value = read & 0b01111111;
+        result |= (value as u64) << (7 * bytes_read as u64);
+        bytes_read += 1;
+
+        if bytes_read > 10 {
+            return Err(anyhow::anyhow!("varlong can't be bigger than 10 bytes"));
+        }
+        if read & 0b1000_0000 == 0 {
+            break;
+        }
+    }
+
+    Ok(result as i64)
 }
 
 pub fn write_varint(mut value: u32) -> ([u8; 10], usize) {

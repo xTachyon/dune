@@ -22,6 +22,7 @@ class BuiltinType(enum.Enum):
     BUFFER = "buffer"
     SLOT = "slot"
     VARINT = "varint"
+    VARLONG = "varlong"
     POSITION = "position"
     BOOL = "bool"
 
@@ -156,6 +157,8 @@ def parse_type(ty, parent_name, structs):
             return BuiltinType.SLOT
         if ty == "varint":
             return BuiltinType.VARINT
+        if ty == "varlong":
+            return BuiltinType.VARLONG
         if ty == "position":
             return BuiltinType.POSITION
     ty = ty[0]
@@ -285,6 +288,8 @@ def get_type(ty):
 
     if ty == BuiltinType.VARINT:
         return "i32"
+    if ty == BuiltinType.VARLONG:
+        return "i64"
     if ty == BuiltinType.SLOT:
         return "InventorySlot"
     if ty == BuiltinType.STRING:
@@ -312,6 +317,8 @@ def deserialize_type(name, ty):
         out += "reader.read_indexed_buffer()?;"
     elif ty == BuiltinType.VARINT:
         out += "read_varint(&mut reader)?;"
+    elif ty == BuiltinType.VARLONG:
+        out += "read_varlong(&mut reader)?;"
     else:
         out += "MD::deserialize(reader)?;"
     return out
@@ -363,6 +370,7 @@ use crate::protocol::InventorySlot;
 use crate::protocol::de::MD;
 use crate::protocol::de::Reader;
 use crate::protocol::varint::read_varint;
+use crate::protocol::varint::read_varlong;
 
 '''
             for direction in state.directions:
