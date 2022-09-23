@@ -275,9 +275,22 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EditBookRequest {}
-    pub(super) fn packet_edit_book_request(mut _reader: &mut Reader) -> Result<EditBookRequest> {
-        let result = EditBookRequest {};
+    pub struct EditBookRequest {
+        pub hand: i32,
+        pub pages: Vec<IndexedString>,
+        pub title: Option<IndexedString>,
+    }
+    pub(super) fn packet_edit_book_request(mut reader: &mut Reader) -> Result<EditBookRequest> {
+        let hand: i32 = read_varint(&mut reader)?;
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut pages = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: IndexedString = reader.read_indexed_string()?;
+            pages.push(x);
+        }
+        let title: Option<IndexedString> = MD::deserialize(reader)?;
+
+        let result = EditBookRequest { hand, pages, title };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1394,11 +1407,46 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TabCompleteResponse {}
+    pub struct TabCompleteResponseMatch_Tooltip {
+        pub match_: IndexedString,
+        pub tooltip: Option<IndexedString>,
+    }
+    pub(super) fn packet_tab_complete_response_match__tooltip(
+        mut reader: &mut Reader,
+    ) -> Result<TabCompleteResponseMatch_Tooltip> {
+        let match_: IndexedString = reader.read_indexed_string()?;
+        let tooltip: Option<IndexedString> = MD::deserialize(reader)?;
+
+        let result = TabCompleteResponseMatch_Tooltip { match_, tooltip };
+        Ok(result)
+    }
+    #[derive(Debug)]
+    pub struct TabCompleteResponse {
+        pub transaction_id: i32,
+        pub start: i32,
+        pub length: i32,
+        pub matches: Vec<TabCompleteResponseMatch_Tooltip>,
+    }
     pub(super) fn packet_tab_complete_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<TabCompleteResponse> {
-        let result = TabCompleteResponse {};
+        let transaction_id: i32 = read_varint(&mut reader)?;
+        let start: i32 = read_varint(&mut reader)?;
+        let length: i32 = read_varint(&mut reader)?;
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut matches = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: TabCompleteResponseMatch_Tooltip =
+                packet_tab_complete_response_match__tooltip(reader)?;
+            matches.push(x);
+        }
+
+        let result = TabCompleteResponse {
+            transaction_id,
+            start,
+            length,
+            matches,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1792,17 +1840,113 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct UpdateLightResponse {}
+    pub struct UpdateLightResponse {
+        pub chunk_x: i32,
+        pub chunk_z: i32,
+        pub trust_edges: bool,
+        pub sky_light_mask: Vec<i64>,
+        pub block_light_mask: Vec<i64>,
+        pub empty_sky_light_mask: Vec<i64>,
+        pub empty_block_light_mask: Vec<i64>,
+        pub sky_light: Vec<Vec<u8>>,
+        pub block_light: Vec<Vec<u8>>,
+    }
     pub(super) fn packet_update_light_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<UpdateLightResponse> {
-        let result = UpdateLightResponse {};
+        let chunk_x: i32 = read_varint(&mut reader)?;
+        let chunk_z: i32 = read_varint(&mut reader)?;
+        let trust_edges: bool = MD::deserialize(reader)?;
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut sky_light_mask = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: i64 = MD::deserialize(reader)?;
+            sky_light_mask.push(x);
+        }
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut block_light_mask = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: i64 = MD::deserialize(reader)?;
+            block_light_mask.push(x);
+        }
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut empty_sky_light_mask = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: i64 = MD::deserialize(reader)?;
+            empty_sky_light_mask.push(x);
+        }
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut empty_block_light_mask = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: i64 = MD::deserialize(reader)?;
+            empty_block_light_mask.push(x);
+        }
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut sky_light = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let count_array: i32 = read_varint(&mut reader)?;
+            let mut x = Vec::with_capacity(count_array as usize);
+            for _ in 0..count_array {
+                let x_2: u8 = MD::deserialize(reader)?;
+                x.push(x_2);
+            }
+            sky_light.push(x);
+        }
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut block_light = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let count_array: i32 = read_varint(&mut reader)?;
+            let mut x = Vec::with_capacity(count_array as usize);
+            for _ in 0..count_array {
+                let x_2: u8 = MD::deserialize(reader)?;
+                x.push(x_2);
+            }
+            block_light.push(x);
+        }
+
+        let result = UpdateLightResponse {
+            chunk_x,
+            chunk_z,
+            trust_edges,
+            sky_light_mask,
+            block_light_mask,
+            empty_sky_light_mask,
+            empty_block_light_mask,
+            sky_light,
+            block_light,
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct LoginResponse {}
     pub(super) fn packet_login_response(mut _reader: &mut Reader) -> Result<LoginResponse> {
         let result = LoginResponse {};
+        Ok(result)
+    }
+    #[derive(Debug)]
+    pub struct MapResponseType_XZDirectionDisplay_Name {
+        pub type_: i32,
+        pub x: i8,
+        pub z: i8,
+        pub direction: u8,
+        pub display_name: Option<IndexedString>,
+    }
+    pub(super) fn packet_map_response_type_xz_direction_display__name(
+        mut reader: &mut Reader,
+    ) -> Result<MapResponseType_XZDirectionDisplay_Name> {
+        let type_: i32 = read_varint(&mut reader)?;
+        let x: i8 = MD::deserialize(reader)?;
+        let z: i8 = MD::deserialize(reader)?;
+        let direction: u8 = MD::deserialize(reader)?;
+        let display_name: Option<IndexedString> = MD::deserialize(reader)?;
+
+        let result = MapResponseType_XZDirectionDisplay_Name {
+            type_,
+            x,
+            z,
+            direction,
+            display_name,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -2121,11 +2265,20 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityDestroyResponse {}
+    pub struct EntityDestroyResponse {
+        pub entity_ids: Vec<i32>,
+    }
     pub(super) fn packet_entity_destroy_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<EntityDestroyResponse> {
-        let result = EntityDestroyResponse {};
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut entity_ids = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: i32 = read_varint(&mut reader)?;
+            entity_ids.push(x);
+        }
+
+        let result = EntityDestroyResponse { entity_ids };
         Ok(result)
     }
     #[derive(Debug)]
@@ -2146,11 +2299,26 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ResourcePackSendResponse {}
+    pub struct ResourcePackSendResponse {
+        pub url: IndexedString,
+        pub hash: IndexedString,
+        pub forced: bool,
+        pub prompt_message: Option<IndexedString>,
+    }
     pub(super) fn packet_resource_pack_send_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<ResourcePackSendResponse> {
-        let result = ResourcePackSendResponse {};
+        let url: IndexedString = reader.read_indexed_string()?;
+        let hash: IndexedString = reader.read_indexed_string()?;
+        let forced: bool = MD::deserialize(reader)?;
+        let prompt_message: Option<IndexedString> = MD::deserialize(reader)?;
+
+        let result = ResourcePackSendResponse {
+            url,
+            hash,
+            forced,
+            prompt_message,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -2343,11 +2511,25 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SetPassengersResponse {}
+    pub struct SetPassengersResponse {
+        pub entity_id: i32,
+        pub passengers: Vec<i32>,
+    }
     pub(super) fn packet_set_passengers_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SetPassengersResponse> {
-        let result = SetPassengersResponse {};
+        let entity_id: i32 = read_varint(&mut reader)?;
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut passengers = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: i32 = read_varint(&mut reader)?;
+            passengers.push(x);
+        }
+
+        let result = SetPassengersResponse {
+            entity_id,
+            passengers,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -2618,11 +2800,15 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct SelectAdvancementTabResponse {}
+    pub struct SelectAdvancementTabResponse {
+        pub id: Option<IndexedString>,
+    }
     pub(super) fn packet_select_advancement_tab_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<SelectAdvancementTabResponse> {
-        let result = SelectAdvancementTabResponse {};
+        let id: Option<IndexedString> = MD::deserialize(reader)?;
+
+        let result = SelectAdvancementTabResponse { id };
         Ok(result)
     }
     #[derive(Debug)]

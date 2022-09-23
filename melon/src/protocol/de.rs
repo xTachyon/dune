@@ -86,6 +86,12 @@ impl MD for IndexedBuffer {
     }
 }
 
+impl MD for IndexedString {
+    fn deserialize(reader: &mut Reader) -> Result<Self> {
+        reader.read_indexed_string()
+    }
+}
+
 impl MD for InventorySlot {
     fn deserialize(mut reader: &mut Reader) -> Result<Self> {
         let present: bool = MD::deserialize(reader)?;

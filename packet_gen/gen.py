@@ -121,8 +121,6 @@ def parse_array(ty, parent_name, structs):
 
 def parse_option(ty, parent_name, structs):
     subtype = parse_type(ty, parent_name, structs)
-    if subtype == BuiltinType.STRING:
-        raise Exception("option with str not supported")
     return OptionType(subtype)
 
 
@@ -178,12 +176,6 @@ def parse_type(ty, parent_name, structs):
 
 
 def parse_container(j, struct_name, structs, root=False):
-    if struct_name == "LoginPluginResponse":
-        pass
-    if struct_name in ["UpdateLightResponse", "EntityDestroyResponse", "SetPassengersResponse", "EditBookRequest",
-                       "ResourcePackSendResponse", "SelectAdvancementTabResponse"]:
-        raise Exception("unsupported packet")
-
     fields = []
 
     needs_lifetime = True
@@ -304,12 +296,15 @@ def get_type(ty):
     return ty.value
 
 
-def deserialize_type(name, ty):
+def deserialize_type(name, ty, current_element_count):
     if is_array(ty):
-        out = deserialize_type("count_array", ty.count_type)
+        out = deserialize_type("count_array", ty.count_type, current_element_count + 1)
         out += f'''let mut {name} = Vec::with_capacity(count_array as usize); for _ in 0..count_array {{'''
-        out += deserialize_type("x", ty.subtype)
-        out += f'''{name}.push(x);}}'''
+        elem_name = "x"
+        if current_element_count > 1:
+            elem_name += f"_{current_element_count}"
+        out += deserialize_type(elem_name, ty.subtype, current_element_count + 1)
+        out += f'''{name}.push({elem_name});}}'''
         return out
     out = f"let {name}: {get_type(ty)} = "
     if is_struct(ty):
@@ -354,7 +349,7 @@ class Generator:
         self.out += f'''pub(super) fn packet_{pascal_to_snake(struct.name)}{lifetime}(mut {underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
         -> Result<{struct.name}{lifetime}> {{ '''
         for i in struct.fields:
-            self.out += deserialize_type(i.name, i.ty)
+            self.out += deserialize_type(i.name, i.ty, 1)
 
         self.out += f"\n\nlet result = {struct.name} {{"
         for i in struct.fields:
