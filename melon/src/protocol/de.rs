@@ -200,8 +200,9 @@ impl<'r> Reader<'r> {
     }
 
     pub fn read_rest_buffer(&mut self) -> IndexedBuffer {
-        let r = self.offset() as u32..self.get().len() as u32;
-        self.cursor.set_position(r.end as u64);
+        let end = self.get().len() ;
+        let r = self.offset() as u32..end as u32;
+        self.cursor.set_position(end as u64);
         IndexedBuffer {
             start: r.start,
             end: r.end,

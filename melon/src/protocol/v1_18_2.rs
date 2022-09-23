@@ -135,11 +135,17 @@ pub mod login {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginPluginResponse {}
+    pub struct LoginPluginResponse {
+        pub message_id: i32,
+        pub data: Option<IndexedBuffer>,
+    }
     pub(super) fn packet_login_plugin_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<LoginPluginResponse> {
-        let result = LoginPluginResponse {};
+        let message_id: i32 = read_varint(&mut reader)?;
+        let data: Option<IndexedBuffer> = MD::deserialize(reader)?;
+
+        let result = LoginPluginResponse { message_id, data };
         Ok(result)
     }
     #[derive(Debug)]
@@ -197,11 +203,23 @@ pub mod login {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginPluginRequest {}
+    pub struct LoginPluginRequest {
+        pub message_id: i32,
+        pub channel: IndexedString,
+        pub data: IndexedBuffer,
+    }
     pub(super) fn packet_login_plugin_request(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<LoginPluginRequest> {
-        let result = LoginPluginRequest {};
+        let message_id: i32 = read_varint(&mut reader)?;
+        let channel: IndexedString = reader.read_indexed_string()?;
+        let data: IndexedBuffer = reader.read_rest_buffer();
+
+        let result = LoginPluginRequest {
+            message_id,
+            channel,
+            data,
+        };
         Ok(result)
     }
 }
@@ -584,11 +602,17 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CustomPayloadRequest {}
+    pub struct CustomPayloadRequest {
+        pub channel: IndexedString,
+        pub data: IndexedBuffer,
+    }
     pub(super) fn packet_custom_payload_request(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<CustomPayloadRequest> {
-        let result = CustomPayloadRequest {};
+        let channel: IndexedString = reader.read_indexed_string()?;
+        let data: IndexedBuffer = reader.read_rest_buffer();
+
+        let result = CustomPayloadRequest { channel, data };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1544,11 +1568,17 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct CustomPayloadResponse {}
+    pub struct CustomPayloadResponse {
+        pub channel: IndexedString,
+        pub data: IndexedBuffer,
+    }
     pub(super) fn packet_custom_payload_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<CustomPayloadResponse> {
-        let result = CustomPayloadResponse {};
+        let channel: IndexedString = reader.read_indexed_string()?;
+        let data: IndexedBuffer = reader.read_rest_buffer();
+
+        let result = CustomPayloadResponse { channel, data };
         Ok(result)
     }
     #[derive(Debug)]

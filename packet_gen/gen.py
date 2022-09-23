@@ -20,6 +20,7 @@ def snake_to_pascal(name):
 class BuiltinType(enum.Enum):
     STRING = "string"
     BUFFER = "buffer"
+    REST_BUFFER = "rest_buffer"
     SLOT = "slot"
     VARINT = "varint"
     VARLONG = "varlong"
@@ -161,6 +162,8 @@ def parse_type(ty, parent_name, structs):
             return BuiltinType.VARLONG
         if ty == "position":
             return BuiltinType.POSITION
+        if ty == "restBuffer":
+            return BuiltinType.REST_BUFFER
     ty = ty[0]
     if ty == "buffer":
         return BuiltinType.BUFFER
@@ -294,7 +297,7 @@ def get_type(ty):
         return "InventorySlot"
     if ty == BuiltinType.STRING:
         return "IndexedString"
-    if ty == BuiltinType.BUFFER:
+    if ty == BuiltinType.BUFFER or ty == BuiltinType.REST_BUFFER:
         return "IndexedBuffer"
     if ty == BuiltinType.POSITION:
         return "crate::protocol::de::Position"
@@ -315,6 +318,8 @@ def deserialize_type(name, ty):
         out += "reader.read_indexed_string()?;"
     elif ty == BuiltinType.BUFFER:
         out += "reader.read_indexed_buffer()?;"
+    elif ty == BuiltinType.REST_BUFFER:
+        out += "reader.read_rest_buffer();"
     elif ty == BuiltinType.VARINT:
         out += "read_varint(&mut reader)?;"
     elif ty == BuiltinType.VARLONG:
