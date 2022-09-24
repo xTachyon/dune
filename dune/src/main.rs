@@ -2,11 +2,15 @@ mod launchers;
 
 use ansi_term::Color::{Cyan, Green, Purple};
 use anyhow::{bail, Result};
+use bumpalo::Bump;
 use chrono::Local;
 use launchers::{get_access_token, AuthDataExt};
 use melon::chat::parse_chat;
-use melon::events::{EventSubscriber, Position};
+use melon::events::{EventSubscriber, Position, Trades};
+use melon::nbt;
+use melon::nbt::RootTag;
 use melon::play::play;
+use melon::protocol::{InventorySlot, InventorySlotData};
 use melon::record::record_to_file;
 use serde_derive::Deserialize;
 use std::env;
@@ -34,11 +38,46 @@ impl EventHandler {
     }
 }
 
+#[derive(Debug)]
+pub struct InventorySlotUnpacked<'i> {
+    pub item_id: i32,
+    pub count: u8,
+    pub nbt: Option<RootTag<'i>>,
+}
+
+fn get_item_opt(item: Option<InventorySlot>) -> Option<InventorySlotData> {
+    item?.data
+}
+fn get_item<'b>(
+    bump: &'b Bump,
+    buf: &[u8],
+    item: Option<InventorySlot>,
+) -> Result<Option<InventorySlotUnpacked<'b>>> {
+    let item = match get_item_opt(item) {
+        Some(x) => x,
+        None => return Ok(None),
+    };
+    let nbt = match item.nbt {
+        Some(buffer) => {
+            let buffer = buffer.get(buf);
+            let r = nbt::read(buffer, bump)?;
+            Some(r)
+        }
+        None => None,
+    };
+
+    Ok(Some(InventorySlotUnpacked {
+        item_id: item.item_id,
+        count: item.count,
+        nbt,
+    }))
+}
+
 impl EventSubscriber for EventHandler {
     fn on_chat(&mut self, message: &str) -> Result<()> {
         // println!("chat: {}", message);
-        let c = parse_chat(message)?;
-        println!("{}", c);
+        let _c = parse_chat(message)?;
+        // println!("{}", c);
         Ok(())
     }
     fn player_info(&mut self, name: &str, uuid: u128) -> Result<()> {
@@ -50,17 +89,30 @@ impl EventSubscriber for EventHandler {
         self.player_position = pos;
         Ok(())
     }
+    fn trades(&mut self, trades: Trades) -> Result<()> {
+        let buf = trades.buffer;
+        let trades = trades.packet;
+        let bump = &mut Bump::with_capacity(4096);
+        // println!("{:?}", trades);
+
+        for i in trades.trades {
+            println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
+            println!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
+            println!("out:   {:?}\n", get_item(bump, buf, Some(i.output_item))?);
+            
+            bump.reset();
+        }
+        Ok(())
+    }
 }
 
 fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<&String>) -> Result<()> {
     let server = match server {
-        Some(name) => {
-            match config.servers.iter().find(|x| x.name == name) {
-                Some(x) => x,
-                None => bail!("unknown server {}", name)
-            }
-        }
-        None => &config.servers[config.default_server]
+        Some(name) => match config.servers.iter().find(|x| x.name == name) {
+            Some(x) => x,
+            None => bail!("unknown server {}", name),
+        },
+        None => &config.servers[config.default_server],
     };
     loop {
         let listen_addr = "0.0.0.0:25565";

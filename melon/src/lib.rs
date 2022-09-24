@@ -8,7 +8,7 @@ pub mod events;
 mod game;
 pub mod nbt;
 pub mod play;
-mod protocol;
+pub mod protocol;
 pub mod record;
 
 struct DiskPacket<'p> {

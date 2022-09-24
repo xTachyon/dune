@@ -1924,32 +1924,6 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct MapResponseType_XZDirectionDisplay_Name {
-        pub type_: i32,
-        pub x: i8,
-        pub z: i8,
-        pub direction: u8,
-        pub display_name: Option<IndexedString>,
-    }
-    pub(super) fn packet_map_response_type_xz_direction_display__name(
-        mut reader: &mut Reader,
-    ) -> Result<MapResponseType_XZDirectionDisplay_Name> {
-        let type_: i32 = read_varint(&mut reader)?;
-        let x: i8 = MD::deserialize(reader)?;
-        let z: i8 = MD::deserialize(reader)?;
-        let direction: u8 = MD::deserialize(reader)?;
-        let display_name: Option<IndexedString> = MD::deserialize(reader)?;
-
-        let result = MapResponseType_XZDirectionDisplay_Name {
-            type_,
-            x,
-            z,
-            direction,
-            display_name,
-        };
-        Ok(result)
-    }
-    #[derive(Debug)]
     pub struct MapResponse {}
     pub(super) fn packet_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
         let result = MapResponse {};

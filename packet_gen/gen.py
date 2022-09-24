@@ -176,6 +176,9 @@ def parse_type(ty, parent_name, structs):
 
 
 def parse_container(j, struct_name, structs, root=False):
+    print(struct_name)
+    if struct_name == "MapResponse":
+        raise Exception("unsupported packet")
     fields = []
 
     needs_lifetime = True

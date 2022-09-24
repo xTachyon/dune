@@ -47,7 +47,7 @@ pub fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
     Ok(result as i64)
 }
 
-pub fn write_varint<W: Write>(mut writer: W, mut value: u32) -> Result<()> {
+pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> Result<()> {
     loop {
         let mut temp = (value & 0b01111111) as u8;
         value >>= 7;

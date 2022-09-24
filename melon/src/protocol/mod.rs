@@ -1,6 +1,6 @@
-pub mod de;
-pub mod v1_18_2;
-pub mod varint;
+pub(crate) mod de;
+pub(crate) mod v1_18_2;
+pub(crate) mod varint;
 
 use crate::protocol::varint::{read_varint, read_varint_with_size};
 use anyhow::Result;

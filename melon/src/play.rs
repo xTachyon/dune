@@ -1,4 +1,4 @@
-use crate::events::{EventSubscriber, Position};
+use crate::events::{EventSubscriber, Position, Trades};
 use crate::protocol::de::Reader;
 use crate::protocol::{ConnectionState, Packet};
 use crate::{protocol, DiskPacket};
@@ -39,7 +39,7 @@ impl TrafficPlayer {
             &mut reader,
         )?;
 
-        println!("{:?}", packet);
+        // println!("{:?}", packet);
         match packet {
             Packet::SetProtocolRequest(p) => {
                 self.state = match p.next_state {
@@ -63,6 +63,10 @@ impl TrafficPlayer {
                 x: p.x,
                 y: p.y,
                 z: p.z,
+            })?,
+            Packet::TradeListResponse(p) => self.handler.trades(Trades {
+                packet: p,
+                buffer: disk_packet.data,
             })?,
             _ => {}
         }
