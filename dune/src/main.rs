@@ -76,8 +76,8 @@ fn get_item<'b>(
 impl EventSubscriber for EventHandler {
     fn on_chat(&mut self, message: &str) -> Result<()> {
         // println!("chat: {}", message);
-        let _c = parse_chat(message)?;
-        // println!("{}", c);
+        let c = parse_chat(message)?;
+        println!("{}", c);
         Ok(())
     }
     fn player_info(&mut self, name: &str, uuid: u128) -> Result<()> {
@@ -98,8 +98,17 @@ impl EventSubscriber for EventHandler {
         for i in trades.trades {
             println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
             println!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
-            println!("out:   {:?}\n", get_item(bump, buf, Some(i.output_item))?);
-            
+            {
+                let out = get_item(bump, buf, Some(i.output_item))?;
+                println!("out:   {:?}\n", out);
+
+                if let Some(x) = out {
+                    if let Some(nbt) = x.nbt {
+                        println!("nbt:\n{}\n", nbt);
+                    }
+                }
+            }
+
             bump.reset();
         }
         Ok(())
