@@ -52,10 +52,9 @@ class OptionType:
 
 
 class StructType:
-    def __init__(self, name, fields, needs_lifetime):
+    def __init__(self, name, fields):
         self.name = name
         self.fields = fields
-        self.needs_lifetime = needs_lifetime
 
 
 def is_builtin(x):
@@ -181,7 +180,6 @@ def parse_container(j, struct_name, structs, root=False):
         raise Exception("unsupported packet")
     fields = []
 
-    needs_lifetime = True
     for i in j:
         name = i["name"]
         name = pascal_to_snake(name)
@@ -196,14 +194,13 @@ def parse_container(j, struct_name, structs, root=False):
             print(f"couldn't parse name=`{name}`,type=`{str(ty)[:15]}` in packet `{struct_name}`")
             raise
 
-        needs_lifetime = needs_lifetime or ty == BuiltinType.STRING or ty == BuiltinType.BUFFER
         fields.append(Field(name, ty))
 
     if not root:
         for i in fields:
             struct_name += i.name.title()
 
-    result = StructType(struct_name, fields, needs_lifetime)
+    result = StructType(struct_name, fields)
     structs.append(result)
     return result
 
@@ -253,7 +250,7 @@ class Parser:
                     p = Packet(packet_name, struct, True)
                     packets.append(p)
                 except:
-                    structs.append(StructType(packet_name, [], False))
+                    structs.append(StructType(packet_name, []))
                     packets.append(Packet(packet_name, None, False))
             else:
                 unreachable()
@@ -332,25 +329,14 @@ class Generator:
         self.out = "#![allow(unused_imports)] #![allow(unused_mut)] #![allow(non_camel_case_types)] #![allow(non_snake_case)]"
 
     def gen_struct(self, struct):
-        needs_lifetime = True
-
-        for i in struct.fields:
-            if i.ty == BuiltinType.STRING or i.ty == BuiltinType.BUFFER:
-                needs_lifetime = True
-                break
-        needs_lifetime = False
-
-        lifetime_simple = f'''{"'p" if needs_lifetime else ""}'''
-        lifetime = f'''{"<'p>" if needs_lifetime else ""}'''
-        self.out += f'''#[derive(Debug)] pub struct {struct.name} {lifetime} {{'''
+        self.out += f'''#[derive(Debug)] pub struct {struct.name} {{'''
         for i in struct.fields:
             ty = get_type(i.ty)
             self.out += f"pub {i.name}: {ty},"
 
         self.out += "}"
         underscore = "_" if len(struct.fields) == 0 else ""
-        self.out += f'''pub(super) fn packet_{pascal_to_snake(struct.name)}{lifetime}(mut {underscore}reader: &{lifetime_simple} mut Reader{lifetime}) 
-        -> Result<{struct.name}{lifetime}> {{ '''
+        self.out += f'''pub(super) fn packet_{pascal_to_snake(struct.name)}(mut {underscore}reader: &mut Reader) -> Result<{struct.name}> {{ '''
         for i in struct.fields:
             self.out += deserialize_type(i.name, i.ty, 1)
 
@@ -395,11 +381,7 @@ pub enum Packet {{
         for state in states:
             for direction in state.directions:
                 for i in direction.packets:
-                    needs_lifetime = True
-                    if i.struct is not None:
-                        needs_lifetime = i.struct.needs_lifetime
-                    needs_lifetime = False
-                    self.out += f'''{i.name}({state.state.value}::{i.name}{"<'p>" if needs_lifetime else ""}),'''
+                    self.out += f'''{i.name}({state.state.value}::{i.name}),'''
 
         self.out += '''
 }
