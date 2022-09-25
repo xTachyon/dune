@@ -1,5 +1,5 @@
 use crate::game::GameMode;
-use crate::nbt;
+use crate::nbt::{self};
 use crate::protocol::varint::read_varint;
 use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;
@@ -7,7 +7,9 @@ use std::convert::TryFrom;
 use std::io::{Cursor, Read};
 use std::ops::Range;
 
-use super::{IndexedBuffer, IndexedString, InventorySlot, InventorySlotData};
+use super::{
+    IndexedBuffer, IndexedNbt, IndexedOptionNbt, IndexedString, InventorySlot, InventorySlotData,
+};
 
 pub(crate) trait MD {
     fn deserialize(reader: &mut Reader) -> Result<Self>
@@ -121,6 +123,29 @@ impl MD for InventorySlot {
     }
 }
 
+impl MD for IndexedNbt {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
+        let start = reader.offset() as u32;
+        nbt::skip(&mut reader)?;
+        let end = reader.offset() as u32;
+        let nbt = IndexedBuffer { start, end };
+        Ok(IndexedNbt { nbt })
+    }
+}
+
+impl MD for IndexedOptionNbt {
+    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
+        let start = reader.offset() as u32;
+        let nbt = if nbt::skip_option(&mut reader)? {
+            let end = reader.offset() as u32;
+            Some(IndexedBuffer { start, end })
+        } else {
+            None
+        };
+        Ok(IndexedOptionNbt { nbt })
+    }
+}
+
 impl<T: MD> MD for Option<T> {
     fn deserialize(reader: &mut Reader) -> Result<Option<T>>
     where
@@ -206,7 +231,7 @@ impl<'r> Reader<'r> {
     }
 
     pub fn read_rest_buffer(&mut self) -> IndexedBuffer {
-        let end = self.get().len() ;
+        let end = self.get().len();
         let r = self.offset() as u32..end as u32;
         self.cursor.set_position(end as u64);
         IndexedBuffer {

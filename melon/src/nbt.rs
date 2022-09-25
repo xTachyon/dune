@@ -243,6 +243,12 @@ pub(crate) fn skip_option<R: Read>(mut reader: R) -> Result<bool> {
     Ok(r)
 }
 
+pub(crate) fn skip<R: Read>(mut reader: R) -> Result<()> {
+    let reader = &mut reader;
+    let tag = reader.read_u8()?;
+    skip_start(reader, tag)
+}
+
 // print
 
 fn print_indent(output: &mut String, indent: usize) {

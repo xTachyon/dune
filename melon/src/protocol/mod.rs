@@ -29,6 +29,8 @@ pub enum PacketDirection {
 
 #[derive(Debug)]
 pub struct IndexedString {
+    // I wanted to make this Range<u32> but that is not Copy because reasons so that'll have to suffice.
+    // 2 minutes later: on the other hand this is not Copy either so :shrug: :whatever:
     pub start: u32,
     pub end: u32,
 }
@@ -71,6 +73,15 @@ pub struct InventorySlotData {
 #[derive(Debug)]
 pub struct InventorySlot {
     pub data: Option<InventorySlotData>,
+}
+
+#[derive(Debug)]
+pub struct IndexedOptionNbt {
+    pub nbt: Option<IndexedBuffer>,
+}
+#[derive(Debug)]
+pub struct IndexedNbt {
+    pub nbt: IndexedBuffer,
 }
 
 pub struct PacketData {

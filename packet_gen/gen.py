@@ -10,7 +10,9 @@ def unreachable():
 
 def pascal_to_snake(name):
     name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+    name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+    name = name.replace('__', '_')
+    return name
 
 
 def snake_to_pascal(name):
@@ -21,11 +23,15 @@ class BuiltinType(enum.Enum):
     STRING = "string"
     BUFFER = "buffer"
     REST_BUFFER = "rest_buffer"
-    SLOT = "slot"
+    BOOL = "bool"
+
     VARINT = "varint"
     VARLONG = "varlong"
-    POSITION = "position"
-    BOOL = "bool"
+    POSITION = "Position"
+    
+    NBT = "IndexedNbt"
+    OPTIONAL_NBT = "IndexedOptionNbt"
+    SLOT = "InventorySlot"
 
     U8 = "u8"
     U16 = "u16"
@@ -112,97 +118,109 @@ class StateInfo:
         self.directions = directions
 
 
-def parse_array(ty, parent_name, structs):
-    count_type = parse_type(ty["countType"], parent_name, structs)
-    ty = parse_type(ty["type"], parent_name, structs)
-    return ArrayType(ty, count_type)
+class GenException(Exception):
+    pass
+
+class TypeParser:
+    def __init__(self, structs):
+        self.structs = structs
+
+    def parse_array(self, ty, parent_name, parent_field_name):
+        count_type = self.parse_type(ty["countType"], parent_name, parent_field_name)
+        ty = self.parse_type(ty["type"], parent_name, parent_field_name)
+        return ArrayType(ty, count_type)
 
 
-def parse_option(ty, parent_name, structs):
-    subtype = parse_type(ty, parent_name, structs)
-    return OptionType(subtype)
+    def parse_option(self, ty, parent_name, parent_field_name):
+        subtype = self.parse_type(ty, parent_name, parent_field_name)
+        return OptionType(subtype)
 
 
-def parse_type(ty, parent_name, structs):
-    original_ty = ty
-    if isinstance(ty, str):
-        if ty == "u8":
-            return BuiltinType.U8
-        if ty == "u16":
-            return BuiltinType.U16
+    def parse_type(self, ty, parent_name, parent_field_name):
+        original_ty = ty
+        if isinstance(ty, str):
+            if ty == "u8":
+                return BuiltinType.U8
+            if ty == "u16":
+                return BuiltinType.U16
 
-        if ty == "i8":
-            return BuiltinType.I8
-        if ty == "i16":
-            return BuiltinType.I16
-        if ty == "i32":
-            return BuiltinType.I32
-        if ty == "i64":
-            return BuiltinType.I64
+            if ty == "i8":
+                return BuiltinType.I8
+            if ty == "i16":
+                return BuiltinType.I16
+            if ty == "i32":
+                return BuiltinType.I32
+            if ty == "i64":
+                return BuiltinType.I64
 
-        if ty == "f32":
-            return BuiltinType.F32
-        if ty == "f64":
-            return BuiltinType.F64
+            if ty == "f32":
+                return BuiltinType.F32
+            if ty == "f64":
+                return BuiltinType.F64
 
-        if ty == "bool":
-            return BuiltinType.BOOL
-        if ty == "UUID":
-            return BuiltinType.UUID
-        if ty == "string":
-            return BuiltinType.STRING
-        if ty == "slot":
-            return BuiltinType.SLOT
-        if ty == "varint":
-            return BuiltinType.VARINT
-        if ty == "varlong":
-            return BuiltinType.VARLONG
-        if ty == "position":
-            return BuiltinType.POSITION
-        if ty == "restBuffer":
-            return BuiltinType.REST_BUFFER
-    ty = ty[0]
-    if ty == "buffer":
-        return BuiltinType.BUFFER
-    if ty == "array":
-        return parse_array(original_ty[1], parent_name, structs)
-    if ty == "option":
-        return parse_option(original_ty[1], parent_name, structs)
-    if ty == "container":
-        return parse_container(original_ty[1], parent_name, structs)
+            if ty == "bool":
+                return BuiltinType.BOOL
+            if ty == "UUID":
+                return BuiltinType.UUID
+            if ty == "string":
+                return BuiltinType.STRING
+            if ty == "slot":
+                return BuiltinType.SLOT
+            if ty == "varint":
+                return BuiltinType.VARINT
+            if ty == "varlong":
+                return BuiltinType.VARLONG
+            if ty == "position":
+                return BuiltinType.POSITION
+            if ty == "restBuffer":
+                return BuiltinType.REST_BUFFER
+            if ty == "nbt":
+                return BuiltinType.NBT
+            if ty == "optionalNbt":
+                return BuiltinType.OPTIONAL_NBT
+            if ty == "command_node" or ty == "chunkBlockEntity" or ty == "entityMetadata" or ty == "tags":
+                raise GenException(f"{ty} not implemented")
+            unreachable()
+        ty = ty[0]
+        if ty == "buffer":
+            return BuiltinType.BUFFER
+        if ty == "array":
+            return self.parse_array(original_ty[1], parent_name, parent_field_name)
+        if ty == "option":
+            return self.parse_option(original_ty[1], parent_name, parent_field_name)
+        if ty == "container":
+            return self.parse_container(original_ty[1], parent_name, parent_field_name)
 
-    raise Exception("unknown type")
+        raise GenException("unknown type")
 
 
-def parse_container(j, struct_name, structs, root=False):
-    print(struct_name)
-    if struct_name == "MapResponse":
-        raise Exception("unsupported packet")
-    fields = []
+    def parse_container(self, j, struct_name, parent_field_name):
+        if struct_name == "MapResponse":
+            raise GenException("unsupported packet")
+        fields = []
 
-    for i in j:
-        name = i["name"]
-        name = pascal_to_snake(name)
-        if name == "type":
-            name = "type_"
-        if name == "match":
-            name = "match_"
-        ty = i["type"]
-        try:
-            ty = parse_type(ty, struct_name, structs)
-        except:
-            print(f"couldn't parse name=`{name}`,type=`{str(ty)[:15]}` in packet `{struct_name}`")
-            raise
+        for i in j:
+            name = i["name"]
+            name = pascal_to_snake(name)
+            if name == "type":
+                name = "type_"
+            if name == "match":
+                name = "match_"
+            ty = i["type"]
+            try:
+                ty = self.parse_type(ty, struct_name, name)
+            except GenException:
+                print(f"couldn't parse name=`{name}`,type=`{str(ty)[:15]}` in packet `{struct_name}`")
+                raise
 
-        fields.append(Field(name, ty))
+            fields.append(Field(name, ty))
 
-    if not root:
-        for i in fields:
-            struct_name += i.name.title()
+        if parent_field_name is not None:
+            struct_name += f"_{snake_to_pascal(parent_field_name)}"
 
-    result = StructType(struct_name, fields)
-    structs.append(result)
-    return result
+        result = StructType(struct_name, fields)
+        self.structs.append(result)
+        return result
 
 
 def make_name_direction(state, direction, name):
@@ -246,10 +264,10 @@ class Parser:
             elif ty == "container":
                 packet_name = name.title().replace('_', '')
                 try:
-                    struct = parse_container(value[1], packet_name, structs, True)
+                    struct = TypeParser(structs).parse_container(value[1], packet_name, None)
                     p = Packet(packet_name, struct, True)
                     packets.append(p)
-                except:
+                except GenException:
                     structs.append(StructType(packet_name, []))
                     packets.append(Packet(packet_name, None, False))
             else:
@@ -285,14 +303,10 @@ def get_type(ty):
         return "i32"
     if ty == BuiltinType.VARLONG:
         return "i64"
-    if ty == BuiltinType.SLOT:
-        return "InventorySlot"
     if ty == BuiltinType.STRING:
         return "IndexedString"
     if ty == BuiltinType.BUFFER or ty == BuiltinType.REST_BUFFER:
         return "IndexedBuffer"
-    if ty == BuiltinType.POSITION:
-        return "crate::protocol::de::Position"
     return ty.value
 
 
@@ -309,10 +323,6 @@ def deserialize_type(name, ty, current_element_count):
     out = f"let {name}: {get_type(ty)} = "
     if is_struct(ty):
         out += f"packet_{pascal_to_snake(ty.name)}(reader)?;"
-    elif ty == BuiltinType.STRING:
-        out += "reader.read_indexed_string()?;"
-    elif ty == BuiltinType.BUFFER:
-        out += "reader.read_indexed_buffer()?;"
     elif ty == BuiltinType.REST_BUFFER:
         out += "reader.read_rest_buffer();"
     elif ty == BuiltinType.VARINT:
@@ -326,7 +336,25 @@ def deserialize_type(name, ty, current_element_count):
 
 class Generator:
     def __init__(self):
-        self.out = "#![allow(unused_imports)] #![allow(unused_mut)] #![allow(non_camel_case_types)] #![allow(non_snake_case)]"
+        self.out = '''
+#![allow(unused_mut)]
+#![allow(non_camel_case_types)]
+
+use crate::protocol::IndexedBuffer;
+use crate::protocol::IndexedString;
+use crate::protocol::InventorySlot;
+use crate::protocol::de::MD;
+use crate::protocol::de::Reader;
+use crate::protocol::de::Position;
+use crate::protocol::varint::read_varint;
+use crate::protocol::varint::read_varlong;
+use crate::protocol::ConnectionState;
+use crate::protocol::PacketDirection;
+use crate::protocol::IndexedNbt;
+use crate::protocol::IndexedOptionNbt;
+use anyhow::{{anyhow, Result}};
+
+'''
 
     def gen_struct(self, struct):
         self.out += f'''#[derive(Debug)] pub struct {struct.name} {{'''
@@ -352,14 +380,7 @@ class Generator:
         for state in states:
             self.out += f'''
 pub mod {state.state.value} {{
-use anyhow::Result;
-use crate::protocol::IndexedBuffer;
-use crate::protocol::IndexedString;
-use crate::protocol::InventorySlot;
-use crate::protocol::de::MD;
-use crate::protocol::de::Reader;
-use crate::protocol::varint::read_varint;
-use crate::protocol::varint::read_varlong;
+use super::*;
 
 '''
             for direction in state.directions:
@@ -369,11 +390,6 @@ use crate::protocol::varint::read_varlong;
             self.out += "}"
 
         self.out += f'''
-use anyhow::{{anyhow, Result}};
-use crate::protocol::ConnectionState as S;
-use crate::protocol::PacketDirection as D;
-use crate::protocol::de::Reader;
-
 #[derive(Debug)]
 pub enum Packet {{
 '''
@@ -386,8 +402,11 @@ pub enum Packet {{
         self.out += '''
 }
         
-pub fn de_packets<'r>(state: S, direction: D, id: u32, reader: &'r mut Reader<'r>) -> Result<Packet> {
-let packet = match (state, direction, id) {
+pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u32, reader: &'r mut Reader<'r>) -> Result<Packet> {
+    use PacketDirection as D;
+    use ConnectionState as S;
+    
+    let packet = match (state, direction, id) {
 '''
 
         for state in states:

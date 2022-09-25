@@ -1,16 +1,22 @@
-#![allow(unused_imports)]
 #![allow(unused_mut)]
 #![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
+
+use crate::protocol::de::Position;
+use crate::protocol::de::Reader;
+use crate::protocol::de::MD;
+use crate::protocol::varint::read_varint;
+use crate::protocol::varint::read_varlong;
+use crate::protocol::ConnectionState;
+use crate::protocol::IndexedBuffer;
+use crate::protocol::IndexedNbt;
+use crate::protocol::IndexedOptionNbt;
+use crate::protocol::IndexedString;
+use crate::protocol::InventorySlot;
+use crate::protocol::PacketDirection;
+use anyhow::{anyhow, Result};
+
 pub mod handshaking {
-    use crate::protocol::de::Reader;
-    use crate::protocol::de::MD;
-    use crate::protocol::varint::read_varint;
-    use crate::protocol::varint::read_varlong;
-    use crate::protocol::IndexedBuffer;
-    use crate::protocol::IndexedString;
-    use crate::protocol::InventorySlot;
-    use anyhow::Result;
+    use super::*;
 
     #[derive(Debug)]
     pub struct SetProtocolRequest {
@@ -23,7 +29,7 @@ pub mod handshaking {
         mut reader: &mut Reader,
     ) -> Result<SetProtocolRequest> {
         let protocol_version: i32 = read_varint(&mut reader)?;
-        let server_host: IndexedString = reader.read_indexed_string()?;
+        let server_host: IndexedString = MD::deserialize(reader)?;
         let server_port: u16 = MD::deserialize(reader)?;
         let next_state: i32 = read_varint(&mut reader)?;
 
@@ -49,14 +55,7 @@ pub mod handshaking {
     }
 }
 pub mod status {
-    use crate::protocol::de::Reader;
-    use crate::protocol::de::MD;
-    use crate::protocol::varint::read_varint;
-    use crate::protocol::varint::read_varlong;
-    use crate::protocol::IndexedBuffer;
-    use crate::protocol::IndexedString;
-    use crate::protocol::InventorySlot;
-    use anyhow::Result;
+    use super::*;
 
     #[derive(Debug)]
     pub struct PingStartRequest {}
@@ -81,7 +80,7 @@ pub mod status {
     pub(super) fn packet_server_info_response(
         mut reader: &mut Reader,
     ) -> Result<ServerInfoResponse> {
-        let response: IndexedString = reader.read_indexed_string()?;
+        let response: IndexedString = MD::deserialize(reader)?;
 
         let result = ServerInfoResponse { response };
         Ok(result)
@@ -98,21 +97,14 @@ pub mod status {
     }
 }
 pub mod login {
-    use crate::protocol::de::Reader;
-    use crate::protocol::de::MD;
-    use crate::protocol::varint::read_varint;
-    use crate::protocol::varint::read_varlong;
-    use crate::protocol::IndexedBuffer;
-    use crate::protocol::IndexedString;
-    use crate::protocol::InventorySlot;
-    use anyhow::Result;
+    use super::*;
 
     #[derive(Debug)]
     pub struct LoginStartRequest {
         pub username: IndexedString,
     }
     pub(super) fn packet_login_start_request(mut reader: &mut Reader) -> Result<LoginStartRequest> {
-        let username: IndexedString = reader.read_indexed_string()?;
+        let username: IndexedString = MD::deserialize(reader)?;
 
         let result = LoginStartRequest { username };
         Ok(result)
@@ -125,8 +117,8 @@ pub mod login {
     pub(super) fn packet_encryption_begin_request(
         mut reader: &mut Reader,
     ) -> Result<EncryptionBeginRequest> {
-        let shared_secret: IndexedBuffer = reader.read_indexed_buffer()?;
-        let verify_token: IndexedBuffer = reader.read_indexed_buffer()?;
+        let shared_secret: IndexedBuffer = MD::deserialize(reader)?;
+        let verify_token: IndexedBuffer = MD::deserialize(reader)?;
 
         let result = EncryptionBeginRequest {
             shared_secret,
@@ -155,7 +147,7 @@ pub mod login {
     pub(super) fn packet_disconnect_response(
         mut reader: &mut Reader,
     ) -> Result<DisconnectResponse> {
-        let reason: IndexedString = reader.read_indexed_string()?;
+        let reason: IndexedString = MD::deserialize(reader)?;
 
         let result = DisconnectResponse { reason };
         Ok(result)
@@ -169,9 +161,9 @@ pub mod login {
     pub(super) fn packet_encryption_begin_response(
         mut reader: &mut Reader,
     ) -> Result<EncryptionBeginResponse> {
-        let server_id: IndexedString = reader.read_indexed_string()?;
-        let public_key: IndexedBuffer = reader.read_indexed_buffer()?;
-        let verify_token: IndexedBuffer = reader.read_indexed_buffer()?;
+        let server_id: IndexedString = MD::deserialize(reader)?;
+        let public_key: IndexedBuffer = MD::deserialize(reader)?;
+        let verify_token: IndexedBuffer = MD::deserialize(reader)?;
 
         let result = EncryptionBeginResponse {
             server_id,
@@ -187,7 +179,7 @@ pub mod login {
     }
     pub(super) fn packet_success_response(mut reader: &mut Reader) -> Result<SuccessResponse> {
         let uuid: u128 = MD::deserialize(reader)?;
-        let username: IndexedString = reader.read_indexed_string()?;
+        let username: IndexedString = MD::deserialize(reader)?;
 
         let result = SuccessResponse { uuid, username };
         Ok(result)
@@ -212,7 +204,7 @@ pub mod login {
         mut reader: &mut Reader,
     ) -> Result<LoginPluginRequest> {
         let message_id: i32 = read_varint(&mut reader)?;
-        let channel: IndexedString = reader.read_indexed_string()?;
+        let channel: IndexedString = MD::deserialize(reader)?;
         let data: IndexedBuffer = reader.read_rest_buffer();
 
         let result = LoginPluginRequest {
@@ -224,14 +216,7 @@ pub mod login {
     }
 }
 pub mod play {
-    use crate::protocol::de::Reader;
-    use crate::protocol::de::MD;
-    use crate::protocol::varint::read_varint;
-    use crate::protocol::varint::read_varlong;
-    use crate::protocol::IndexedBuffer;
-    use crate::protocol::IndexedString;
-    use crate::protocol::InventorySlot;
-    use anyhow::Result;
+    use super::*;
 
     #[derive(Debug)]
     pub struct TeleportConfirmRequest {
@@ -248,13 +233,13 @@ pub mod play {
     #[derive(Debug)]
     pub struct QueryBlockNbtRequest {
         pub transaction_id: i32,
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
     }
     pub(super) fn packet_query_block_nbt_request(
         mut reader: &mut Reader,
     ) -> Result<QueryBlockNbtRequest> {
         let transaction_id: i32 = read_varint(&mut reader)?;
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
 
         let result = QueryBlockNbtRequest {
             transaction_id,
@@ -285,7 +270,7 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut pages = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: IndexedString = reader.read_indexed_string()?;
+            let x: IndexedString = MD::deserialize(reader)?;
             pages.push(x);
         }
         let title: Option<IndexedString> = MD::deserialize(reader)?;
@@ -325,7 +310,7 @@ pub mod play {
         pub name: IndexedString,
     }
     pub(super) fn packet_name_item_request(mut reader: &mut Reader) -> Result<NameItemRequest> {
-        let name: IndexedString = reader.read_indexed_string()?;
+        let name: IndexedString = MD::deserialize(reader)?;
 
         let result = NameItemRequest { name };
         Ok(result)
@@ -361,7 +346,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateCommandBlockRequest {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub command: IndexedString,
         pub mode: i32,
         pub flags: u8,
@@ -369,8 +354,8 @@ pub mod play {
     pub(super) fn packet_update_command_block_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateCommandBlockRequest> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
-        let command: IndexedString = reader.read_indexed_string()?;
+        let location: Position = MD::deserialize(reader)?;
+        let command: IndexedString = MD::deserialize(reader)?;
         let mode: i32 = read_varint(&mut reader)?;
         let flags: u8 = MD::deserialize(reader)?;
 
@@ -392,7 +377,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<UpdateCommandBlockMinecartRequest> {
         let entity_id: i32 = read_varint(&mut reader)?;
-        let command: IndexedString = reader.read_indexed_string()?;
+        let command: IndexedString = MD::deserialize(reader)?;
         let track_output: bool = MD::deserialize(reader)?;
 
         let result = UpdateCommandBlockMinecartRequest {
@@ -404,7 +389,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateStructureBlockRequest {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub action: i32,
         pub mode: i32,
         pub name: IndexedString,
@@ -424,10 +409,10 @@ pub mod play {
     pub(super) fn packet_update_structure_block_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateStructureBlockRequest> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let action: i32 = read_varint(&mut reader)?;
         let mode: i32 = read_varint(&mut reader)?;
-        let name: IndexedString = reader.read_indexed_string()?;
+        let name: IndexedString = MD::deserialize(reader)?;
         let offset_x: i8 = MD::deserialize(reader)?;
         let offset_y: i8 = MD::deserialize(reader)?;
         let offset_z: i8 = MD::deserialize(reader)?;
@@ -436,7 +421,7 @@ pub mod play {
         let size_z: i8 = MD::deserialize(reader)?;
         let mirror: i32 = read_varint(&mut reader)?;
         let rotation: i32 = read_varint(&mut reader)?;
-        let metadata: IndexedString = reader.read_indexed_string()?;
+        let metadata: IndexedString = MD::deserialize(reader)?;
         let integrity: f32 = MD::deserialize(reader)?;
         let seed: i64 = read_varlong(&mut reader)?;
         let flags: u8 = MD::deserialize(reader)?;
@@ -470,7 +455,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<TabCompleteRequest> {
         let transaction_id: i32 = read_varint(&mut reader)?;
-        let text: IndexedString = reader.read_indexed_string()?;
+        let text: IndexedString = MD::deserialize(reader)?;
 
         let result = TabCompleteRequest {
             transaction_id,
@@ -483,7 +468,7 @@ pub mod play {
         pub message: IndexedString,
     }
     pub(super) fn packet_chat_request(mut reader: &mut Reader) -> Result<ChatRequest> {
-        let message: IndexedString = reader.read_indexed_string()?;
+        let message: IndexedString = MD::deserialize(reader)?;
 
         let result = ChatRequest { message };
         Ok(result)
@@ -512,7 +497,7 @@ pub mod play {
         pub enable_server_listing: bool,
     }
     pub(super) fn packet_settings_request(mut reader: &mut Reader) -> Result<SettingsRequest> {
-        let locale: IndexedString = reader.read_indexed_string()?;
+        let locale: IndexedString = MD::deserialize(reader)?;
         let view_distance: i8 = MD::deserialize(reader)?;
         let chat_flags: i32 = read_varint(&mut reader)?;
         let chat_colors: bool = MD::deserialize(reader)?;
@@ -551,17 +536,17 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct WindowClickRequestLocationItem {
+    pub struct WindowClickRequest_ChangedSlots {
         pub location: i16,
         pub item: InventorySlot,
     }
-    pub(super) fn packet_window_click_request_location_item(
+    pub(super) fn packet_window_click_request_changed_slots(
         mut reader: &mut Reader,
-    ) -> Result<WindowClickRequestLocationItem> {
+    ) -> Result<WindowClickRequest_ChangedSlots> {
         let location: i16 = MD::deserialize(reader)?;
         let item: InventorySlot = MD::deserialize(reader)?;
 
-        let result = WindowClickRequestLocationItem { location, item };
+        let result = WindowClickRequest_ChangedSlots { location, item };
         Ok(result)
     }
     #[derive(Debug)]
@@ -571,7 +556,7 @@ pub mod play {
         pub slot: i16,
         pub mouse_button: i8,
         pub mode: i32,
-        pub changed_slots: Vec<WindowClickRequestLocationItem>,
+        pub changed_slots: Vec<WindowClickRequest_ChangedSlots>,
         pub cursor_item: InventorySlot,
     }
     pub(super) fn packet_window_click_request(
@@ -585,8 +570,8 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut changed_slots = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: WindowClickRequestLocationItem =
-                packet_window_click_request_location_item(reader)?;
+            let x: WindowClickRequest_ChangedSlots =
+                packet_window_click_request_changed_slots(reader)?;
             changed_slots.push(x);
         }
         let cursor_item: InventorySlot = MD::deserialize(reader)?;
@@ -622,7 +607,7 @@ pub mod play {
     pub(super) fn packet_custom_payload_request(
         mut reader: &mut Reader,
     ) -> Result<CustomPayloadRequest> {
-        let channel: IndexedString = reader.read_indexed_string()?;
+        let channel: IndexedString = MD::deserialize(reader)?;
         let data: IndexedBuffer = reader.read_rest_buffer();
 
         let result = CustomPayloadRequest { channel, data };
@@ -636,14 +621,14 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct GenerateStructureRequest {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub levels: i32,
         pub keep_jigsaws: bool,
     }
     pub(super) fn packet_generate_structure_request(
         mut reader: &mut Reader,
     ) -> Result<GenerateStructureRequest> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let levels: i32 = read_varint(&mut reader)?;
         let keep_jigsaws: bool = MD::deserialize(reader)?;
 
@@ -800,7 +785,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<CraftRecipeRequest> {
         let window_id: i8 = MD::deserialize(reader)?;
-        let recipe: IndexedString = reader.read_indexed_string()?;
+        let recipe: IndexedString = MD::deserialize(reader)?;
         let make_all: bool = MD::deserialize(reader)?;
 
         let result = CraftRecipeRequest {
@@ -823,12 +808,12 @@ pub mod play {
     #[derive(Debug)]
     pub struct BlockDigRequest {
         pub status: i32,
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub face: i8,
     }
     pub(super) fn packet_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
         let status: i32 = read_varint(&mut reader)?;
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let face: i8 = MD::deserialize(reader)?;
 
         let result = BlockDigRequest {
@@ -885,7 +870,7 @@ pub mod play {
     pub(super) fn packet_displayed_recipe_request(
         mut reader: &mut Reader,
     ) -> Result<DisplayedRecipeRequest> {
-        let recipe_id: IndexedString = reader.read_indexed_string()?;
+        let recipe_id: IndexedString = MD::deserialize(reader)?;
 
         let result = DisplayedRecipeRequest { recipe_id };
         Ok(result)
@@ -948,7 +933,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateJigsawBlockRequest {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub name: IndexedString,
         pub target: IndexedString,
         pub pool: IndexedString,
@@ -958,12 +943,12 @@ pub mod play {
     pub(super) fn packet_update_jigsaw_block_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateJigsawBlockRequest> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
-        let name: IndexedString = reader.read_indexed_string()?;
-        let target: IndexedString = reader.read_indexed_string()?;
-        let pool: IndexedString = reader.read_indexed_string()?;
-        let final_state: IndexedString = reader.read_indexed_string()?;
-        let joint_type: IndexedString = reader.read_indexed_string()?;
+        let location: Position = MD::deserialize(reader)?;
+        let name: IndexedString = MD::deserialize(reader)?;
+        let target: IndexedString = MD::deserialize(reader)?;
+        let pool: IndexedString = MD::deserialize(reader)?;
+        let final_state: IndexedString = MD::deserialize(reader)?;
+        let joint_type: IndexedString = MD::deserialize(reader)?;
 
         let result = UpdateJigsawBlockRequest {
             location,
@@ -977,18 +962,18 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UpdateSignRequest {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub text1: IndexedString,
         pub text2: IndexedString,
         pub text3: IndexedString,
         pub text4: IndexedString,
     }
     pub(super) fn packet_update_sign_request(mut reader: &mut Reader) -> Result<UpdateSignRequest> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
-        let text1: IndexedString = reader.read_indexed_string()?;
-        let text2: IndexedString = reader.read_indexed_string()?;
-        let text3: IndexedString = reader.read_indexed_string()?;
-        let text4: IndexedString = reader.read_indexed_string()?;
+        let location: Position = MD::deserialize(reader)?;
+        let text1: IndexedString = MD::deserialize(reader)?;
+        let text2: IndexedString = MD::deserialize(reader)?;
+        let text3: IndexedString = MD::deserialize(reader)?;
+        let text4: IndexedString = MD::deserialize(reader)?;
 
         let result = UpdateSignRequest {
             location,
@@ -1024,7 +1009,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct BlockPlaceRequest {
         pub hand: i32,
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub direction: i32,
         pub cursor_x: f32,
         pub cursor_y: f32,
@@ -1033,7 +1018,7 @@ pub mod play {
     }
     pub(super) fn packet_block_place_request(mut reader: &mut Reader) -> Result<BlockPlaceRequest> {
         let hand: i32 = read_varint(&mut reader)?;
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let direction: i32 = read_varint(&mut reader)?;
         let cursor_x: f32 = MD::deserialize(reader)?;
         let cursor_y: f32 = MD::deserialize(reader)?;
@@ -1204,7 +1189,7 @@ pub mod play {
         pub entity_id: i32,
         pub entity_uuid: u128,
         pub title: i32,
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub direction: u8,
     }
     pub(super) fn packet_spawn_entity_painting_response(
@@ -1213,7 +1198,7 @@ pub mod play {
         let entity_id: i32 = read_varint(&mut reader)?;
         let entity_uuid: u128 = MD::deserialize(reader)?;
         let title: i32 = read_varint(&mut reader)?;
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let direction: u8 = MD::deserialize(reader)?;
 
         let result = SpawnEntityPaintingResponse {
@@ -1273,19 +1258,19 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct StatisticsResponseCategory_IdStatistic_IdValue {
+    pub struct StatisticsResponse_Entries {
         pub category_id: i32,
         pub statistic_id: i32,
         pub value: i32,
     }
-    pub(super) fn packet_statistics_response_category__id_statistic__id_value(
+    pub(super) fn packet_statistics_response_entries(
         mut reader: &mut Reader,
-    ) -> Result<StatisticsResponseCategory_IdStatistic_IdValue> {
+    ) -> Result<StatisticsResponse_Entries> {
         let category_id: i32 = read_varint(&mut reader)?;
         let statistic_id: i32 = read_varint(&mut reader)?;
         let value: i32 = read_varint(&mut reader)?;
 
-        let result = StatisticsResponseCategory_IdStatistic_IdValue {
+        let result = StatisticsResponse_Entries {
             category_id,
             statistic_id,
             value,
@@ -1294,7 +1279,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct StatisticsResponse {
-        pub entries: Vec<StatisticsResponseCategory_IdStatistic_IdValue>,
+        pub entries: Vec<StatisticsResponse_Entries>,
     }
     pub(super) fn packet_statistics_response(
         mut reader: &mut Reader,
@@ -1302,8 +1287,7 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut entries = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: StatisticsResponseCategory_IdStatistic_IdValue =
-                packet_statistics_response_category__id_statistic__id_value(reader)?;
+            let x: StatisticsResponse_Entries = packet_statistics_response_entries(reader)?;
             entries.push(x);
         }
 
@@ -1321,14 +1305,14 @@ pub mod play {
     #[derive(Debug)]
     pub struct BlockBreakAnimationResponse {
         pub entity_id: i32,
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub destroy_stage: i8,
     }
     pub(super) fn packet_block_break_animation_response(
         mut reader: &mut Reader,
     ) -> Result<BlockBreakAnimationResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let destroy_stage: i8 = MD::deserialize(reader)?;
 
         let result = BlockBreakAnimationResponse {
@@ -1339,16 +1323,28 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TileEntityDataResponse {}
+    pub struct TileEntityDataResponse {
+        pub location: Position,
+        pub action: i32,
+        pub nbt_data: IndexedOptionNbt,
+    }
     pub(super) fn packet_tile_entity_data_response(
-        mut _reader: &mut Reader,
+        mut reader: &mut Reader,
     ) -> Result<TileEntityDataResponse> {
-        let result = TileEntityDataResponse {};
+        let location: Position = MD::deserialize(reader)?;
+        let action: i32 = read_varint(&mut reader)?;
+        let nbt_data: IndexedOptionNbt = MD::deserialize(reader)?;
+
+        let result = TileEntityDataResponse {
+            location,
+            action,
+            nbt_data,
+        };
         Ok(result)
     }
     #[derive(Debug)]
     pub struct BlockActionResponse {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub byte1: u8,
         pub byte2: u8,
         pub block_id: i32,
@@ -1356,7 +1352,7 @@ pub mod play {
     pub(super) fn packet_block_action_response(
         mut reader: &mut Reader,
     ) -> Result<BlockActionResponse> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let byte1: u8 = MD::deserialize(reader)?;
         let byte2: u8 = MD::deserialize(reader)?;
         let block_id: i32 = read_varint(&mut reader)?;
@@ -1371,13 +1367,13 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct BlockChangeResponse {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub type_: i32,
     }
     pub(super) fn packet_block_change_response(
         mut reader: &mut Reader,
     ) -> Result<BlockChangeResponse> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let type_: i32 = read_varint(&mut reader)?;
 
         let result = BlockChangeResponse { location, type_ };
@@ -1407,17 +1403,17 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TabCompleteResponseMatch_Tooltip {
+    pub struct TabCompleteResponse_Matches {
         pub match_: IndexedString,
         pub tooltip: Option<IndexedString>,
     }
-    pub(super) fn packet_tab_complete_response_match__tooltip(
+    pub(super) fn packet_tab_complete_response_matches(
         mut reader: &mut Reader,
-    ) -> Result<TabCompleteResponseMatch_Tooltip> {
-        let match_: IndexedString = reader.read_indexed_string()?;
+    ) -> Result<TabCompleteResponse_Matches> {
+        let match_: IndexedString = MD::deserialize(reader)?;
         let tooltip: Option<IndexedString> = MD::deserialize(reader)?;
 
-        let result = TabCompleteResponseMatch_Tooltip { match_, tooltip };
+        let result = TabCompleteResponse_Matches { match_, tooltip };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1425,7 +1421,7 @@ pub mod play {
         pub transaction_id: i32,
         pub start: i32,
         pub length: i32,
-        pub matches: Vec<TabCompleteResponseMatch_Tooltip>,
+        pub matches: Vec<TabCompleteResponse_Matches>,
     }
     pub(super) fn packet_tab_complete_response(
         mut reader: &mut Reader,
@@ -1436,8 +1432,7 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut matches = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: TabCompleteResponseMatch_Tooltip =
-                packet_tab_complete_response_match__tooltip(reader)?;
+            let x: TabCompleteResponse_Matches = packet_tab_complete_response_matches(reader)?;
             matches.push(x);
         }
 
@@ -1466,9 +1461,18 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct NbtQueryResponse {}
-    pub(super) fn packet_nbt_query_response(mut _reader: &mut Reader) -> Result<NbtQueryResponse> {
-        let result = NbtQueryResponse {};
+    pub struct NbtQueryResponse {
+        pub transaction_id: i32,
+        pub nbt: IndexedOptionNbt,
+    }
+    pub(super) fn packet_nbt_query_response(mut reader: &mut Reader) -> Result<NbtQueryResponse> {
+        let transaction_id: i32 = read_varint(&mut reader)?;
+        let nbt: IndexedOptionNbt = MD::deserialize(reader)?;
+
+        let result = NbtQueryResponse {
+            transaction_id,
+            nbt,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1478,7 +1482,7 @@ pub mod play {
         pub sender: u128,
     }
     pub(super) fn packet_chat_response(mut reader: &mut Reader) -> Result<ChatResponse> {
-        let message: IndexedString = reader.read_indexed_string()?;
+        let message: IndexedString = MD::deserialize(reader)?;
         let position: i8 = MD::deserialize(reader)?;
         let sender: u128 = MD::deserialize(reader)?;
 
@@ -1520,7 +1524,7 @@ pub mod play {
     ) -> Result<OpenWindowResponse> {
         let window_id: i32 = read_varint(&mut reader)?;
         let inventory_type: i32 = read_varint(&mut reader)?;
-        let window_title: IndexedString = reader.read_indexed_string()?;
+        let window_title: IndexedString = MD::deserialize(reader)?;
 
         let result = OpenWindowResponse {
             window_id,
@@ -1623,7 +1627,7 @@ pub mod play {
     pub(super) fn packet_custom_payload_response(
         mut reader: &mut Reader,
     ) -> Result<CustomPayloadResponse> {
-        let channel: IndexedString = reader.read_indexed_string()?;
+        let channel: IndexedString = MD::deserialize(reader)?;
         let data: IndexedBuffer = reader.read_rest_buffer();
 
         let result = CustomPayloadResponse { channel, data };
@@ -1642,7 +1646,7 @@ pub mod play {
     pub(super) fn packet_named_sound_effect_response(
         mut reader: &mut Reader,
     ) -> Result<NamedSoundEffectResponse> {
-        let sound_name: IndexedString = reader.read_indexed_string()?;
+        let sound_name: IndexedString = MD::deserialize(reader)?;
         let sound_category: i32 = read_varint(&mut reader)?;
         let x: i32 = MD::deserialize(reader)?;
         let y: i32 = MD::deserialize(reader)?;
@@ -1668,7 +1672,7 @@ pub mod play {
     pub(super) fn packet_kick_disconnect_response(
         mut reader: &mut Reader,
     ) -> Result<KickDisconnectResponse> {
-        let reason: IndexedString = reader.read_indexed_string()?;
+        let reason: IndexedString = MD::deserialize(reader)?;
 
         let result = KickDisconnectResponse { reason };
         Ok(result)
@@ -1691,19 +1695,19 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct ExplosionResponseXYZ {
+    pub struct ExplosionResponse_AffectedBlockOffsets {
         pub x: i8,
         pub y: i8,
         pub z: i8,
     }
-    pub(super) fn packet_explosion_response_xyz(
+    pub(super) fn packet_explosion_response_affected_block_offsets(
         mut reader: &mut Reader,
-    ) -> Result<ExplosionResponseXYZ> {
+    ) -> Result<ExplosionResponse_AffectedBlockOffsets> {
         let x: i8 = MD::deserialize(reader)?;
         let y: i8 = MD::deserialize(reader)?;
         let z: i8 = MD::deserialize(reader)?;
 
-        let result = ExplosionResponseXYZ { x, y, z };
+        let result = ExplosionResponse_AffectedBlockOffsets { x, y, z };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1712,7 +1716,7 @@ pub mod play {
         pub y: f32,
         pub z: f32,
         pub radius: f32,
-        pub affected_block_offsets: Vec<ExplosionResponseXYZ>,
+        pub affected_block_offsets: Vec<ExplosionResponse_AffectedBlockOffsets>,
         pub player_motion_x: f32,
         pub player_motion_y: f32,
         pub player_motion_z: f32,
@@ -1725,7 +1729,8 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut affected_block_offsets = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: ExplosionResponseXYZ = packet_explosion_response_xyz(reader)?;
+            let x: ExplosionResponse_AffectedBlockOffsets =
+                packet_explosion_response_affected_block_offsets(reader)?;
             affected_block_offsets.push(x);
         }
         let player_motion_x: f32 = MD::deserialize(reader)?;
@@ -1811,7 +1816,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct WorldEventResponse {
         pub effect_id: i32,
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub data: i32,
         pub global: bool,
     }
@@ -1819,7 +1824,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<WorldEventResponse> {
         let effect_id: i32 = MD::deserialize(reader)?;
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let data: i32 = MD::deserialize(reader)?;
         let global: bool = MD::deserialize(reader)?;
 
@@ -1918,9 +1923,65 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct LoginResponse {}
-    pub(super) fn packet_login_response(mut _reader: &mut Reader) -> Result<LoginResponse> {
-        let result = LoginResponse {};
+    pub struct LoginResponse {
+        pub entity_id: i32,
+        pub is_hardcore: bool,
+        pub game_mode: u8,
+        pub previous_game_mode: i8,
+        pub world_names: Vec<IndexedString>,
+        pub dimension_codec: IndexedNbt,
+        pub dimension: IndexedNbt,
+        pub world_name: IndexedString,
+        pub hashed_seed: i64,
+        pub max_players: i32,
+        pub view_distance: i32,
+        pub simulation_distance: i32,
+        pub reduced_debug_info: bool,
+        pub enable_respawn_screen: bool,
+        pub is_debug: bool,
+        pub is_flat: bool,
+    }
+    pub(super) fn packet_login_response(mut reader: &mut Reader) -> Result<LoginResponse> {
+        let entity_id: i32 = MD::deserialize(reader)?;
+        let is_hardcore: bool = MD::deserialize(reader)?;
+        let game_mode: u8 = MD::deserialize(reader)?;
+        let previous_game_mode: i8 = MD::deserialize(reader)?;
+        let count_array: i32 = read_varint(&mut reader)?;
+        let mut world_names = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {
+            let x: IndexedString = MD::deserialize(reader)?;
+            world_names.push(x);
+        }
+        let dimension_codec: IndexedNbt = MD::deserialize(reader)?;
+        let dimension: IndexedNbt = MD::deserialize(reader)?;
+        let world_name: IndexedString = MD::deserialize(reader)?;
+        let hashed_seed: i64 = MD::deserialize(reader)?;
+        let max_players: i32 = read_varint(&mut reader)?;
+        let view_distance: i32 = read_varint(&mut reader)?;
+        let simulation_distance: i32 = read_varint(&mut reader)?;
+        let reduced_debug_info: bool = MD::deserialize(reader)?;
+        let enable_respawn_screen: bool = MD::deserialize(reader)?;
+        let is_debug: bool = MD::deserialize(reader)?;
+        let is_flat: bool = MD::deserialize(reader)?;
+
+        let result = LoginResponse {
+            entity_id,
+            is_hardcore,
+            game_mode,
+            previous_game_mode,
+            world_names,
+            dimension_codec,
+            dimension,
+            world_name,
+            hashed_seed,
+            max_players,
+            view_distance,
+            simulation_distance,
+            reduced_debug_info,
+            enable_respawn_screen,
+            is_debug,
+            is_flat,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -1930,8 +1991,7 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TradeListResponseInput_Item1Output_ItemInput_Item2Trade_DisabledNb_Trade_UsesMaximum_Nb_Trade_UsesXpSpecial_PricePrice_MultiplierDemand
-    {
+    pub struct TradeListResponse_Trades {
         pub input_item1: InventorySlot,
         pub output_item: InventorySlot,
         pub input_item2: Option<InventorySlot>,
@@ -1942,8 +2002,10 @@ pub mod play {
         pub special_price: i32,
         pub price_multiplier: f32,
         pub demand: i32,
-    }pub(super) fn packet_trade_list_response_input__item1_output__item_input__item2_trade__disabled_nb__trade__uses_maximum__nb__trade__uses_xp_special__price_price__multiplier_demand(mut reader: & mut Reader)
-    -> Result<TradeListResponseInput_Item1Output_ItemInput_Item2Trade_DisabledNb_Trade_UsesMaximum_Nb_Trade_UsesXpSpecial_PricePrice_MultiplierDemand>{
+    }
+    pub(super) fn packet_trade_list_response_trades(
+        mut reader: &mut Reader,
+    ) -> Result<TradeListResponse_Trades> {
         let input_item1: InventorySlot = MD::deserialize(reader)?;
         let output_item: InventorySlot = MD::deserialize(reader)?;
         let input_item2: Option<InventorySlot> = MD::deserialize(reader)?;
@@ -1955,17 +2017,35 @@ pub mod play {
         let price_multiplier: f32 = MD::deserialize(reader)?;
         let demand: i32 = MD::deserialize(reader)?;
 
-        let result = TradeListResponseInput_Item1Output_ItemInput_Item2Trade_DisabledNb_Trade_UsesMaximum_Nb_Trade_UsesXpSpecial_PricePrice_MultiplierDemand {input_item1,output_item,input_item2,trade_disabled,nb_trade_uses,maximum_nb_trade_uses,xp,special_price,price_multiplier,demand,};
+        let result = TradeListResponse_Trades {
+            input_item1,
+            output_item,
+            input_item2,
+            trade_disabled,
+            nb_trade_uses,
+            maximum_nb_trade_uses,
+            xp,
+            special_price,
+            price_multiplier,
+            demand,
+        };
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct TradeListResponse  {pub window_id: i32,pub trades: Vec<TradeListResponseInput_Item1Output_ItemInput_Item2Trade_DisabledNb_Trade_UsesMaximum_Nb_Trade_UsesXpSpecial_PricePrice_MultiplierDemand>,pub villager_level: i32,pub experience: i32,pub is_regular_villager: bool,pub can_restock: bool,}
+    pub struct TradeListResponse {
+        pub window_id: i32,
+        pub trades: Vec<TradeListResponse_Trades>,
+        pub villager_level: i32,
+        pub experience: i32,
+        pub is_regular_villager: bool,
+        pub can_restock: bool,
+    }
     pub(super) fn packet_trade_list_response(mut reader: &mut Reader) -> Result<TradeListResponse> {
         let window_id: i32 = read_varint(&mut reader)?;
         let count_array: u8 = MD::deserialize(reader)?;
         let mut trades = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: TradeListResponseInput_Item1Output_ItemInput_Item2Trade_DisabledNb_Trade_UsesMaximum_Nb_Trade_UsesXpSpecial_PricePrice_MultiplierDemand = packet_trade_list_response_input__item1_output__item_input__item2_trade__disabled_nb__trade__uses_maximum__nb__trade__uses_xp_special__price_price__multiplier_demand(reader)?;
+            let x: TradeListResponse_Trades = packet_trade_list_response_trades(reader)?;
             trades.push(x);
         }
         let villager_level: i32 = read_varint(&mut reader)?;
@@ -2102,12 +2182,12 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct OpenSignEntityResponse {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
     }
     pub(super) fn packet_open_sign_entity_response(
         mut reader: &mut Reader,
     ) -> Result<OpenSignEntityResponse> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
 
         let result = OpenSignEntityResponse { location };
         Ok(result)
@@ -2121,7 +2201,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<CraftRecipeResponse> {
         let window_id: i8 = MD::deserialize(reader)?;
-        let recipe: IndexedString = reader.read_indexed_string()?;
+        let recipe: IndexedString = MD::deserialize(reader)?;
 
         let result = CraftRecipeResponse { window_id, recipe };
         Ok(result)
@@ -2180,7 +2260,7 @@ pub mod play {
     ) -> Result<DeathCombatEventResponse> {
         let player_id: i32 = read_varint(&mut reader)?;
         let entity_id: i32 = MD::deserialize(reader)?;
-        let message: IndexedString = reader.read_indexed_string()?;
+        let message: IndexedString = MD::deserialize(reader)?;
 
         let result = DeathCombatEventResponse {
             player_id,
@@ -2282,8 +2362,8 @@ pub mod play {
     pub(super) fn packet_resource_pack_send_response(
         mut reader: &mut Reader,
     ) -> Result<ResourcePackSendResponse> {
-        let url: IndexedString = reader.read_indexed_string()?;
-        let hash: IndexedString = reader.read_indexed_string()?;
+        let url: IndexedString = MD::deserialize(reader)?;
+        let hash: IndexedString = MD::deserialize(reader)?;
         let forced: bool = MD::deserialize(reader)?;
         let prompt_message: Option<IndexedString> = MD::deserialize(reader)?;
 
@@ -2296,9 +2376,36 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct RespawnResponse {}
-    pub(super) fn packet_respawn_response(mut _reader: &mut Reader) -> Result<RespawnResponse> {
-        let result = RespawnResponse {};
+    pub struct RespawnResponse {
+        pub dimension: IndexedNbt,
+        pub world_name: IndexedString,
+        pub hashed_seed: i64,
+        pub gamemode: u8,
+        pub previous_gamemode: u8,
+        pub is_debug: bool,
+        pub is_flat: bool,
+        pub copy_metadata: bool,
+    }
+    pub(super) fn packet_respawn_response(mut reader: &mut Reader) -> Result<RespawnResponse> {
+        let dimension: IndexedNbt = MD::deserialize(reader)?;
+        let world_name: IndexedString = MD::deserialize(reader)?;
+        let hashed_seed: i64 = MD::deserialize(reader)?;
+        let gamemode: u8 = MD::deserialize(reader)?;
+        let previous_gamemode: u8 = MD::deserialize(reader)?;
+        let is_debug: bool = MD::deserialize(reader)?;
+        let is_flat: bool = MD::deserialize(reader)?;
+        let copy_metadata: bool = MD::deserialize(reader)?;
+
+        let result = RespawnResponse {
+            dimension,
+            world_name,
+            hashed_seed,
+            gamemode,
+            previous_gamemode,
+            is_debug,
+            is_flat,
+            copy_metadata,
+        };
         Ok(result)
     }
     #[derive(Debug)]
@@ -2375,7 +2482,7 @@ pub mod play {
         mut reader: &mut Reader,
     ) -> Result<ScoreboardDisplayObjectiveResponse> {
         let position: i8 = MD::deserialize(reader)?;
-        let name: IndexedString = reader.read_indexed_string()?;
+        let name: IndexedString = MD::deserialize(reader)?;
 
         let result = ScoreboardDisplayObjectiveResponse { position, name };
         Ok(result)
@@ -2522,13 +2629,13 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct SpawnPositionResponse {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub angle: f32,
     }
     pub(super) fn packet_spawn_position_response(
         mut reader: &mut Reader,
     ) -> Result<SpawnPositionResponse> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let angle: f32 = MD::deserialize(reader)?;
 
         let result = SpawnPositionResponse { location, angle };
@@ -2622,8 +2729,8 @@ pub mod play {
     pub(super) fn packet_playerlist_header_response(
         mut reader: &mut Reader,
     ) -> Result<PlayerlistHeaderResponse> {
-        let header: IndexedString = reader.read_indexed_string()?;
-        let footer: IndexedString = reader.read_indexed_string()?;
+        let header: IndexedString = MD::deserialize(reader)?;
+        let footer: IndexedString = MD::deserialize(reader)?;
 
         let result = PlayerlistHeaderResponse { header, footer };
         Ok(result)
@@ -2679,19 +2786,19 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityUpdateAttributesResponseUuidAmountOperation {
+    pub struct EntityUpdateAttributesResponse_Modifiers {
         pub uuid: u128,
         pub amount: f64,
         pub operation: i8,
     }
-    pub(super) fn packet_entity_update_attributes_response_uuid_amount_operation(
+    pub(super) fn packet_entity_update_attributes_response_modifiers(
         mut reader: &mut Reader,
-    ) -> Result<EntityUpdateAttributesResponseUuidAmountOperation> {
+    ) -> Result<EntityUpdateAttributesResponse_Modifiers> {
         let uuid: u128 = MD::deserialize(reader)?;
         let amount: f64 = MD::deserialize(reader)?;
         let operation: i8 = MD::deserialize(reader)?;
 
-        let result = EntityUpdateAttributesResponseUuidAmountOperation {
+        let result = EntityUpdateAttributesResponse_Modifiers {
             uuid,
             amount,
             operation,
@@ -2699,25 +2806,25 @@ pub mod play {
         Ok(result)
     }
     #[derive(Debug)]
-    pub struct EntityUpdateAttributesResponseKeyValueModifiers {
+    pub struct EntityUpdateAttributesResponse_Properties {
         pub key: IndexedString,
         pub value: f64,
-        pub modifiers: Vec<EntityUpdateAttributesResponseUuidAmountOperation>,
+        pub modifiers: Vec<EntityUpdateAttributesResponse_Modifiers>,
     }
-    pub(super) fn packet_entity_update_attributes_response_key_value_modifiers(
+    pub(super) fn packet_entity_update_attributes_response_properties(
         mut reader: &mut Reader,
-    ) -> Result<EntityUpdateAttributesResponseKeyValueModifiers> {
-        let key: IndexedString = reader.read_indexed_string()?;
+    ) -> Result<EntityUpdateAttributesResponse_Properties> {
+        let key: IndexedString = MD::deserialize(reader)?;
         let value: f64 = MD::deserialize(reader)?;
         let count_array: i32 = read_varint(&mut reader)?;
         let mut modifiers = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: EntityUpdateAttributesResponseUuidAmountOperation =
-                packet_entity_update_attributes_response_uuid_amount_operation(reader)?;
+            let x: EntityUpdateAttributesResponse_Modifiers =
+                packet_entity_update_attributes_response_modifiers(reader)?;
             modifiers.push(x);
         }
 
-        let result = EntityUpdateAttributesResponseKeyValueModifiers {
+        let result = EntityUpdateAttributesResponse_Properties {
             key,
             value,
             modifiers,
@@ -2727,7 +2834,7 @@ pub mod play {
     #[derive(Debug)]
     pub struct EntityUpdateAttributesResponse {
         pub entity_id: i32,
-        pub properties: Vec<EntityUpdateAttributesResponseKeyValueModifiers>,
+        pub properties: Vec<EntityUpdateAttributesResponse_Properties>,
     }
     pub(super) fn packet_entity_update_attributes_response(
         mut reader: &mut Reader,
@@ -2736,8 +2843,8 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut properties = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: EntityUpdateAttributesResponseKeyValueModifiers =
-                packet_entity_update_attributes_response_key_value_modifiers(reader)?;
+            let x: EntityUpdateAttributesResponse_Properties =
+                packet_entity_update_attributes_response_properties(reader)?;
             properties.push(x);
         }
 
@@ -2801,7 +2908,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct AcknowledgePlayerDiggingResponse {
-        pub location: crate::protocol::de::Position,
+        pub location: Position,
         pub block: i32,
         pub status: i32,
         pub successful: bool,
@@ -2809,7 +2916,7 @@ pub mod play {
     pub(super) fn packet_acknowledge_player_digging_response(
         mut reader: &mut Reader,
     ) -> Result<AcknowledgePlayerDiggingResponse> {
-        let location: crate::protocol::de::Position = MD::deserialize(reader)?;
+        let location: Position = MD::deserialize(reader)?;
         let block: i32 = read_varint(&mut reader)?;
         let status: i32 = read_varint(&mut reader)?;
         let successful: bool = MD::deserialize(reader)?;
@@ -2882,7 +2989,7 @@ pub mod play {
         pub text: IndexedString,
     }
     pub(super) fn packet_action_bar_response(mut reader: &mut Reader) -> Result<ActionBarResponse> {
-        let text: IndexedString = reader.read_indexed_string()?;
+        let text: IndexedString = MD::deserialize(reader)?;
 
         let result = ActionBarResponse { text };
         Ok(result)
@@ -2974,7 +3081,7 @@ pub mod play {
     pub(super) fn packet_set_title_subtitle_response(
         mut reader: &mut Reader,
     ) -> Result<SetTitleSubtitleResponse> {
-        let text: IndexedString = reader.read_indexed_string()?;
+        let text: IndexedString = MD::deserialize(reader)?;
 
         let result = SetTitleSubtitleResponse { text };
         Ok(result)
@@ -2986,7 +3093,7 @@ pub mod play {
     pub(super) fn packet_set_title_text_response(
         mut reader: &mut Reader,
     ) -> Result<SetTitleTextResponse> {
-        let text: IndexedString = reader.read_indexed_string()?;
+        let text: IndexedString = MD::deserialize(reader)?;
 
         let result = SetTitleTextResponse { text };
         Ok(result)
@@ -3024,11 +3131,6 @@ pub mod play {
         Ok(result)
     }
 }
-use crate::protocol::de::Reader;
-use crate::protocol::ConnectionState as S;
-use crate::protocol::PacketDirection as D;
-use anyhow::{anyhow, Result};
-
 #[derive(Debug)]
 pub enum Packet {
     SetProtocolRequest(handshaking::SetProtocolRequest),
@@ -3200,11 +3302,14 @@ pub enum Packet {
 }
 
 pub fn de_packets<'r>(
-    state: S,
-    direction: D,
+    state: ConnectionState,
+    direction: PacketDirection,
     id: u32,
     reader: &'r mut Reader<'r>,
 ) -> Result<Packet> {
+    use ConnectionState as S;
+    use PacketDirection as D;
+
     let packet = match (state, direction, id) {
         (S::Handshaking, D::ClientToServer, 0x0) => {
             let p = handshaking::packet_set_protocol_request(reader)?;
