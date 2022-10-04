@@ -1,6 +1,8 @@
 import json
+from pathlib import Path
 import subprocess
 import re
+import os
 import enum
 
 
@@ -421,12 +423,30 @@ pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u3
         self.out += '''_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }'''
 
 
+class Version:
+    def __init__(self, version: str):
+        with open("minecraft-data/data/dataPaths.json") as f:
+            j = json.load(f)
+        
+        paths = j["pc"][version]
+
+        def get(name: str):
+            path = paths[name]
+            path = f"minecraft-data/data/{path}/{name}.json"
+            with open(path) as f:
+                j = json.load(f)
+            return j
+        
+        self.json_items = get("items")
+        self.json_protocol = get("protocol")
+
+
 def main():
-    with open("minecraft-data/data/pc/1.18.2/protocol.json") as f:
-        j = json.load(f)
+    VERSION = "1.18.2"
+    version = Version(VERSION)
 
     parser = Parser()
-    states = parser.parse(j)
+    states = parser.parse(version.json_protocol)
 
     gen = Generator()
     gen.gen(states)
@@ -438,4 +458,8 @@ def main():
 
 
 if __name__ == "__main__":
+    source_path = Path(__file__).resolve()
+    source_dir = source_path.parent
+    os.chdir(source_dir)
+
     main()

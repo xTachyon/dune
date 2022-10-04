@@ -1,1 +1,1 @@
-python gen.py
+python %0/../gen.py
