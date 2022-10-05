@@ -4,5 +4,7 @@ members = [
   "melon"
 ]
 
-# [profile.release]
+[profile.release]
+debug = true
 # lto = true
+

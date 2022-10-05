@@ -245,7 +245,7 @@ fn main_impl() -> Result<()> {
             let handler = Box::new(EventHandler::new());
             play(packet_file, handler)?;
         }
-        "play" => {}
+        "play" => unimplemented!(),
         _ => bail!("unknown command"),
     }
 
