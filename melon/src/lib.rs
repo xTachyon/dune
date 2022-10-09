@@ -1,7 +1,10 @@
 use crate::protocol::de::{Reader, MD};
 use crate::protocol::PacketDirection;
 use anyhow::Result;
+use serde_derive::Deserialize;
+use std::collections::HashMap;
 use std::io::Write;
+use anyhow::bail;
 
 pub mod chat;
 pub mod events;
@@ -55,5 +58,71 @@ impl<'p> DiskPacket<'p> {
         }
         let size = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
         size + SIZEOF_U32 <= buf.len()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct ItemId(u16);
+
+pub struct Item {
+    name: &'static str,
+    display_name: &'static str,
+}
+
+pub struct GameData {
+    items_by_id: Vec<Item>,
+    items_by_name: HashMap<&'static str, ItemId>,
+}
+
+impl GameData {
+    pub fn load() -> GameData {
+        #[derive(Deserialize)]
+        struct JsonItem {
+            name: &'static str,
+            display_name: &'static str,
+        }
+        const ITEMS_JSON: &str = include_str!("data/items.json");
+
+        let json_items: Vec<JsonItem> = serde_json::from_str(ITEMS_JSON).unwrap();
+
+        let mut items_by_id = Vec::with_capacity(2048);
+        items_by_id.push(Item {
+            name: "bad_item",
+            display_name: "BadItem",
+        });
+
+        for i in json_items {
+            let item = Item {
+                name: i.name,
+                display_name: i.display_name,
+            };
+            items_by_id.push(item);
+        }
+
+        let mut count = 1;
+        let mut items_by_name = HashMap::new();
+        for i in items_by_id.iter().skip(1) {
+            let id = ItemId(count);
+            items_by_name.insert(i.name, id);
+
+            count += 1;
+        }
+
+        GameData {
+            items_by_id,
+            items_by_name,
+        }
+    }
+
+    pub fn item_by_name(&self, mut name: &str) -> Result<ItemId> {
+        const PREFIX: &str = "minecraft:";
+        if !name.starts_with(PREFIX) {
+            bail!("expected item name to start with minecraft:, found {}", name);
+        }
+        name = &name[PREFIX.len()..];
+        match self.items_by_name.get(name) {
+            Some(x) => Ok(*x),
+            None => bail!("item name {} not found", name)
+        }
     }
 }

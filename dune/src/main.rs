@@ -17,16 +17,19 @@ use std::env;
 use std::fs;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
+use melon::GameData;
 
 struct EventHandler {
     player_name: String,
     player_uuid: u128,
     player_position: Position,
+    game_data: GameData
 }
 
 impl EventHandler {
     fn new() -> EventHandler {
         EventHandler {
+            game_data: GameData::load(),
             player_name: "".to_string(),
             player_uuid: 0,
             player_position: Position {
@@ -242,6 +245,7 @@ fn main_impl() -> Result<()> {
                 .get(2)
                 .map(|x| x.as_str())
                 .unwrap_or(DEFAULT_PACKET_FILE);
+
             let handler = Box::new(EventHandler::new());
             play(packet_file, handler)?;
         }

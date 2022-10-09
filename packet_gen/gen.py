@@ -423,6 +423,43 @@ pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u3
         self.out += '''_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }'''
 
 
+class Item:
+    def __init__(self, name, display_name) -> None:
+        self.name = name
+        self.display_name = display_name
+
+def do_items(j: json):
+    JSON_PATH = "../melon/src/data/items.json"
+    items = []
+
+    with open(JSON_PATH, "r") as f:
+        original_json = json.load(f)
+
+    for i in original_json:
+        name = i["name"]
+        display_name = i["display_name"]
+        items.append(Item(name, display_name))
+
+    for i in j:
+        name = i["name"]
+        display_name = i["displayName"]
+
+        found = False
+        for old_item in items:
+            if old_item.name == name:
+                found = True
+                break
+        
+        if not found:
+            items.append(Item(name, display_name))
+
+    res = []
+    for i in items:
+        res.append({"name": i.name, "display_name": i.display_name})
+    
+    with open(JSON_PATH, "w") as f:
+        json.dump(res, f, indent=4)
+
 class Version:
     def __init__(self, version: str):
         with open("minecraft-data/data/dataPaths.json") as f:
@@ -444,6 +481,8 @@ class Version:
 def main():
     VERSION = "1.18.2"
     version = Version(VERSION)
+
+    do_items(version.json_items)
 
     parser = Parser()
     states = parser.parse(version.json_protocol)
