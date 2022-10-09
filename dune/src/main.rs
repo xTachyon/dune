@@ -55,6 +55,7 @@ fn get_item<'b>(
     bump: &'b Bump,
     buf: &[u8],
     item: Option<InventorySlot>,
+    game_data: &GameData,
 ) -> Result<Option<InventorySlotUnpacked<'b>>> {
     let item = match get_item_opt(item) {
         Some(x) => x,
@@ -69,6 +70,8 @@ fn get_item<'b>(
         None => None,
     };
 
+    let item_id = game_data.item_1_18_2(item.item_id as u16);
+    println!("{}", game_data.item(item_id).display_name);
     Ok(Some(InventorySlotUnpacked {
         item_id: item.item_id,
         count: item.count,
@@ -99,10 +102,10 @@ impl EventSubscriber for EventHandler {
         // println!("{:?}", trades);
 
         for i in trades.trades {
-            println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
-            println!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
+            println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1), &self.game_data)?);
+            println!("item2: {:?}", get_item(bump, buf, i.input_item2, &self.game_data)?);
             {
-                let out = get_item(bump, buf, Some(i.output_item))?;
+                let out = get_item(bump, buf, Some(i.output_item), &self.game_data)?;
                 println!("out:   {:?}\n", out);
 
                 if let Some(x) = out {

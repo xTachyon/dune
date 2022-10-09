@@ -66,32 +66,35 @@ pub struct ItemId(u16);
 
 pub struct Item {
     name: &'static str,
-    display_name: &'static str,
+    pub display_name: &'static str,
 }
 
 pub struct GameData {
     items_by_id: Vec<Item>,
     items_by_name: HashMap<&'static str, ItemId>,
+    items_1_18_2: Vec<ItemId>
 }
 
 impl GameData {
     pub fn load() -> GameData {
         #[derive(Deserialize)]
-        struct JsonItem {
-            name: &'static str,
-            display_name: &'static str,
+        struct JsonItem<'i> {
+            name: &'i str,
+            display_name: &'i str,
+        }
+        #[derive(Deserialize)]
+        struct JsonItemData {
+            #[serde(borrow)]
+            ids: Vec<JsonItem<'static>>,
+            items_1_18_2: Vec<i16>
         }
         const ITEMS_JSON: &str = include_str!("data/items.json");
 
-        let json_items: Vec<JsonItem> = serde_json::from_str(ITEMS_JSON).unwrap();
+        let json_items: JsonItemData = serde_json::from_str(ITEMS_JSON).unwrap();
 
         let mut items_by_id = Vec::with_capacity(2048);
-        items_by_id.push(Item {
-            name: "bad_item",
-            display_name: "BadItem",
-        });
 
-        for i in json_items {
+        for i in json_items.ids {
             let item = Item {
                 name: i.name,
                 display_name: i.display_name,
@@ -99,18 +102,34 @@ impl GameData {
             items_by_id.push(item);
         }
 
-        let mut count = 1;
+        let mut count = 0;
         let mut items_by_name = HashMap::new();
-        for i in items_by_id.iter().skip(1) {
+        for i in items_by_id.iter() {
             let id = ItemId(count);
             items_by_name.insert(i.name, id);
 
             count += 1;
         }
+        let bad_item_id = items_by_id.len() as u16;
+        items_by_id.push(Item {
+            name: "bad_item",
+            display_name: "BadItem",
+        });
+
+        let mut items_1_18_2 = Vec::with_capacity(json_items.items_1_18_2.len());
+        for i in json_items.items_1_18_2 {
+            let item_id = if i == -1 {
+                ItemId(bad_item_id)
+            } else {
+                ItemId(i as u16)
+            };
+            items_1_18_2.push(item_id);
+        }
 
         GameData {
             items_by_id,
             items_by_name,
+            items_1_18_2
         }
     }
 
@@ -124,5 +143,11 @@ impl GameData {
             Some(x) => Ok(*x),
             None => bail!("item name {} not found", name)
         }
+    }
+    pub fn item(&self, id: ItemId) -> &Item {
+        &self.items_by_id[id.0 as usize]
+    }
+    pub fn item_1_18_2(&self, id: u16) -> ItemId {
+        self.items_1_18_2[id as usize]
     }
 }
