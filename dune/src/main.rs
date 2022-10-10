@@ -7,7 +7,7 @@ use chrono::Local;
 use launchers::{get_access_token, AuthDataExt};
 use melon::chat::parse_chat;
 use melon::events::{EventSubscriber, Position, Trades};
-use melon::nbt;
+use melon::{nbt, ItemId};
 use melon::nbt::RootTag;
 use melon::play::play;
 use melon::protocol::{InventorySlot, InventorySlotData};
@@ -43,7 +43,7 @@ impl EventHandler {
 
 #[derive(Debug)]
 pub struct InventorySlotUnpacked<'i> {
-    pub item_id: i32,
+    pub item_id: ItemId,
     pub count: u8,
     pub nbt: Option<RootTag<'i>>,
 }
@@ -70,10 +70,9 @@ fn get_item<'b>(
         None => None,
     };
 
-    let item_id = game_data.item_1_18_2(item.item_id as u16);
-    println!("{}", game_data.item(item_id).display_name);
+    let item_id = game_data.item_1_18_2(item.item_id);
     Ok(Some(InventorySlotUnpacked {
-        item_id: item.item_id,
+        item_id,
         count: item.count,
         nbt,
     }))

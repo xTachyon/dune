@@ -61,7 +61,7 @@ impl<'p> DiskPacket<'p> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct ItemId(u16);
 
 pub struct Item {
@@ -147,7 +147,7 @@ impl GameData {
     pub fn item(&self, id: ItemId) -> &Item {
         &self.items_by_id[id.0 as usize]
     }
-    pub fn item_1_18_2(&self, id: u16) -> ItemId {
+    pub fn item_1_18_2(&self, id: i32) -> ItemId {
         self.items_1_18_2[id as usize]
     }
 }
