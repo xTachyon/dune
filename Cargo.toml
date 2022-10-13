@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "dune",
-  "melon"
+  "melon",
+  "data_gen"
 ]
 
 [profile.release]
