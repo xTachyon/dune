@@ -130,7 +130,10 @@ fn process_items(versions: &[&str]) {
         )
         .unwrap();
 
-        for (name, version_id) in map {
+        let mut sorted: Vec<(&str, u32)> = map.iter().map(|(name, id)| (name.as_str(), *id)).collect();
+        sorted.sort_by(|(_, id1), (_, id2)| id1.cmp(id2));
+
+        for (name, version_id) in sorted {
             let item = items.iter().find(|x| x.name == name).unwrap();
             write!(out, "{} => {},", version_id, title_case(&item.name)).unwrap();
         }
