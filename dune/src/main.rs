@@ -7,29 +7,26 @@ use chrono::Local;
 use launchers::{get_access_token, AuthDataExt};
 use melon::chat::parse_chat;
 use melon::events::{EventSubscriber, Position, Trades};
-use melon::{nbt, ItemId};
 use melon::nbt::RootTag;
 use melon::play::play;
 use melon::protocol::{InventorySlot, InventorySlotData};
 use melon::record::record_to_file;
+use melon::{nbt, Item};
 use serde_derive::Deserialize;
 use std::env;
 use std::fs;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
-use melon::GameData;
 
 struct EventHandler {
     player_name: String,
     player_uuid: u128,
     player_position: Position,
-    game_data: GameData
 }
 
 impl EventHandler {
     fn new() -> EventHandler {
         EventHandler {
-            game_data: GameData::load(),
             player_name: "".to_string(),
             player_uuid: 0,
             player_position: Position {
@@ -43,7 +40,7 @@ impl EventHandler {
 
 #[derive(Debug)]
 pub struct InventorySlotUnpacked<'i> {
-    pub item_id: ItemId,
+    pub item_id: Item,
     pub count: u8,
     pub nbt: Option<RootTag<'i>>,
 }
@@ -55,7 +52,6 @@ fn get_item<'b>(
     bump: &'b Bump,
     buf: &[u8],
     item: Option<InventorySlot>,
-    game_data: &GameData,
 ) -> Result<Option<InventorySlotUnpacked<'b>>> {
     let item = match get_item_opt(item) {
         Some(x) => x,
@@ -70,7 +66,7 @@ fn get_item<'b>(
         None => None,
     };
 
-    let item_id = game_data.item_1_18_2(item.item_id);
+    let item_id = Item::from_1_18_2(item.item_id.try_into()?)?;
     Ok(Some(InventorySlotUnpacked {
         item_id,
         count: item.count,
@@ -101,10 +97,10 @@ impl EventSubscriber for EventHandler {
         // println!("{:?}", trades);
 
         for i in trades.trades {
-            println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1), &self.game_data)?);
-            println!("item2: {:?}", get_item(bump, buf, i.input_item2, &self.game_data)?);
+            println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
+            println!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
             {
-                let out = get_item(bump, buf, Some(i.output_item), &self.game_data)?;
+                let out = get_item(bump, buf, Some(i.output_item))?;
                 println!("out:   {:?}\n", out);
 
                 if let Some(x) = out {

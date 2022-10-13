@@ -1,5 +1,5 @@
 use serde_derive::{Deserialize, Serialize};
-use std::fmt::{Write};
+use std::fmt::Write;
 use std::process::Command;
 use std::{collections::HashMap, fs};
 
@@ -101,7 +101,7 @@ fn process_items(versions: &[&str]) {
                 items.push(OutItemsJson {
                     name: i.name.to_string(),
                     display_name: i.display_name.to_string(),
-                    id: items.len() as u16
+                    id: items.len() as u16,
                 });
             }
 
@@ -113,24 +113,36 @@ fn process_items(versions: &[&str]) {
     fs::write(JSON_PATH, out).unwrap();
 
     let out = &mut String::with_capacity(4096);
-    *out += "pub enum ItemNew {";
+    *out += "#[derive(Debug)] pub enum Item {";
     for (index, item) in items.iter().enumerate() {
         write!(out, "{} = {},", title_case(&item.name), index).unwrap();
     }
 
-    *out += "}";
-    
+    *out += "} impl Item {";
+
     for (v, map) in items_by_version {
-        write!(out, "pub fn from_{}(id: u16) -> anyhow::Result<u16> {{ let result = match id {{", v.replace('.', "_")).unwrap();
-        
+        write!(
+            out,
+            "pub fn from_{}(id: u16) -> anyhow::Result<Self> {{
+                use Item::*;
+                let result = match id {{",
+            v.replace('.', "_")
+        )
+        .unwrap();
+
         for (name, version_id) in map {
             let item = items.iter().find(|x| x.name == name).unwrap();
-            write!(out, "{} => {},", version_id, item.id).unwrap();
+            write!(out, "{} => {},", version_id, title_case(&item.name)).unwrap();
         }
-        
-        write!(out, r#"_ => anyhow::bail!("unknown item id") }}; Ok(result) }}"#).unwrap();
+
+        write!(
+            out,
+            r#"_ => anyhow::bail!("unknown item id") }}; Ok(result) }}"#
+        )
+        .unwrap();
     }
-    
+    *out += "}";
+
     write_file_and_fmt(ITEMS_RS_PATH, out);
 }
 
