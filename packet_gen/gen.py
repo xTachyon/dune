@@ -359,6 +359,58 @@ use anyhow::{{anyhow, Result}};
 '''
 
     def gen_struct(self, struct):
+        if struct.name == "UseEntityRequest":
+            self.out += '''
+#[derive(Debug)]
+pub struct Coords {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+#[derive(Debug)]
+pub enum UseEntityKind {
+    Interact,
+    Attack,
+    InteractAt(Coords),
+}
+
+#[derive(Debug)]
+pub struct UseEntityRequest {
+    pub entity_id: i32,
+    pub kind: UseEntityKind,
+    pub sneaking: bool,
+}
+
+pub(super) fn packet_use_entity_request(mut reader: &mut Reader) -> Result<UseEntityRequest> {
+    let entity_id = read_varint(&mut reader)?;
+    let kind = read_varint(&mut reader)?;
+    let kind = match kind {
+        0 => {
+            let _ = read_varint(&mut reader)?;
+            UseEntityKind::Interact
+        }
+        1 => UseEntityKind::Attack,
+        2 => {
+            let x = MD::deserialize(&mut reader)?;
+            let y = MD::deserialize(&mut reader)?;
+            let z = MD::deserialize(&mut reader)?;
+            let _ = read_varint(&mut reader)?;
+
+            UseEntityKind::InteractAt(Coords { x, y, z })
+        }
+        _ => anyhow::bail!("unknown use entity kind {}", kind),
+    };
+    let sneaking = MD::deserialize(&mut reader)?;
+
+    Ok(UseEntityRequest {
+        entity_id,
+        kind,
+        sneaking,
+    })
+}
+'''
+            return
+
         self.out += f'''#[derive(Debug)] pub struct {struct.name} {{'''
         for i in struct.fields:
             ty = get_type(i.ty)
