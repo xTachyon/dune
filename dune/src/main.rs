@@ -75,11 +75,11 @@ fn deserialize_item_nbt<'b>(
 
             let level = i
                 .remove("lvl")
-                .ok_or(anyhow!("'lvl' attr not found"))?
+                .ok_or_else(|| anyhow!("'lvl' attr not found"))?
                 .short()?;
             let id = i
                 .remove("id")
-                .ok_or(anyhow!("'id' attr not found"))?
+                .ok_or_else(|| anyhow!("'id' attr not found"))?
                 .string()?;
             let id = Enchantment::from(id)?;
 
@@ -115,7 +115,8 @@ fn get_item<'b>(
         None => None,
     };
 
-    let item_id = Item::from_1_18_2(item.item_id.try_into()?)?;
+    let id = item.item_id.try_into()?;
+    let item_id = Item::from_1_18_2(id)?;
     Ok(Some(InventorySlotUnpacked {
         item_id,
         count: item.count,
