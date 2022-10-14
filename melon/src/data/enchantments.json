@@ -1,0 +1,154 @@
+[
+  {
+    "name": "protection",
+    "id": 0
+  },
+  {
+    "name": "fire_protection",
+    "id": 1
+  },
+  {
+    "name": "feather_falling",
+    "id": 2
+  },
+  {
+    "name": "blast_protection",
+    "id": 3
+  },
+  {
+    "name": "projectile_protection",
+    "id": 4
+  },
+  {
+    "name": "respiration",
+    "id": 5
+  },
+  {
+    "name": "aqua_affinity",
+    "id": 6
+  },
+  {
+    "name": "thorns",
+    "id": 7
+  },
+  {
+    "name": "depth_strider",
+    "id": 8
+  },
+  {
+    "name": "frost_walker",
+    "id": 9
+  },
+  {
+    "name": "binding_curse",
+    "id": 10
+  },
+  {
+    "name": "soul_speed",
+    "id": 11
+  },
+  {
+    "name": "sharpness",
+    "id": 12
+  },
+  {
+    "name": "smite",
+    "id": 13
+  },
+  {
+    "name": "bane_of_arthropods",
+    "id": 14
+  },
+  {
+    "name": "knockback",
+    "id": 15
+  },
+  {
+    "name": "fire_aspect",
+    "id": 16
+  },
+  {
+    "name": "looting",
+    "id": 17
+  },
+  {
+    "name": "sweeping",
+    "id": 18
+  },
+  {
+    "name": "efficiency",
+    "id": 19
+  },
+  {
+    "name": "silk_touch",
+    "id": 20
+  },
+  {
+    "name": "unbreaking",
+    "id": 21
+  },
+  {
+    "name": "fortune",
+    "id": 22
+  },
+  {
+    "name": "power",
+    "id": 23
+  },
+  {
+    "name": "punch",
+    "id": 24
+  },
+  {
+    "name": "flame",
+    "id": 25
+  },
+  {
+    "name": "infinity",
+    "id": 26
+  },
+  {
+    "name": "luck_of_the_sea",
+    "id": 27
+  },
+  {
+    "name": "lure",
+    "id": 28
+  },
+  {
+    "name": "loyalty",
+    "id": 29
+  },
+  {
+    "name": "impaling",
+    "id": 30
+  },
+  {
+    "name": "riptide",
+    "id": 31
+  },
+  {
+    "name": "channeling",
+    "id": 32
+  },
+  {
+    "name": "multishot",
+    "id": 33
+  },
+  {
+    "name": "quick_charge",
+    "id": 34
+  },
+  {
+    "name": "piercing",
+    "id": 35
+  },
+  {
+    "name": "mending",
+    "id": 36
+  },
+  {
+    "name": "vanishing_curse",
+    "id": 37
+  }
+]

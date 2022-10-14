@@ -6,7 +6,7 @@ use std::{collections::HashMap, fs};
 #[derive(Debug)]
 struct Version {
     items_path: String,
-    // enchantments_path: String,
+    enchants_path: String,
 }
 
 fn get_path(version_path: &str, name: &str) -> String {
@@ -20,7 +20,7 @@ fn new(name: &str) -> Version {
     #[derive(Debug, Deserialize)]
     struct DataPathsVersion<'x> {
         items: Option<&'x str>,
-        // enchantments: Option<&'x str>,
+        enchantments: Option<&'x str>,
     }
     #[derive(Debug, Deserialize)]
     struct DataPathsJson<'x> {
@@ -32,10 +32,10 @@ fn new(name: &str) -> Version {
 
     let v = data.pc.get(name).unwrap();
     let items_path = get_path(v.items.unwrap(), "items");
-    // let enchantments_path = get_path(v.enchantments.unwrap(), "enchantments");
+    let enchants_path = get_path(v.enchantments.unwrap(), "enchantments");
     Version {
         items_path,
-        // enchantments_path,
+        enchants_path,
     }
 }
 
@@ -57,7 +57,7 @@ fn write_file_and_fmt(path: &str, content: &str) {
 }
 
 fn title_case(input: &str) -> String {
-    let mut res = String::new();
+    let mut res = String::with_capacity(input.len());
     let mut next_is_upper = true;
     for mut c in input.chars() {
         if next_is_upper {
@@ -73,13 +73,15 @@ fn title_case(input: &str) -> String {
     res
 }
 
-fn process_items(versions: &[&str]) {
+const V1_18_2: &str = "1.18.2";
+
+fn process_items(versions: &HashMap<&str, Version>) {
     #[derive(Debug, Deserialize)]
     struct InItemsJson<'x> {
         name: String,
         #[serde(rename = "displayName")]
         display_name: &'x str,
-        id: u32,
+        id: u16,
     }
 
     const JSON_PATH: &str = "melon/src/data/items.json";
@@ -89,11 +91,10 @@ fn process_items(versions: &[&str]) {
     let mut items: Vec<OutItemsJson> = serde_json::from_slice(&original_items_data).unwrap();
     let mut items_by_version = HashMap::new();
 
-    for v in versions {
-        let version = new(v);
-        let items_v: &mut HashMap<String, u32> = items_by_version.entry(v).or_default();
+    for (name, version) in versions {
+        let items_v: &mut HashMap<String, u16> = items_by_version.entry(name).or_default();
 
-        let json = fs::read(version.items_path).unwrap();
+        let json = fs::read(&version.items_path).unwrap();
         let in_items: Vec<InItemsJson> = serde_json::from_slice(&json).unwrap();
 
         for i in in_items {
@@ -130,7 +131,8 @@ fn process_items(versions: &[&str]) {
         )
         .unwrap();
 
-        let mut sorted: Vec<(&str, u32)> = map.iter().map(|(name, id)| (name.as_str(), *id)).collect();
+        let mut sorted: Vec<(&str, u16)> =
+            map.iter().map(|(name, id)| (name.as_str(), *id)).collect();
         sorted.sort_by(|(_, id1), (_, id2)| id1.cmp(id2));
 
         for (name, version_id) in sorted {
@@ -140,7 +142,7 @@ fn process_items(versions: &[&str]) {
 
         write!(
             out,
-            r#"_ => anyhow::bail!("unknown item id") }}; Ok(result) }}"#
+            r#"_ => anyhow::bail!("unknown item id: {{}}", id) }}; Ok(result) }}"#
         )
         .unwrap();
     }
@@ -149,6 +151,71 @@ fn process_items(versions: &[&str]) {
     write_file_and_fmt(ITEMS_RS_PATH, out);
 }
 
+fn process_enchants(versions: &HashMap<&str, Version>) {
+    #[derive(Debug, Serialize, Deserialize)]
+    struct EnchJson {
+        name: String,
+        id: u16,
+    }
+
+    const JSON_PATH: &str = "melon/src/data/enchantments.json";
+    const RS_PATH: &str = "melon/src/data/enchantments.rs";
+
+    let original_items_data = fs::read(JSON_PATH).unwrap();
+    let mut enchants: Vec<EnchJson> = serde_json::from_slice(&original_items_data).unwrap();
+
+    for (_, version) in versions {
+        let json = fs::read(&version.enchants_path).unwrap();
+        let in_items: Vec<EnchJson> = serde_json::from_slice(&json).unwrap();
+
+        for i in in_items {
+            if !enchants.iter().any(|x| x.name == i.name) {
+                enchants.push(EnchJson {
+                    name: i.name.to_string(),
+                    id: enchants.len() as u16,
+                });
+            }
+        }
+    }
+
+    let out = serde_json::to_vec_pretty(&enchants).unwrap();
+    fs::write(JSON_PATH, out).unwrap();
+
+    let out = &mut String::with_capacity(4096);
+    *out += "pub enum Enchantment {";
+
+    for i in enchants.iter() {
+        write!(out, "{} = {},", title_case(&i.name), i.id).unwrap();
+    }
+
+    *out += r#"}
+impl Enchantment {
+    pub fn from(input: &str) -> anyhow::Result<Self> {
+        let minecraft = "minecraft:";
+        let s;
+        if input.starts_with(minecraft) {
+            s = &input[minecraft.len()..];
+        } else {
+            anyhow::bail!("unknown enchantment: {}", input);
+        }
+        use Enchantment::*;
+
+        let result = match s {"#;
+    for i in enchants.iter() {
+        write!(out, r#""{}" => {},"#, i.name, title_case(&i.name)).unwrap();
+    }
+
+    *out += r#"
+            _ => anyhow::bail!("unknown enchantment: {}", input)
+        };
+        Ok(result)
+}}"#;
+
+    write_file_and_fmt(RS_PATH, out);
+}
+
 fn main() {
-    process_items(&["1.18.2"]);
+    let versions: HashMap<&str, Version> = [(V1_18_2, new(V1_18_2))].into_iter().collect();
+    process_items(&versions);
+    process_enchants(&versions);
 }

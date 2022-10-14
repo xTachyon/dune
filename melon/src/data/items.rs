@@ -2205,7 +2205,7 @@ impl Item {
             1098 => LargeAmethystBud,
             1099 => AmethystCluster,
             1100 => PointedDripstone,
-            _ => anyhow::bail!("unknown item id"),
+            _ => anyhow::bail!("unknown item id: {}", id),
         };
         Ok(result)
     }
