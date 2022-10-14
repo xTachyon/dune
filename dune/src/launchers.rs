@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use melon::record::AuthData;
+use dune_lib::record::AuthData;
 use serde_derive::Deserialize;
 use std::env;
 

@@ -423,71 +423,6 @@ pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u3
         self.out += '''_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }'''
 
 
-class Item:
-    def __init__(self, name: str, display_name: str, id: int) -> None:
-        self.name = name
-        self.display_name = display_name
-        self.id = id
-
-def do_items(versions_names: list[str]):
-    JSON_PATH = "../melon/src/data/items.json"
-
-    versions = []
-    for i in versions_names:
-        versions.append(Version(i))
-
-    items = []
-
-    with open(JSON_PATH, "r") as f:
-        original_json = json.load(f)
-
-    count = 0
-    if original_json.get("ids") is not None:
-        for i in original_json["ids"]:
-            name = i["name"]
-            display_name = i["display_name"]
-            items.append(Item(name, display_name, count))
-
-            count += 1
-
-    def find_item(name: str):
-        for i in items:
-            if i.name == name:
-                return i
-        return None
-
-    for version in versions:
-        for i in version.json_items:
-            name = i["name"]
-            display_name = i["displayName"]
-            item = find_item(name)
-            
-            if item is None:
-                items.append(Item(name, display_name, count))
-                count += 1
-
-
-    res = {}
-    res["ids"] = []
-    for i in items:
-        res["ids"].append({"name": i.name, "display_name": i.display_name})
-
-    for version in versions:
-        items_json = version.json_items
-        m = [-1] * len(items)
-
-        for i in items_json:
-            item = find_item(i["name"])
-            if item.name == "paper":
-                rfsdfsd = 65
-            m[i["id"]] = item.id
-
-        res[f"items_{version.name.replace('.', '_')}"] = m
-
-    
-    with open(JSON_PATH, "w") as f:
-        json.dump(res, f, indent=4)
-
 class Version:
     def __init__(self, version: str):
         self.name = version
@@ -511,15 +446,13 @@ def main():
     VERSION = "1.18.2"
     version = Version(VERSION)
 
-    do_items(["1.19", "1.18.2"])
-
     parser = Parser()
     states = parser.parse(version.json_protocol)
 
     gen = Generator()
     gen.gen(states)
 
-    out_file = "../melon/src/protocol/v1_18_2.rs"
+    out_file = "../dune_lib/src/protocol/v1_18_2.rs"
     with open(out_file, "w") as f:
         f.write(gen.out)
     subprocess.run(["rustfmt", out_file])

@@ -8,23 +8,23 @@ use anyhow::{bail, Result};
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
+use dune_lib::chat::parse_chat;
+use dune_lib::events::{EventSubscriber, Position, Trades};
+use dune_lib::nbt::Tag;
+use dune_lib::play::play;
+use dune_lib::protocol::{InventorySlot, InventorySlotData};
+use dune_lib::record::record_to_file;
+use dune_lib::{nbt, Enchantment, Item};
 use launchers::{get_access_token, AuthDataExt};
-use melon::chat::parse_chat;
-use melon::events::{EventSubscriber, Position, Trades};
-use melon::nbt::Tag;
-use melon::play::play;
-use melon::protocol::{InventorySlot, InventorySlotData};
-use melon::record::record_to_file;
-use melon::{nbt, Enchantment, Item};
+use log::warn;
 use serde_derive::Deserialize;
+use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::intrinsics::unlikely;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
-use simple_logger::SimpleLogger;
-use log::warn;
 
 struct EventHandler {
     player_name: String,

@@ -1,9 +1,10 @@
 [workspace]
 members = [
   "dune",
-  "melon",
-  "data_gen"
+  "dune_lib",
+  "dune_data_gen"
 ]
+default-members = ["dune"]
 
 [profile.release]
 debug = true

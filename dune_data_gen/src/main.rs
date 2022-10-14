@@ -84,8 +84,8 @@ fn process_items(versions: &HashMap<&str, Version>) {
         id: u16,
     }
 
-    const JSON_PATH: &str = "melon/src/data/items.json";
-    const ITEMS_RS_PATH: &str = "melon/src/data/items.rs";
+    const JSON_PATH: &str = "dune_lib/src/data/items.json";
+    const ITEMS_RS_PATH: &str = "dune_lib/src/data/items.rs";
 
     let original_items_data = fs::read(JSON_PATH).unwrap();
     let mut items: Vec<OutItemsJson> = serde_json::from_slice(&original_items_data).unwrap();
@@ -158,8 +158,8 @@ fn process_enchants(versions: &HashMap<&str, Version>) {
         id: u16,
     }
 
-    const JSON_PATH: &str = "melon/src/data/enchantments.json";
-    const RS_PATH: &str = "melon/src/data/enchantments.rs";
+    const JSON_PATH: &str = "dune_lib/src/data/enchantments.json";
+    const RS_PATH: &str = "dune_lib/src/data/enchantments.rs";
 
     let original_items_data = fs::read(JSON_PATH).unwrap();
     let mut enchants: Vec<EnchJson> = serde_json::from_slice(&original_items_data).unwrap();
