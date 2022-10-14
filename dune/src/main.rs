@@ -1,20 +1,26 @@
+#![feature(core_intrinsics)]
+
 mod launchers;
 
 use ansi_term::Color::{Cyan, Green, Purple};
+use anyhow::anyhow;
 use anyhow::{bail, Result};
+use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
 use launchers::{get_access_token, AuthDataExt};
 use melon::chat::parse_chat;
 use melon::events::{EventSubscriber, Position, Trades};
-use melon::nbt::RootTag;
+use melon::nbt::Tag;
 use melon::play::play;
 use melon::protocol::{InventorySlot, InventorySlotData};
 use melon::record::record_to_file;
-use melon::{nbt, Item};
+use melon::{nbt, Enchantment, Item};
 use serde_derive::Deserialize;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::intrinsics::unlikely;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
 
@@ -39,14 +45,56 @@ impl EventHandler {
 }
 
 #[derive(Debug)]
-pub struct InventorySlotUnpacked<'i> {
-    pub item_id: Item,
-    pub count: u8,
-    pub nbt: Option<RootTag<'i>>,
+struct EnchantmentData {
+    enchantment: Enchantment,
+    level: u16,
+}
+#[derive(Debug)]
+struct InventorySlotAttrs<'i> {
+    enchantments: BVec<'i, EnchantmentData>,
+}
+
+#[derive(Debug)]
+struct InventorySlotUnpacked<'i> {
+    item_id: Item,
+    count: u8,
+    attrs: Option<InventorySlotAttrs<'i>>,
 }
 
 fn get_item_opt(item: Option<InventorySlot>) -> Option<InventorySlotData> {
     item?.data
+}
+fn deserialize_item_nbt<'b>(
+    bump: &'b Bump,
+    mut map: HashMap<&str, Tag>,
+) -> Result<InventorySlotAttrs<'b>> {
+    let mut enchantments = BVec::new_in(bump);
+    if let Some(list) = map.remove("StoredEnchantments") {
+        for i in list.list()? {
+            let mut i = i.compound()?;
+
+            let level = i
+                .remove("lvl")
+                .ok_or(anyhow!("'lvl' attr not found"))?
+                .short()?;
+            let id = i
+                .remove("id")
+                .ok_or(anyhow!("'id' attr not found"))?
+                .string()?;
+            let id = Enchantment::from(id)?;
+
+            enchantments.push(EnchantmentData {
+                enchantment: id,
+                level: level.try_into()?,
+            });
+        }
+    }
+
+    if unlikely(!map.is_empty()) {
+        println!("item nbt map not empty after deserializing: {:?}", map);
+    }
+
+    Ok(InventorySlotAttrs { enchantments })
 }
 fn get_item<'b>(
     bump: &'b Bump,
@@ -57,11 +105,12 @@ fn get_item<'b>(
         Some(x) => x,
         None => return Ok(None),
     };
-    let nbt = match item.nbt {
+    let attrs = match item.nbt {
         Some(buffer) => {
             let buffer = buffer.get(buf);
             let r = nbt::read(buffer, bump)?;
-            Some(r)
+            let attrs = deserialize_item_nbt(bump, r.tag.compound()?)?;
+            Some(attrs)
         }
         None => None,
     };
@@ -70,7 +119,7 @@ fn get_item<'b>(
     Ok(Some(InventorySlotUnpacked {
         item_id,
         count: item.count,
-        nbt,
+        attrs,
     }))
 }
 
@@ -102,12 +151,6 @@ impl EventSubscriber for EventHandler {
             {
                 let out = get_item(bump, buf, Some(i.output_item))?;
                 println!("out:   {:?}\n", out);
-
-                if let Some(x) = out {
-                    if let Some(nbt) = x.nbt {
-                        println!("nbt:\n{}\n", nbt);
-                    }
-                }
             }
 
             bump.reset();

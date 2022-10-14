@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Enchantment {
     Protection = 0,
     FireProtection = 1,

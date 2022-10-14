@@ -182,7 +182,7 @@ fn process_enchants(versions: &HashMap<&str, Version>) {
     fs::write(JSON_PATH, out).unwrap();
 
     let out = &mut String::with_capacity(4096);
-    *out += "pub enum Enchantment {";
+    *out += "#[derive(Debug)] pub enum Enchantment {";
 
     for i in enchants.iter() {
         write!(out, "{} = {},", title_case(&i.name), i.id).unwrap();

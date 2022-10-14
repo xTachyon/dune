@@ -12,8 +12,8 @@ pub mod play;
 pub mod protocol;
 pub mod record;
 
-pub use data::items::Item;
 pub use data::enchantments::Enchantment;
+pub use data::items::Item;
 
 struct DiskPacket<'p> {
     pub id: u32,

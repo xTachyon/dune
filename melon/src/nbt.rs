@@ -30,6 +30,51 @@ pub struct RootTag<'n> {
     pub tag: Tag<'n>,
 }
 
+macro_rules! get_variant {
+    ($obj:expr, $var:ident) => {{
+        use Tag::*;
+        match $obj {
+            $var(x) => Ok(x),
+            _ => Err(anyhow!(
+                "expected tag {}, found {:?}",
+                $obj.tag_name(),
+                $obj
+            )),
+        }
+    }};
+}
+impl<'n> Tag<'n> {
+    fn tag_name(&self) -> &str {
+        match self {
+            Tag::Byte(_) => "byte",
+            Tag::Short(_) => "short",
+            Tag::Int(_) => "int",
+            Tag::Long(_) => "long",
+            Tag::Float(_) => "float",
+            Tag::Double(_) => "double",
+            Tag::ByteArray(_) => "byte_array",
+            Tag::String(_) => "string",
+            Tag::List(_) => "list",
+            Tag::Compound(_) => "compound",
+            Tag::IntArray(_) => "int_array",
+            Tag::LongArray(_) => "long_array",
+        }
+    }
+
+    pub fn compound(self) -> Result<HashMap<&'n str, Tag<'n>>> {
+        get_variant!(self, Compound)
+    }
+    pub fn list(self) -> Result<Vec<'n, Tag<'n>>> {
+        get_variant!(self, List)
+    }
+    pub fn short(self) -> Result<i16> {
+        get_variant!(self, Short)
+    }
+    pub fn string(self) -> Result<&'n str> {
+        get_variant!(self, String)
+    }
+}
+
 impl<'n> Display for RootTag<'n> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult<()> {
         f.write_str(&pretty_print(self)?)
