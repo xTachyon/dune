@@ -23,6 +23,8 @@ use std::fs;
 use std::intrinsics::unlikely;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
+use simple_logger::SimpleLogger;
+use log::warn;
 
 struct EventHandler {
     player_name: String,
@@ -91,7 +93,7 @@ fn deserialize_item_nbt<'b>(
     }
 
     if unlikely(!map.is_empty()) {
-        println!("item nbt map not empty after deserializing: {:?}", map);
+        warn!("item nbt map not empty after deserializing: {:?}", map);
     }
 
     Ok(InventorySlotAttrs { enchantments })
@@ -299,6 +301,8 @@ fn main_impl() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    let _ = SimpleLogger::new().init();
+
     let start = Instant::now();
     let result = main_impl();
     println!("execution took {:?}", start.elapsed());
