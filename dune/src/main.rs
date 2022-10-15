@@ -9,14 +9,14 @@ use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
 use dune_lib::chat::parse_chat;
-use dune_lib::events::{EventSubscriber, Position, Trades};
+use dune_lib::events::{EventSubscriber, Position, Trades, UseEntity, UseEntityKind};
 use dune_lib::nbt::Tag;
 use dune_lib::play::play;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
 use dune_lib::{nbt, Enchantment, Item};
 use launchers::{get_access_token, AuthDataExt};
-use log::warn;
+use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
@@ -30,6 +30,7 @@ struct EventHandler {
     player_name: String,
     player_uuid: u128,
     player_position: Position,
+    last_entity_interact: Option<Position>,
 }
 
 impl EventHandler {
@@ -42,20 +43,28 @@ impl EventHandler {
                 y: 0.0,
                 z: 0.0,
             },
+            last_entity_interact: None,
         }
     }
 }
 
+// TODO: remove
+#[allow(unused)]
 #[derive(Debug)]
 struct EnchantmentData {
     enchantment: Enchantment,
     level: u16,
 }
+
+// TODO: remove
+#[allow(unused)]
 #[derive(Debug)]
 struct InventorySlotAttrs<'i> {
     enchantments: BVec<'i, EnchantmentData>,
 }
 
+// TODO: remove
+#[allow(unused)]
 #[derive(Debug)]
 struct InventorySlotUnpacked<'i> {
     item_id: Item,
@@ -153,21 +162,37 @@ impl EventSubscriber for EventHandler {
         let buf = trades.buffer;
         let trades = trades.packet;
         let bump = &mut Bump::with_capacity(4096);
-        // println!("{:?}", trades);
 
+        let last_entity = self
+            .last_entity_interact
+            .ok_or(anyhow!("use entity wasn't set before using it"))?;
+        info!("trades at {:?}:", last_entity);
         for i in trades.trades {
-            println!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
-            println!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
+            info!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
+            info!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
             {
                 let out = get_item(bump, buf, Some(i.output_item))?;
-                println!("out:   {:?}\n", out);
+                info!("out:   {:?}\n", out);
             }
 
             bump.reset();
         }
+        info!("------------------------------------------------------------------------------------------------------------");
+        Ok(())
+    }
+    fn interact(&mut self, use_entity: UseEntity) -> Result<()> {
+        if let UseEntityKind::InteractAt(coords) = use_entity.kind {
+            let position = Position {
+                x: coords.x as f64 + self.player_position.x,
+                y: coords.y as f64 + self.player_position.y,
+                z: coords.z as f64 + self.player_position.z,
+            };
+            self.last_entity_interact = Some(position);
+        }
         Ok(())
     }
 }
+// /summon minecraft:villager ~ ~ ~ {VillagerData:{type:"minecraft:plains",profession:"minecraft:mason",level:2}}
 
 fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<&String>) -> Result<()> {
     let server = match server {
@@ -276,8 +301,6 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
 }
 
 fn main_impl() -> Result<()> {
-    let _ = ansi_term::enable_ansi_support();
-
     let args: Vec<String> = env::args().collect();
     if args.len() == 1 {
         bail!("no args supplied");
@@ -308,7 +331,8 @@ fn main_impl() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let _ = SimpleLogger::new().init();
+    let _ = SimpleLogger::new().with_level(LevelFilter::Debug).init();
+    let _ = ansi_term::enable_ansi_support();
 
     let start = Instant::now();
     let result = main_impl();

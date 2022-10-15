@@ -1,9 +1,10 @@
-use crate::events::{EventSubscriber, Position, Trades};
+use crate::events::{EventSubscriber, Position, Trades, UseEntity};
 use crate::protocol::de::Reader;
 use crate::protocol::{ConnectionState, Packet};
 use crate::{protocol, DiskPacket};
 use anyhow::Result;
 use flate2::read::ZlibDecoder;
+use log::warn;
 use std::fs::File;
 use std::io::Read;
 
@@ -63,6 +64,10 @@ impl TrafficPlayer {
                 packet: p,
                 buffer: disk_packet.data,
             })?,
+            Packet::UseEntityRequest(p) => self.handler.interact(UseEntity {
+                entity_id: p.entity_id,
+                kind: p.kind,
+            })?,
             _ => {}
         }
         Ok(())
@@ -85,7 +90,9 @@ impl TrafficPlayer {
             let mut cursor = Reader::new(&buffer);
             while DiskPacket::has_enough_bytes(&buffer[cursor.offset()..]) {
                 let disk_packet = DiskPacket::read(&mut cursor)?;
-                self.do_packet(disk_packet)?;
+                if let Err(err) = self.do_packet(disk_packet) {
+                    warn!("{:?}", err);
+                }
             }
 
             buffer.drain(..cursor.offset());

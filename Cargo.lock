@@ -285,6 +285,7 @@ dependencies = [
  "cfb8",
  "cipher 0.4.3",
  "flate2",
+ "log",
  "num-bigint",
  "num_enum",
  "polling",
