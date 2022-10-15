@@ -66,13 +66,21 @@ struct InventorySlotUnpacked<'i> {
 fn get_item_opt(item: Option<InventorySlot>) -> Option<InventorySlotData> {
     item?.data
 }
+fn check_map_empty(map: HashMap<&str, Tag>) {
+    if unlikely(!map.is_empty()) {
+        warn!("item nbt map not empty after deserializing: {:?}", map);
+    }
+}
 fn deserialize_item_nbt<'b>(
     bump: &'b Bump,
     mut map: HashMap<&str, Tag>,
 ) -> Result<InventorySlotAttrs<'b>> {
     let mut enchantments = BVec::new_in(bump);
     if let Some(list) = map.remove("StoredEnchantments") {
-        for i in list.list()? {
+        let list = list.list()?;
+        enchantments.reserve(list.len());
+
+        for i in list {
             let mut i = i.compound()?;
 
             let level = i
@@ -89,13 +97,12 @@ fn deserialize_item_nbt<'b>(
                 enchantment: id,
                 level: level.try_into()?,
             });
+
+            check_map_empty(i);
         }
     }
 
-    if unlikely(!map.is_empty()) {
-        warn!("item nbt map not empty after deserializing: {:?}", map);
-    }
-
+    check_map_empty(map);
     Ok(InventorySlotAttrs { enchantments })
 }
 fn get_item<'b>(
