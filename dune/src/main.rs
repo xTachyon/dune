@@ -5,6 +5,7 @@ mod launchers;
 use ansi_term::Color::{Cyan, Green, Purple};
 use anyhow::anyhow;
 use anyhow::{bail, Result};
+use bumpalo::collections::String as BString;
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
@@ -21,6 +22,7 @@ use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Write;
 use std::fs;
 use std::intrinsics::unlikely;
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -53,7 +55,7 @@ impl EventHandler {
 #[derive(Debug)]
 struct EnchantmentData {
     enchantment: Enchantment,
-    level: u16,
+    level: u8,
 }
 
 // TODO: remove
@@ -142,6 +144,37 @@ fn get_item<'b>(
     }))
 }
 
+fn to_roman(number: u8) -> &'static str {
+    match number {
+        0 => "",
+        1 => "I",
+        2 => "II",
+        3 => "III",
+        4 => "IV",
+        5 => "V",
+        _ => unreachable!(),
+    }
+}
+fn print_item(out: &mut BString, name: &str, item: Option<InventorySlotUnpacked>) -> Result<()> {
+    if let Some(x) = item {
+        write!(out, "{}: {:>2}x {:?}", name, x.count, x.item_id)?;
+
+        if let Some(attrs) = x.attrs {
+            write!(out, "(")?;
+            for i in attrs.enchantments {
+                write!(out, "{:?}", i.enchantment)?;
+                if i.level != 0 {
+                    write!(out, " {}", to_roman(i.level))?;
+                }
+            }
+            write!(out, ")")?;
+        }
+
+        writeln!(out)?;
+    }
+    Ok(())
+}
+
 impl EventSubscriber for EventHandler {
     fn on_chat(&mut self, message: &str) -> Result<()> {
         // println!("chat: {}", message);
@@ -166,18 +199,24 @@ impl EventSubscriber for EventHandler {
         let last_entity = self
             .last_entity_interact
             .ok_or(anyhow!("use entity wasn't set before using it"))?;
-        info!("trades at {:?}:", last_entity);
-        for i in trades.trades {
-            info!("item1: {:?}", get_item(bump, buf, Some(i.input_item1))?);
-            info!("item2: {:?}", get_item(bump, buf, i.input_item2)?);
-            {
-                let out = get_item(bump, buf, Some(i.output_item))?;
-                info!("out:   {:?}\n", out);
-            }
 
-            bump.reset();
+        let out = &mut BString::with_capacity_in(1024, bump);
+        writeln!(out, "trades at {:?}:", last_entity)?;
+        for i in trades.trades {
+            let in1 = get_item(bump, buf, Some(i.input_item1))?;
+            print_item(out, "in1", in1)?;
+
+            let in2 = get_item(bump, buf, i.input_item2)?;
+            print_item(out, "in2", in2)?;
+
+            let out_item = get_item(bump, buf, Some(i.output_item))?;
+            print_item(out, "out", out_item)?;
+
+            writeln!(out)?;
         }
-        info!("------------------------------------------------------------------------------------------------------------");
+        writeln!(out, "------------------------------------------------------------------------------------------------------------")?;
+
+        info!("{}", out);
         Ok(())
     }
     fn interact(&mut self, use_entity: UseEntity) -> Result<()> {
