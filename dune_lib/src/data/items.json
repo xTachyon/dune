@@ -1,5 +1,10 @@
 [
   {
+    "name": "air",
+    "display_name": "Air",
+    "id": 0
+  },
+  {
     "name": "stone",
     "display_name": "Stone",
     "id": 0
