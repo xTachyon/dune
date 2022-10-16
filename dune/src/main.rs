@@ -155,23 +155,32 @@ fn to_roman(number: u8) -> &'static str {
         _ => unreachable!(),
     }
 }
-fn print_item(out: &mut BString, name: &str, item: Option<InventorySlotUnpacked>) -> Result<()> {
-    if let Some(x) = item {
-        write!(out, "{}: {:>2}x {:?}", name, x.count, x.item_id)?;
 
-        if let Some(attrs) = x.attrs {
-            write!(out, "(")?;
-            for i in attrs.enchantments {
-                write!(out, "{:?}", i.enchantment)?;
-                if i.level != 0 {
-                    write!(out, " {}", to_roman(i.level))?;
-                }
-            }
-            write!(out, ")")?;
+macro_rules! some_or_return {
+    ($e:expr) => {
+        match $e {
+            Some(x) => x,
+            None => return Ok(()),
         }
+    };
+}
+fn print_item(out: &mut BString, name: &str, item: Option<InventorySlotUnpacked>) -> Result<()> {
+    let x = some_or_return!(item);
+    write!(out, "{}: {:>2}x {:?}", name, x.count, x.item_id)?;
 
-        writeln!(out)?;
+    if let Some(attrs) = x.attrs {
+        write!(out, "(")?;
+        for i in attrs.enchantments {
+            write!(out, "{:?}", i.enchantment)?;
+            if i.level != 0 {
+                write!(out, " {}", to_roman(i.level))?;
+            }
+        }
+        write!(out, ")")?;
     }
+
+    writeln!(out)?;
+
     Ok(())
 }
 
@@ -372,6 +381,16 @@ fn main_impl() -> Result<()> {
 fn main() -> Result<()> {
     let _ = SimpleLogger::new().with_level(LevelFilter::Debug).init();
     let _ = ansi_term::enable_ansi_support();
+
+    // std::thread::spawn(|| {
+    //     let s = &mut String::new();
+    //     let stdin = &mut stdin().lock();
+    //     loop {
+    //         stdin.read_line(s).unwrap();
+    //         println!("{}", s);
+    //         s.clear();
+    //     }
+    // });
 
     let start = Instant::now();
     let result = main_impl();
