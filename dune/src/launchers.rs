@@ -10,33 +10,33 @@ pub struct AuthDataExt {
 }
 
 #[derive(Deserialize)]
-struct PolyProfile<'x> {
+struct PrismProfile<'x> {
     name: &'x str,
     id: &'x str,
 }
 #[derive(Deserialize)]
-struct PolyYgg<'x> {
+struct PrismYgg<'x> {
     token: &'x str,
 }
 #[derive(Deserialize)]
-struct PolyAccount<'x> {
+struct PrismAccount<'x> {
     #[serde(borrow)]
-    profile: PolyProfile<'x>,
+    profile: PrismProfile<'x>,
     #[serde(borrow)]
-    ygg: PolyYgg<'x>,
+    ygg: PrismYgg<'x>,
     #[serde(rename = "type")]
     ty: &'x str,
 }
 #[derive(Deserialize)]
-struct PolyJson<'x> {
+struct PrismJson<'x> {
     #[serde(borrow)]
-    accounts: Vec<PolyAccount<'x>>,
+    accounts: Vec<PrismAccount<'x>>,
 }
 
-pub fn get_access_token(profile: &str) -> Result<AuthDataExt> {
-    let path = env::var("appdata")? + "/PolyMC/accounts.json";
+fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
+    let path = format!("{}/{}/accounts.json", env::var("appdata")? , path);
     let content = std::fs::read_to_string(path)?;
-    let value: PolyJson = serde_json::from_str(&content)?;
+    let value: PrismJson = serde_json::from_str(&content)?;
     let acc = value.accounts.iter().find(|x| x.profile.name == profile);
     let acc = match acc {
         Some(x) => x,
@@ -56,4 +56,14 @@ pub fn get_access_token(profile: &str) -> Result<AuthDataExt> {
         name: acc.profile.name.to_string(),
         online,
     })
+}
+
+pub fn get_access_token(profile: &str) -> Result<AuthDataExt> {
+    if let Ok(x) = get_access_token_prism(profile, "PrismLauncher") {
+        return Ok(x);
+    }
+    if let Ok(x) = get_access_token_prism(profile, "PolyMC") {
+        return Ok(x);
+    }
+    anyhow::bail!("can't find the config of any supported launcher")
 }
