@@ -38,7 +38,7 @@ struct Args {
 }
 #[derive(clap::Subcommand)]
 enum Action {
-    Record { option: String },
+    Record { option: Option<String> },
     Replay { option: String },
 }
 struct EventHandler {
@@ -255,12 +255,14 @@ impl EventSubscriber for EventHandler {
 }
 // /summon minecraft:villager ~ ~ ~ {VillagerData:{type:"minecraft:plains",profession:"minecraft:mason",level:2}}
 
-fn record(config: Config, auth_data_ext: AuthDataExt, server: &String) -> Result<()> {
-    let server = match config.servers.iter().find(|x| x.name == server) {
-        Some(x) => x,
-        None => bail!("unknown server {}", server),
+fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) -> Result<()> {
+    let server = match server {
+        Some(name) => match config.servers.iter().find(|x| x.name == name) {
+            Some(x) => x,
+            None => bail!("unknown server {}", name),
+        },
+        None => &config.servers[config.default_server],
     };
-
     loop {
         let listen_addr = "0.0.0.0:25565";
 
@@ -368,7 +370,7 @@ fn main_impl() -> Result<()> {
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
     let result = match arguments.action {
-        Action::Record { option } => record(config, auth_data_ext, &option),
+        Action::Record { option } => record(config, auth_data_ext, option),
         Action::Replay { option } => {
             let handler = Box::new(EventHandler::new());
             play(&option, handler)
