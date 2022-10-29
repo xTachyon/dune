@@ -367,17 +367,17 @@ fn main_impl() -> Result<()> {
     let config = parse_config(config_json)?;
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
-    match arguments.action {
+    let result = match arguments.action {
         Action::Record { option } => {
-            _ = record(config, auth_data_ext, &option);
+            record(config, auth_data_ext, &option)
         }
         Action::Replay { option } => {
             let handler = Box::new(EventHandler::new());
-            _ = play(&option, handler);
+            play(&option, handler)
         }
     };
 
-    Ok(())
+    result
 }
 
 fn main() -> Result<()> {
