@@ -30,16 +30,16 @@ use std::time::Instant;
 use clap::Parser;
 
 ///Tool for replaying saves with game input
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(author,version,about,long_about=None)]
-struct Arguments {
-    /// Start the program in recording mode
-    #[arg(short = 'r', long = "record")]
-    record: Option<String>,
-
-    /// Replay the save recorded, specify the saving path
-    #[arg(short = 'p', long = "playold")]
-    playold: Option<String>,
+struct Args {
+    #[command(subcommand)]
+    action: Action,
+}
+#[derive(clap::Subcommand)]
+enum Action {
+    Record { option: String },
+    Replay { option: String },
 }
 struct EventHandler {
     player_name: String,
@@ -360,29 +360,21 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
 }
 
 fn main_impl() -> Result<()> {
-    let arguments = Arguments::parse();
-    if arguments.playold == None && arguments.record == None {
-        bail!("No arguments supplied");
-    }
+    let arguments = Args::parse();
 
     let config_text = fs::read_to_string("config.json")?;
     let config_json = serde_json::from_str(&config_text)?;
     let config = parse_config(config_json)?;
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
-    match arguments.record {
-        Some(value) => {
-            _ = record(config, auth_data_ext, &value);
+    match arguments.action {
+        Action::Record { option } => {
+            _ = record(config, auth_data_ext, &option);
         }
-        None => print!("No record option"),
-    };
-    match arguments.playold {
-        Some(packet) => {
-            println!("{}", packet);
+        Action::Replay { option } => {
             let handler = Box::new(EventHandler::new());
-            _ = play(&packet, handler);
+            _ = play(&option, handler);
         }
-        None => print!("No playold option"),
     };
 
     Ok(())
