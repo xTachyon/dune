@@ -21,13 +21,26 @@ use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
-use std::env;
 use std::fmt::Write;
 use std::fs;
 use std::intrinsics::unlikely;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
 
+use clap::Parser;
+
+///Tool for replaying saves with game input
+#[derive(Parser)]
+#[command(author,version,about,long_about=None)]
+struct Args {
+    #[command(subcommand)]
+    action: Action,
+}
+#[derive(clap::Subcommand)]
+enum Action {
+    Record { option: Option<String> },
+    Replay { option: String },
+}
 struct EventHandler {
     player_name: String,
     player_uuid: u128,
@@ -242,7 +255,7 @@ impl EventSubscriber for EventHandler {
 }
 // /summon minecraft:villager ~ ~ ~ {VillagerData:{type:"minecraft:plains",profession:"minecraft:mason",level:2}}
 
-fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<&String>) -> Result<()> {
+fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) -> Result<()> {
     let server = match server {
         Some(name) => match config.servers.iter().find(|x| x.name == name) {
             Some(x) => x,
@@ -349,33 +362,20 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
 }
 
 fn main_impl() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() == 1 {
-        bail!("no args supplied");
-    }
+    let arguments = Args::parse();
 
     let config_text = fs::read_to_string("config.json")?;
     let config_json = serde_json::from_str(&config_text)?;
     let config = parse_config(config_json)?;
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
-    match args[1].as_str() {
-        "record" => record(config, auth_data_ext, args.get(2))?,
-        "playold" => {
-            const DEFAULT_PACKET_FILE: &str = "packets.dune";
-            let packet_file = args
-                .get(2)
-                .map(|x| x.as_str())
-                .unwrap_or(DEFAULT_PACKET_FILE);
-
+    match arguments.action {
+        Action::Record { option } => record(config, auth_data_ext, option),
+        Action::Replay { option } => {
             let handler = Box::new(EventHandler::new());
-            play(packet_file, handler)?;
+            play(&option, handler)
         }
-        "play" => unimplemented!(),
-        _ => bail!("unknown command"),
     }
-
-    Ok(())
 }
 
 fn main() -> Result<()> {
