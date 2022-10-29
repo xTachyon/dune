@@ -30,16 +30,16 @@ use std::time::Instant;
 use clap::Parser;
 
 ///Tool for replaying saves with game input
-#[derive(Parser,Debug)]
+#[derive(Parser, Debug)]
 #[command(author,version,about,long_about=None)]
-struct Arguments { 
+struct Arguments {
     /// Start the program in recording mode
-    #[arg(short='r',long="record")]
-    record:Option<String>,
+    #[arg(short = 'r', long = "record")]
+    record: Option<String>,
 
     /// Replay the save recorded, specify the saving path
-    #[arg(short='p',long="playold")]
-    playold:Option<String>
+    #[arg(short = 'p', long = "playold")]
+    playold: Option<String>,
 }
 struct EventHandler {
     player_name: String,
@@ -260,7 +260,7 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: &String) -> Result
         Some(x) => x,
         None => bail!("unknown server {}", server),
     };
-        
+
     loop {
         let listen_addr = "0.0.0.0:25565";
 
@@ -361,27 +361,27 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
 
 fn main_impl() -> Result<()> {
     let arguments = Arguments::parse();
-    if arguments.playold == None && arguments.record == None { 
+    if arguments.playold == None && arguments.record == None {
         bail!("No arguments supplied");
     }
-    
+
     let config_text = fs::read_to_string("config.json")?;
     let config_json = serde_json::from_str(&config_text)?;
     let config = parse_config(config_json)?;
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
-    
-    match arguments.record { 
+
+    match arguments.record {
         Some(value) => {
             _ = record(config, auth_data_ext, &value);
-        },
+        }
         None => print!("No record option"),
     };
-    match arguments.playold { 
+    match arguments.playold {
         Some(packet) => {
-            println!("{}",packet);
+            println!("{}", packet);
             let handler = Box::new(EventHandler::new());
             _ = play(&packet, handler);
-        },
+        }
         None => print!("No playold option"),
     };
 
