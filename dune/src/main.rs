@@ -368,9 +368,7 @@ fn main_impl() -> Result<()> {
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
     let result = match arguments.action {
-        Action::Record { option } => {
-            record(config, auth_data_ext, &option)
-        }
+        Action::Record { option } => record(config, auth_data_ext, &option),
         Action::Replay { option } => {
             let handler = Box::new(EventHandler::new());
             play(&option, handler)
