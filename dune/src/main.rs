@@ -369,20 +369,18 @@ fn main_impl() -> Result<()> {
     let config = parse_config(config_json)?;
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
 
-    let result = match arguments.action {
+    match arguments.action {
         Action::Record { option } => record(config, auth_data_ext, option),
         Action::Replay { option } => {
             let handler = Box::new(EventHandler::new());
             play(&option, handler)
         }
-    };
-
-    result
+    }
 }
 
 fn main() -> Result<()> {
     let _ = SimpleLogger::new().with_level(LevelFilter::Debug).init();
-    //let _ = ansi_term::enable_ansi_support();
+    let _ = ansi_term::enable_ansi_support();
 
     // std::thread::spawn(|| {
     //     let s = &mut String::new();
