@@ -21,13 +21,26 @@ use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
-use std::env;
 use std::fmt::Write;
 use std::fs;
 use std::intrinsics::unlikely;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
 
+use clap::Parser;
+
+///Tool for replaying saves with game input
+#[derive(Parser,Debug)]
+#[command(author,version,about,long_about=None)]
+struct Arguments { 
+    /// Start the program in recording mode
+    #[arg(short='r',long="record")]
+    record:Option<String>,
+
+    /// Replay the save recorded, specify the saving path
+    #[arg(short='p',long="playold")]
+    playold:Option<String>
+}
 struct EventHandler {
     player_name: String,
     player_uuid: u128,
@@ -242,14 +255,12 @@ impl EventSubscriber for EventHandler {
 }
 // /summon minecraft:villager ~ ~ ~ {VillagerData:{type:"minecraft:plains",profession:"minecraft:mason",level:2}}
 
-fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<&String>) -> Result<()> {
-    let server = match server {
-        Some(name) => match config.servers.iter().find(|x| x.name == name) {
-            Some(x) => x,
-            None => bail!("unknown server {}", name),
-        },
-        None => &config.servers[config.default_server],
+fn record(config: Config, auth_data_ext: AuthDataExt, server: &String) -> Result<()> {
+    let server = match config.servers.iter().find(|x| x.name == server) {
+        Some(x) => x,
+        None => bail!("unknown server {}", server),
     };
+        
     loop {
         let listen_addr = "0.0.0.0:25565";
 
@@ -349,38 +360,37 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
 }
 
 fn main_impl() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() == 1 {
-        bail!("no args supplied");
+    let arguments = Arguments::parse();
+    if arguments.playold == None && arguments.record == None { 
+        bail!("No arguments supplied");
     }
-
+    
     let config_text = fs::read_to_string("config.json")?;
     let config_json = serde_json::from_str(&config_text)?;
     let config = parse_config(config_json)?;
     let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
-
-    match args[1].as_str() {
-        "record" => record(config, auth_data_ext, args.get(2))?,
-        "playold" => {
-            const DEFAULT_PACKET_FILE: &str = "packets.dune";
-            let packet_file = args
-                .get(2)
-                .map(|x| x.as_str())
-                .unwrap_or(DEFAULT_PACKET_FILE);
-
+    
+    match arguments.record { 
+        Some(value) => {
+            _ = record(config, auth_data_ext, &value);
+        },
+        None => print!("No record option"),
+    };
+    match arguments.playold { 
+        Some(packet) => {
+            println!("{}",packet);
             let handler = Box::new(EventHandler::new());
-            play(packet_file, handler)?;
-        }
-        "play" => unimplemented!(),
-        _ => bail!("unknown command"),
-    }
+            _ = play(&packet, handler);
+        },
+        None => print!("No playold option"),
+    };
 
     Ok(())
 }
 
 fn main() -> Result<()> {
     let _ = SimpleLogger::new().with_level(LevelFilter::Debug).init();
-    let _ = ansi_term::enable_ansi_support();
+    //let _ = ansi_term::enable_ansi_support();
 
     // std::thread::spawn(|| {
     //     let s = &mut String::new();
