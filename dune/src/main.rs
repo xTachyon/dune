@@ -480,6 +480,7 @@ fn main_impl() -> Result<()> {
 
 fn main() -> Result<()> {
     let _ = SimpleLogger::new().with_level(LevelFilter::Debug).init();
+    #[cfg(windows)]
     let _ = ansi_term::enable_ansi_support();
 
     // std::thread::spawn(|| {
