@@ -5,17 +5,17 @@ authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.65"
+anyhow = "1"
 ansi_term = "0.12.1"
-bumpalo = { version = "3.11.0", features = ["collections"] }
+bumpalo = { version = "3", features = ["collections"] }
 chrono = { version = "0.4.22", features = ["clock"], default-features = false }
 
-serde = "1.0.144"
-serde_json = "1.0.85"
-serde_derive = "1.0.144"
+serde = "1"
+serde_json = "1"
+serde_derive = "1"
 
 log = "0.4"
-simple_logger = { version = "2.3.0", features = ["colors", "stderr"], default-features = false}
+simple_logger = { version = "2", features = ["colors", "stderr"], default-features = false}
 
 dune_lib = { path = "../dune_lib" }
-clap = { version = "4.0.18", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }

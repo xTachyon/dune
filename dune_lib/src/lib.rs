@@ -3,6 +3,7 @@ use crate::protocol::PacketDirection;
 use anyhow::Result;
 use std::io::Write;
 
+pub mod anvil;
 pub mod chat;
 mod data;
 pub mod events;

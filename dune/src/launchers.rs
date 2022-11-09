@@ -34,7 +34,7 @@ struct PrismJson<'x> {
 }
 
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
-    let path = format!("{}/{}/accounts.json", env::var("appdata")? , path);
+    let path = format!("{}/{}/accounts.json", env::var("appdata")?, path);
     let content = std::fs::read_to_string(path)?;
     let value: PrismJson = serde_json::from_str(&content)?;
     let acc = value.accounts.iter().find(|x| x.profile.name == profile);

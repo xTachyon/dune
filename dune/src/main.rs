@@ -9,9 +9,11 @@ use bumpalo::collections::String as BString;
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
+use clap::Parser;
+use dune_lib::anvil::{Region, CHUNKS_PER_REGION};
 use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, Trades, UseEntity, UseEntityKind};
-use dune_lib::nbt::Tag;
+use dune_lib::nbt::{RootTag, Tag};
 use dune_lib::play::play;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
@@ -21,13 +23,13 @@ use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
-use std::fmt::Write;
-use std::fs;
+use std::fmt::Write as FmtWrite;
+use std::fs::{self, File};
 use std::intrinsics::unlikely;
+use std::io::BufWriter;
+use std::io::Write;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
-
-use clap::Parser;
 
 ///Tool for replaying saves with game input
 #[derive(Parser)]
@@ -40,6 +42,7 @@ struct Args {
 enum Action {
     Record { option: Option<String> },
     Replay { option: String },
+    Signs { path: String },
 }
 struct EventHandler {
     player_name: String,
@@ -301,6 +304,93 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
     }
 }
 
+fn print_signs_impl(root: RootTag, max: &mut usize, out: &mut BufWriter<File>) -> Result<()> {
+    let mut root = root.tag.compound()?;
+    let mut level = root.remove("Level").unwrap().compound()?;
+    let tiles = match level.remove("TileEntities") {
+        Some(x) => x.list()?,
+        None => return Ok(()),
+    };
+
+    for i in tiles {
+        let mut i = i.compound()?;
+        let id = i.remove("id").unwrap().string()?;
+        if id != "minecraft:sign" {
+            continue;
+        }
+
+        let x = i.remove("x").unwrap().int()?;
+        let y = i.remove("y").unwrap().int()?;
+        let z = i.remove("z").unwrap().int()?;
+        let text1 = i.remove("Text1").unwrap().string()?;
+        let text2 = i.remove("Text2").unwrap().string()?;
+        let text3 = i.remove("Text3").unwrap().string()?;
+        let text4 = i.remove("Text4").unwrap().string()?;
+
+        let text1 = parse_chat(text1)?.to_string();
+        let text2 = parse_chat(text2)?.to_string();
+        let text3 = parse_chat(text3)?.to_string();
+        let text4 = parse_chat(text4)?.to_string();
+
+        if text1.is_empty() && text2.is_ascii() && text3.is_empty() && text4.is_empty() {
+            continue;
+        }
+        *max = (*max)
+            .max(text1.len())
+            .max(text2.len())
+            .max(text3.len())
+            .max(text3.len());
+        let dashes80 =
+            "--------------------------------------------------------------------------------";
+        writeln!(
+            out,
+            "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
+            x, y, z, text1, text2, text3, text4, dashes80
+        )?;
+    }
+
+    Ok(())
+}
+
+fn print_signs(path: String) -> Result<()> {
+    let mut tmp = Vec::new();
+    let bump = &mut Bump::with_capacity(128 * 1024); // 128kb based on experimentation
+
+    let mut max = 0;
+    let files: Vec<_> = fs::read_dir(path)?.collect();
+    let mut out = BufWriter::with_capacity(64 * 1024, File::create("out.txt")?);
+    let files_count = files.len();
+    for (index, file) in files.into_iter().enumerate() {
+        let time = Instant::now();
+        let file = file?;
+
+        let mut region = Region::load(&file.path(), false)?;
+        for i in 0..CHUNKS_PER_REGION {
+            let data = region.get_chunk(&mut tmp, i)?;
+            if data.is_empty() {
+                continue;
+            }
+
+            let root = nbt::read(data, bump)?;
+            print_signs_impl(root, &mut max, &mut out)?;
+        }
+
+        let p = file.path();
+        println!(
+            "{:<15} => {:>4}/{}, time {:?}",
+            p.file_name().unwrap_or(p.as_os_str()).to_string_lossy(),
+            index + 1,
+            files_count,
+            time.elapsed(),
+        );
+
+        bump.reset();
+    }
+    println!("max={}", max);
+
+    Ok(())
+}
+
 #[derive(Deserialize)]
 struct ConfigJsonServer<'x> {
     name: &'x str,
@@ -375,6 +465,7 @@ fn main_impl() -> Result<()> {
             let handler = Box::new(EventHandler::new());
             play(&option, handler)
         }
+        Action::Signs { path } => print_signs(path),
     }
 }
 

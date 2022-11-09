@@ -6,7 +6,11 @@ members = [
 ]
 default-members = ["dune"]
 
+[profile.dev]
+panic = "abort"
+
 [profile.release]
 debug = true
+panic = "abort"
 # lto = true
 

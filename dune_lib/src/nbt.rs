@@ -73,6 +73,9 @@ impl<'n> Tag<'n> {
     pub fn string(self) -> Result<&'n str> {
         get_variant!(self, String)
     }
+    pub fn int(self) -> Result<i32> {
+        get_variant!(self, Int)
+    }
 }
 
 impl<'n> Display for RootTag<'n> {
@@ -345,14 +348,18 @@ fn print_impl(output: &mut String, tag: &Tag, indent: usize) -> FmtResult<()> {
         Tag::ByteArray(x) => write!(output, "{} bytes", x.len())?,
         Tag::String(x) => write!(output, "'{}'", x)?,
         Tag::List(x) => {
-            *output += "[\n";
-            for i in x {
-                print_indent(output, indent + 4);
-                print_impl(output, i, indent + 4)?;
-                output.push('\n');
+            if x.is_empty() {
+                *output += "[]";
+            } else {
+                *output += "[\n";
+                for i in x {
+                    print_indent(output, indent + 4);
+                    print_impl(output, i, indent + 4)?;
+                    output.push('\n');
+                }
+                print_indent(output, indent);
+                *output += "]";
             }
-            print_indent(output, indent);
-            *output += "]";
         }
         Tag::Compound(_) => print_compound(output, tag, None, indent)?,
         Tag::IntArray(x) => write!(output, "{} ints", x.len())?,
@@ -362,7 +369,7 @@ fn print_impl(output: &mut String, tag: &Tag, indent: usize) -> FmtResult<()> {
 }
 
 fn pretty_print(root: &RootTag) -> FmtResult<String> {
-    let mut result = String::new();
+    let mut result = String::with_capacity(4096);
     print_compound(&mut result, &root.tag, Some(root.name), 0)?;
     Ok(result)
 }
