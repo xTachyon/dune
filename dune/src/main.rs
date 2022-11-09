@@ -341,7 +341,7 @@ fn print_signs_impl(root: RootTag, max: &mut usize, out: &mut BufWriter<File>) -
         let text3 = parse_chat(text3)?.to_string();
         let text4 = parse_chat(text4)?.to_string();
 
-        if text1.is_empty() && text2.is_ascii() && text3.is_empty() && text4.is_empty() {
+        if text1.is_empty() && text2.is_empty() && text3.is_empty() && text4.is_empty() {
             continue;
         }
         *max = (*max)
