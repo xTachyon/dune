@@ -86,7 +86,7 @@ impl Region {
 
     pub fn get_chunk<'x>(
         &mut self,
-        mut vec: &'x mut Vec<u8>,
+        vec: &'x mut Vec<u8>,
         chunk_index: usize,
     ) -> Result<&'x [u8]> {
         const CHUNKS_HEADER_SIZE: usize = 5;
@@ -112,21 +112,17 @@ impl Region {
                 compression_type
             )
         }
-        {
-            let mut decoder = ZlibDecoder::new(&mut vec);
-            let first_batch = size.min(SECTOR_SIZE - CHUNKS_HEADER_SIZE);
-            decoder.write_all(&buffer[CHUNKS_HEADER_SIZE..CHUNKS_HEADER_SIZE + first_batch])?;
+        let mut decoder = ZlibDecoder::new(vec);
+        let first_batch = size.min(SECTOR_SIZE - CHUNKS_HEADER_SIZE);
+        decoder.write_all(&buffer[CHUNKS_HEADER_SIZE..CHUNKS_HEADER_SIZE + first_batch])?;
 
-            let mut remaining_size = size - first_batch;
-            while remaining_size > 0 {
-                let to_read = remaining_size.min(buffer.len());
-                let read = self.file.read(&mut buffer[..to_read])?;
-                decoder.write_all(&buffer[..read])?;
-                remaining_size -= read;
-            }
-            decoder.flush()?;
+        let mut remaining_size = size - first_batch;
+        while remaining_size > 0 {
+            let to_read = remaining_size.min(buffer.len());
+            let read = self.file.read(&mut buffer[..to_read])?;
+            decoder.write_all(&buffer[..read])?;
+            remaining_size -= read;
         }
-
-        Ok(vec.as_slice())
+        Ok(decoder.finish()?)
     }
 }
