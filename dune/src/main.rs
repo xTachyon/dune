@@ -306,13 +306,22 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
 
 fn print_signs_impl(root: RootTag, max: &mut usize, out: &mut BufWriter<File>) -> Result<()> {
     let mut root = root.tag.compound()?;
-    let mut level = root.remove("Level").unwrap().compound()?;
-    let tiles = match level.remove("TileEntities") {
-        Some(x) => x.list()?,
-        None => return Ok(()),
+    let data_version = root.remove("DataVersion").unwrap().int()?;
+    let block_entities = if data_version >= 2975 {
+        // 2975 - 1.18.2
+        // no clue when the format changed actually
+        let block_entities = root.remove("block_entities").unwrap().list()?;
+        block_entities
+    } else {
+        let mut level = root.remove("Level").unwrap().compound()?;
+        let tiles = match level.remove("TileEntities") {
+            Some(x) => x.list()?,
+            None => return Ok(()),
+        };
+        tiles
     };
 
-    for i in tiles {
+    for i in block_entities {
         let mut i = i.compound()?;
         let id = i.remove("id").unwrap().string()?;
         if id != "minecraft:sign" {
@@ -364,7 +373,8 @@ fn print_signs(path: String) -> Result<()> {
         let time = Instant::now();
         let file = file?;
 
-        let mut region = Region::load(&file.path(), false)?;
+        let p = file.path();
+        let mut region = Region::load(&p, false)?;
         for i in 0..CHUNKS_PER_REGION {
             let data = region.get_chunk(&mut tmp, i)?;
             if data.is_empty() {
@@ -375,7 +385,6 @@ fn print_signs(path: String) -> Result<()> {
             print_signs_impl(root, &mut max, &mut out)?;
         }
 
-        let p = file.path();
         println!(
             "{:<15} => {:>4}/{}, time {:?}",
             p.file_name().unwrap_or(p.as_os_str()).to_string_lossy(),
