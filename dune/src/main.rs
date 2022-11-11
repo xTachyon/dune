@@ -304,7 +304,12 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
     }
 }
 
-fn print_signs_impl(root: RootTag, max: &mut usize, out: &mut BufWriter<File>) -> Result<()> {
+fn print_signs_impl(
+    root: RootTag,
+    max: &mut usize,
+    signs_count: &mut usize,
+    out: &mut BufWriter<File>,
+) -> Result<()> {
     let mut root = root.tag.compound()?;
     let data_version = root.remove("DataVersion").unwrap().int()?;
     let block_entities = if data_version >= 2975 {
@@ -348,7 +353,8 @@ fn print_signs_impl(root: RootTag, max: &mut usize, out: &mut BufWriter<File>) -
             .max(text1.len())
             .max(text2.len())
             .max(text3.len())
-            .max(text3.len());
+            .max(text4.len());
+
         let dashes80 =
             "--------------------------------------------------------------------------------";
         writeln!(
@@ -356,6 +362,7 @@ fn print_signs_impl(root: RootTag, max: &mut usize, out: &mut BufWriter<File>) -
             "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
             x, y, z, text1, text2, text3, text4, dashes80
         )?;
+        *signs_count += 1;
     }
 
     Ok(())
@@ -375,6 +382,7 @@ fn print_signs(path: String) -> Result<()> {
 
         let p = file.path();
         let mut region = Region::load(&p, false)?;
+        let mut signs_count = 0;
         for i in 0..CHUNKS_PER_REGION {
             let data = region.get_chunk(&mut tmp, i)?;
             if data.is_empty() {
@@ -382,14 +390,15 @@ fn print_signs(path: String) -> Result<()> {
             }
 
             let root = nbt::read(data, bump)?;
-            print_signs_impl(root, &mut max, &mut out)?;
+            print_signs_impl(root, &mut max, &mut signs_count, &mut out)?;
         }
 
         println!(
-            "{:<15} => {:>4}/{}, time {:?}",
+            "{:<15} => {:>4}/{}, {:>4} signs, {:?}",
             p.file_name().unwrap_or(p.as_os_str()).to_string_lossy(),
             index + 1,
             files_count,
+            signs_count,
             time.elapsed(),
         );
 

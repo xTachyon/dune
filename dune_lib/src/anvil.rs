@@ -84,11 +84,7 @@ impl Region {
         (loc * SECTOR_SIZE, size * SECTOR_SIZE)
     }
 
-    pub fn get_chunk<'x>(
-        &mut self,
-        vec: &'x mut Vec<u8>,
-        chunk_index: usize,
-    ) -> Result<&'x [u8]> {
+    pub fn get_chunk<'x>(&mut self, vec: &'x mut Vec<u8>, chunk_index: usize) -> Result<&'x [u8]> {
         const CHUNKS_HEADER_SIZE: usize = 5;
 
         assert!(chunk_index < CHUNKS_PER_REGION);
