@@ -358,17 +358,17 @@ fn print_signs_impl(
         let x = i.remove_err("x")?.int()?;
         let y = i.remove_err("y")?.int()?;
         let z = i.remove_err("z")?.int()?;
+
+        let mut get_text = |key: &str| -> Result<String> {
+            let json = i.remove_err(key)?.string()?;
+            let r = parse_chat(json)?.to_string();
+            Ok(r)
+        };
         let text = [
-            i.remove_err("Text1")?.string()?,
-            i.remove_err("Text2")?.string()?,
-            i.remove_err("Text3")?.string()?,
-            i.remove_err("Text4")?.string()?,
-        ];
-        let text = [
-            parse_chat(text[0])?.to_string(),
-            parse_chat(text[1])?.to_string(),
-            parse_chat(text[2])?.to_string(),
-            parse_chat(text[3])?.to_string(),
+            get_text("Text1")?,
+            get_text("Text2")?,
+            get_text("Text3")?,
+            get_text("Text4")?,
         ];
 
         if text.iter().all(String::is_empty) {
