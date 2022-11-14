@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
+use cfg_if::cfg_if;
 use dune_lib::record::AuthData;
 use serde_derive::Deserialize;
-use users::{get_user_by_uid,get_current_uid};
+use users::{get_current_uid, get_user_by_uid};
 
 pub struct AuthDataExt {
     pub data: AuthData,
@@ -34,12 +35,19 @@ struct PrismJson<'x> {
 }
 
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
-    #[cfg(windows)]
-    let path = format!("{}/{}/accounts.json", env::var("appdata")?, path);
-
-    #[cfg(target_os = "macos")]
-    let path = format!("/Users/{}/Library/Application Support/{}/accounts.json",get_user_by_uid(get_current_uid()).unwrap().name().to_string_lossy(),path);
-    
+    let path = {
+        cfg_if! {
+        if #[cfg(target_os = "windows")] {
+            format!("{}/{}/accounts.json", env::var("appdata")?, path)
+        } else if #[cfg(target_os = "macos")] {
+            let user = get_user_by_uid(get_current_uid());
+            match user {
+                Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json",x.name().to_str().unwrap(),path),
+                None => anyhow::bail!("can't find the config of any supported launcher")
+            }
+        }
+        }
+    };
 
     let content = std::fs::read_to_string(path)?;
     let value: PrismJson = serde_json::from_str(&content)?;
