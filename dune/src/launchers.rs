@@ -37,15 +37,17 @@ struct PrismJson<'x> {
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
     let path = {
         cfg_if! {
-        if #[cfg(target_os = "windows")] {
-            format!("{}/{}/accounts.json", env::var("appdata")?, path)
-        } else if #[cfg(target_os = "macos")] {
-            let user = get_user_by_uid(get_current_uid());
-            match user {
-                Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json", x.name().to_str().unwrap(), path),
-                None => anyhow::bail!("can't find the config of any supported launcher")
+            if #[cfg(target_os = "windows")] {
+                format!("{}/{}/accounts.json", env::var("appdata")?, path)
+            } else if #[cfg(target_os = "macos")] {
+                let user = get_user_by_uid(get_current_uid());
+                match user {
+                    Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json", x.name().to_str().unwrap(), path),
+                    None => bail!("can't find the config of any supported launcher")
+                }
+            } else { 
+                bail!("Platform is not supported yet!")
             }
-        }
         }
     };
 
