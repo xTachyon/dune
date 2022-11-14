@@ -22,9 +22,11 @@ use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
+use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::fmt::Write as FmtWrite;
+use std::fmt::{self, Write as FmtWrite};
 use std::fs::{self, File};
+use std::hash::Hash;
 use std::intrinsics::unlikely;
 use std::io::BufWriter;
 use std::io::Write;
@@ -304,6 +306,26 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
     }
 }
 
+trait HashMapExt<K, V> {
+    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + fmt::Debug;
+}
+impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
+    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + fmt::Debug,
+    {
+        let key = key.borrow();
+        match self.remove(key) {
+            Some(x) => Ok(x),
+            None => bail!("unknown key `{:?}`", key),
+        }
+    }
+}
+
 fn print_signs_impl(
     root: RootTag,
     max: &mut usize,
@@ -311,14 +333,14 @@ fn print_signs_impl(
     out: &mut BufWriter<File>,
 ) -> Result<()> {
     let mut root = root.tag.compound()?;
-    let data_version = root.remove("DataVersion").unwrap().int()?;
+    let data_version = root.remove_err("DataVersion")?.int()?;
     let block_entities = if data_version >= 2975 {
         // 2975 - 1.18.2
         // no clue when the format changed actually
-        let block_entities = root.remove("block_entities").unwrap().list()?;
+        let block_entities = root.remove_err("block_entities")?.list()?;
         block_entities
     } else {
-        let mut level = root.remove("Level").unwrap().compound()?;
+        let mut level = root.remove_err("Level")?.compound()?;
         let tiles = match level.remove("TileEntities") {
             Some(x) => x.list()?,
             None => return Ok(()),
@@ -328,39 +350,38 @@ fn print_signs_impl(
 
     for i in block_entities {
         let mut i = i.compound()?;
-        let id = i.remove("id").unwrap().string()?;
+        let id = i.remove_err("id")?.string()?;
         if id != "minecraft:sign" {
             continue;
         }
 
-        let x = i.remove("x").unwrap().int()?;
-        let y = i.remove("y").unwrap().int()?;
-        let z = i.remove("z").unwrap().int()?;
-        let text1 = i.remove("Text1").unwrap().string()?;
-        let text2 = i.remove("Text2").unwrap().string()?;
-        let text3 = i.remove("Text3").unwrap().string()?;
-        let text4 = i.remove("Text4").unwrap().string()?;
+        let x = i.remove_err("x")?.int()?;
+        let y = i.remove_err("y")?.int()?;
+        let z = i.remove_err("z")?.int()?;
+        let text = [
+            i.remove_err("Text1")?.string()?,
+            i.remove_err("Text2")?.string()?,
+            i.remove_err("Text3")?.string()?,
+            i.remove_err("Text4")?.string()?,
+        ];
+        let text = [
+            parse_chat(text[0])?.to_string(),
+            parse_chat(text[1])?.to_string(),
+            parse_chat(text[2])?.to_string(),
+            parse_chat(text[3])?.to_string(),
+        ];
 
-        let text1 = parse_chat(text1)?.to_string();
-        let text2 = parse_chat(text2)?.to_string();
-        let text3 = parse_chat(text3)?.to_string();
-        let text4 = parse_chat(text4)?.to_string();
-
-        if text1.is_empty() && text2.is_empty() && text3.is_empty() && text4.is_empty() {
+        if text.iter().all(String::is_empty) {
             continue;
         }
-        *max = (*max)
-            .max(text1.len())
-            .max(text2.len())
-            .max(text3.len())
-            .max(text4.len());
+        *max = text.iter().map(String::len).max().unwrap_or(*max);
 
         let dashes80 =
             "--------------------------------------------------------------------------------";
         writeln!(
             out,
             "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
-            x, y, z, text1, text2, text3, text4, dashes80
+            x, y, z, text[0], text[1], text[2], text[3], dashes80
         )?;
         *signs_count += 1;
     }
