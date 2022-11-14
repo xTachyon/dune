@@ -42,7 +42,7 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
         } else if #[cfg(target_os = "macos")] {
             let user = get_user_by_uid(get_current_uid());
             match user {
-                Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json",x.name().to_str().unwrap(),path),
+                Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json", x.name().to_str().unwrap(), path),
                 None => anyhow::bail!("can't find the config of any supported launcher")
             }
         }
