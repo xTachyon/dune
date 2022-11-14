@@ -164,7 +164,7 @@ fn process_enchants(versions: &HashMap<&str, Version>) {
     let original_items_data = fs::read(JSON_PATH).unwrap();
     let mut enchants: Vec<EnchJson> = serde_json::from_slice(&original_items_data).unwrap();
 
-    for (_, version) in versions {
+    for version in versions.values() {
         let json = fs::read(&version.enchants_path).unwrap();
         let in_items: Vec<EnchJson> = serde_json::from_slice(&json).unwrap();
 
@@ -191,13 +191,11 @@ fn process_enchants(versions: &HashMap<&str, Version>) {
     *out += r#"}
 impl Enchantment {
     pub fn from(input: &str) -> anyhow::Result<Self> {
-        let minecraft = "minecraft:";
-        let s;
-        if input.starts_with(minecraft) {
-            s = &input[minecraft.len()..];
-        } else {
-            anyhow::bail!("unknown enchantment: {}", input);
-        }
+        const MINECRAFT: &str = "minecraft:";
+        let s = match input.strip_prefix(MINECRAFT) {
+            Some(x) => x,
+            None => anyhow::bail!("unknown enchantment: {}", input),
+        };
         use Enchantment::*;
 
         let result = match s {"#;

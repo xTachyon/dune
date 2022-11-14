@@ -41,13 +41,11 @@ pub enum Enchantment {
 }
 impl Enchantment {
     pub fn from(input: &str) -> anyhow::Result<Self> {
-        let minecraft = "minecraft:";
-        let s;
-        if input.starts_with(minecraft) {
-            s = &input[minecraft.len()..];
-        } else {
-            anyhow::bail!("unknown enchantment: {}", input);
-        }
+        const MINECRAFT: &str = "minecraft:";
+        let s = match input.strip_prefix(MINECRAFT) {
+            Some(x) => x,
+            None => anyhow::bail!("unknown enchantment: {}", input),
+        };
         use Enchantment::*;
 
         let result = match s {

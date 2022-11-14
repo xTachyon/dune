@@ -39,6 +39,9 @@ impl IndexedString {
     pub fn len(&self) -> u32 {
         self.end - self.start
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     pub fn get<'s>(&self, x: &'s [u8]) -> &'s str {
         let b = &x[self.start as usize..self.end as usize];
@@ -56,6 +59,9 @@ pub struct IndexedBuffer {
 impl IndexedBuffer {
     pub fn len(&self) -> u32 {
         self.end - self.start
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn get<'b>(&self, x: &'b [u8]) -> &'b [u8] {

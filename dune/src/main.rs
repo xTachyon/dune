@@ -225,7 +225,7 @@ impl EventSubscriber for EventHandler {
 
         let last_entity = self
             .last_entity_interact
-            .ok_or(anyhow!("use entity wasn't set before using it"))?;
+            .ok_or_else(|| anyhow!("use entity wasn't set before using it"))?;
 
         let out = &mut BString::with_capacity_in(1024, bump);
         writeln!(out, "trades at {:?}:", last_entity)?;
@@ -337,15 +337,13 @@ fn print_signs_impl(
     let block_entities = if data_version >= 2975 {
         // 2975 - 1.18.2
         // no clue when the format changed actually
-        let block_entities = root.remove_err("block_entities")?.list()?;
-        block_entities
+        root.remove_err("block_entities")?.list()?
     } else {
         let mut level = root.remove_err("Level")?.compound()?;
-        let tiles = match level.remove("TileEntities") {
+        match level.remove("TileEntities") {
             Some(x) => x.list()?,
             None => return Ok(()),
-        };
-        tiles
+        }
     };
 
     for i in block_entities {

@@ -1,5 +1,6 @@
 #![allow(unused_mut)]
 #![allow(non_camel_case_types)]
+#![allow(clippy::needless_borrow)]
 
 use crate::protocol::de::Position;
 use crate::protocol::de::Reader;
