@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use dune_lib::record::AuthData;
 use serde_derive::Deserialize;
-use std::env;
+use users::{get_user_by_uid,get_current_uid};
 
 pub struct AuthDataExt {
     pub data: AuthData,
@@ -34,7 +34,13 @@ struct PrismJson<'x> {
 }
 
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
+    #[cfg(windows)]
     let path = format!("{}/{}/accounts.json", env::var("appdata")?, path);
+
+    #[cfg(target_os = "macos")]
+    let path = format!("/Users/{}/Library/Application Support/{}/accounts.json",get_user_by_uid(get_current_uid()).unwrap().name().to_string_lossy(),path);
+    
+
     let content = std::fs::read_to_string(path)?;
     let value: PrismJson = serde_json::from_str(&content)?;
     let acc = value.accounts.iter().find(|x| x.profile.name == profile);
