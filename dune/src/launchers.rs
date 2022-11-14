@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Result,anyhow};
 use cfg_if::cfg_if;
 use dune_lib::record::AuthData;
 use serde_derive::Deserialize;
@@ -42,7 +42,7 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
             } else if #[cfg(target_os = "macos")] {
                 let user = get_user_by_uid(get_current_uid());
                 match user {
-                    Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json", x.name().to_str().unwrap(), path),
+                    Some(x) => format!("/Users/{}/Library/Application Support/{}/accounts.json", x.name().to_str().ok_or_else(|| anyhow!("Unkown characters in username"))?, path),
                     None => bail!("can't find the config of any supported launcher")
                 }
             } else { 
