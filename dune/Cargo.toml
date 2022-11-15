@@ -9,7 +9,6 @@ anyhow = "1"
 ansi_term = "0.12.1"
 bumpalo = { version = "3", features = ["collections"] }
 chrono = { version = "0.4.22", features = ["clock"], default-features = false }
-users = { version = "0.11", default-features = false }
 cfg-if = "1.0.0"
 
 serde = "1"
@@ -21,3 +20,6 @@ simple_logger = { version = "2", features = ["colors", "stderr"], default-featur
 
 dune_lib = { path = "../dune_lib" }
 clap = { version = "4", features = ["derive"] }
+
+[target.'cfg(target_family = "unix")'.dependencies]
+users = { version = "0.11", default-features = false }
