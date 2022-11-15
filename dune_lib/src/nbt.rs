@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use bumpalo::collections::Vec;
+use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use byteorder::{ReadBytesExt, BE};
 use std::collections::HashMap;
@@ -17,11 +17,11 @@ pub enum Tag<'n> {
     Double(f64),
     ByteArray(&'n [u8]),
     String(&'n str),
-    List(Vec<'n, Tag<'n>>),
+    List(BVec<'n, Tag<'n>>),
     Compound(HashMap<&'n str, Tag<'n>>),
     // TODO: use HashMap with bumpalo?
-    IntArray(Vec<'n, i32>),
-    LongArray(Vec<'n, i64>),
+    IntArray(BVec<'n, i32>),
+    LongArray(BVec<'n, i64>),
 }
 
 #[derive(Debug)]
@@ -64,14 +64,17 @@ impl<'n> Tag<'n> {
     pub fn compound(self) -> Result<HashMap<&'n str, Tag<'n>>> {
         get_variant!(self, Compound)
     }
-    pub fn list(self) -> Result<Vec<'n, Tag<'n>>> {
+    pub fn list(self) -> Result<BVec<'n, Tag<'n>>> {
         get_variant!(self, List)
-    }
-    pub fn short(self) -> Result<i16> {
-        get_variant!(self, Short)
     }
     pub fn string(self) -> Result<&'n str> {
         get_variant!(self, String)
+    }
+    pub fn byte(self) -> Result<i8> {
+        get_variant!(self, Byte)
+    }
+    pub fn short(self) -> Result<i16> {
+        get_variant!(self, Short)
     }
     pub fn int(self) -> Result<i32> {
         get_variant!(self, Int)
@@ -112,7 +115,7 @@ fn read_impl<'n, R: Read>(mut reader: &mut R, tag: u8, bump: &'n Bump) -> Result
         9 => {
             let kind = reader.read_u8()?;
             let size = reader.read_i32::<BE>()? as usize;
-            let mut values = Vec::with_capacity_in(size, bump);
+            let mut values = BVec::with_capacity_in(size, bump);
             for _ in 0..size {
                 let v = read_impl(reader, kind, bump)?;
                 values.push(v);
@@ -135,7 +138,7 @@ fn read_impl<'n, R: Read>(mut reader: &mut R, tag: u8, bump: &'n Bump) -> Result
         }
         11 => {
             let size = reader.read_i32::<BE>()? as usize;
-            let mut values = Vec::with_capacity_in(size, bump);
+            let mut values = BVec::with_capacity_in(size, bump);
             for _ in 0..size {
                 values.push(reader.read_i32::<BE>()?);
             }
@@ -143,7 +146,7 @@ fn read_impl<'n, R: Read>(mut reader: &mut R, tag: u8, bump: &'n Bump) -> Result
         }
         12 => {
             let size = reader.read_i32::<BE>()? as usize;
-            let mut values = Vec::with_capacity_in(size, bump);
+            let mut values = BVec::with_capacity_in(size, bump);
             for _ in 0..size {
                 values.push(reader.read_i64::<BE>()?);
             }
