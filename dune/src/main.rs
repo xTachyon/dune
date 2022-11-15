@@ -10,23 +10,22 @@ use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
 use clap::Parser;
-use dune_lib::anvil::{Region, CHUNKS_PER_REGION};
 use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, Trades, UseEntity, UseEntityKind};
-use dune_lib::nbt::{RootTag, Tag};
+use dune_lib::nbt::Tag;
 use dune_lib::play::play;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
+use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
+use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
 use dune_lib::{nbt, Enchantment, Item};
 use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
-use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::fmt::{self, Write as FmtWrite};
+use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
-use std::hash::Hash;
 use std::intrinsics::unlikely;
 use std::io::BufWriter;
 use std::io::Write;
@@ -306,84 +305,40 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
     }
 }
 
-trait HashMapExt<K, V> {
-    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq + fmt::Debug;
-}
-impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
-    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq + fmt::Debug,
-    {
-        let key = key.borrow();
-        match self.remove(key) {
-            Some(x) => Ok(x),
-            None => bail!("unknown key `{:?}`", key),
-        }
-    }
-}
-
 fn print_signs_impl(
-    root: RootTag,
+    chunk: Chunk,
     max: &mut usize,
     signs_count: &mut usize,
     out: &mut BufWriter<File>,
 ) -> Result<()> {
-    let mut root = root.tag.compound()?;
-    let data_version = root.remove_err("DataVersion")?.int()?;
-    let block_entities = if data_version >= 2975 {
-        // 2975 - 1.18.2
-        // no clue when the format changed actually
-        root.remove_err("block_entities")?.list()?
-    } else {
-        let mut level = root.remove_err("Level")?.compound()?;
-        match level.remove("TileEntities") {
-            Some(x) => x.list()?,
-            None => return Ok(()),
+    const DASHES80: &str =
+        "--------------------------------------------------------------------------------";
+
+    for i in chunk.block_entities {
+        match i.kind {
+            BlockEntityKind::Sign(sign) => {
+                if sign.text.iter().all(String::is_empty) {
+                    continue;
+                }
+                *max = sign.text.iter().map(String::len).max().unwrap_or(*max);
+
+                writeln!(
+                    out,
+                    "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
+                    i.position.x,
+                    i.position.y,
+                    i.position.z,
+                    sign.text[0],
+                    sign.text[1],
+                    sign.text[2],
+                    sign.text[3],
+                    DASHES80
+                )?;
+                *signs_count += 1;
+            }
+            _ => {}
         }
-    };
-
-    for i in block_entities {
-        let mut i = i.compound()?;
-        let id = i.remove_err("id")?.string()?;
-        if id != "minecraft:sign" {
-            continue;
-        }
-
-        let x = i.remove_err("x")?.int()?;
-        let y = i.remove_err("y")?.int()?;
-        let z = i.remove_err("z")?.int()?;
-
-        let mut get_text = |key: &str| -> Result<String> {
-            let json = i.remove_err(key)?.string()?;
-            let r = parse_chat(json)?.to_string();
-            Ok(r)
-        };
-        let text = [
-            get_text("Text1")?,
-            get_text("Text2")?,
-            get_text("Text3")?,
-            get_text("Text4")?,
-        ];
-
-        if text.iter().all(String::is_empty) {
-            continue;
-        }
-        *max = text.iter().map(String::len).max().unwrap_or(*max);
-
-        let dashes80 =
-            "--------------------------------------------------------------------------------";
-        writeln!(
-            out,
-            "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
-            x, y, z, text[0], text[1], text[2], text[3], dashes80
-        )?;
-        *signs_count += 1;
     }
-
     Ok(())
 }
 
@@ -408,8 +363,8 @@ fn print_signs(path: String) -> Result<()> {
                 continue;
             }
 
-            let root = nbt::read(data, bump)?;
-            print_signs_impl(root, &mut max, &mut signs_count, &mut out)?;
+            let chunk = read_chunk(data, bump)?;
+            print_signs_impl(chunk, &mut max, &mut signs_count, &mut out)?;
         }
 
         println!(

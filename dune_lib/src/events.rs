@@ -4,6 +4,12 @@ use crate::protocol::v1_18_2::play::TradeListResponse;
 pub use crate::protocol::v1_18_2::play::UseEntityKind;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub struct PositionInt {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Position {
     pub x: f64,
     pub y: f64,

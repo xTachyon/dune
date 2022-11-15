@@ -1,9 +1,13 @@
 use crate::protocol::de::{Reader, MD};
 use crate::protocol::PacketDirection;
+use anyhow::bail;
 use anyhow::Result;
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fmt;
+use std::hash::Hash;
 use std::io::Write;
 
-pub mod anvil;
 pub mod chat;
 mod data;
 pub mod events;
@@ -12,6 +16,7 @@ pub mod nbt;
 pub mod play;
 pub mod protocol;
 pub mod record;
+pub mod world;
 
 pub use data::enchantments::Enchantment;
 pub use data::items::Item;
@@ -60,5 +65,25 @@ impl<'p> DiskPacket<'p> {
         }
         let size = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
         size + SIZEOF_U32 <= buf.len()
+    }
+}
+
+pub trait HashMapExt<K, V> {
+    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + fmt::Debug;
+}
+impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
+    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + fmt::Debug,
+    {
+        let key = key.borrow();
+        match self.remove(key) {
+            Some(x) => Ok(x),
+            None => bail!("unknown key `{:?}`", key),
+        }
     }
 }
