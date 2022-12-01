@@ -315,28 +315,25 @@ fn print_signs_impl(
         "--------------------------------------------------------------------------------";
 
     for i in chunk.block_entities {
-        match i.kind {
-            BlockEntityKind::Sign(sign) => {
-                if sign.text.iter().all(String::is_empty) {
-                    continue;
-                }
-                *max = sign.text.iter().map(String::len).max().unwrap_or(*max);
-
-                writeln!(
-                    out,
-                    "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
-                    i.position.x,
-                    i.position.y,
-                    i.position.z,
-                    sign.text[0],
-                    sign.text[1],
-                    sign.text[2],
-                    sign.text[3],
-                    DASHES80
-                )?;
-                *signs_count += 1;
+        if let BlockEntityKind::Sign(sign) = i.kind {
+            if sign.text.iter().all(String::is_empty) {
+                continue;
             }
-            _ => {}
+            *max = sign.text.iter().map(String::len).max().unwrap_or(*max);
+
+            writeln!(
+                out,
+                "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
+                i.position.x,
+                i.position.y,
+                i.position.z,
+                sign.text[0],
+                sign.text[1],
+                sign.text[2],
+                sign.text[3],
+                DASHES80
+            )?;
+            *signs_count += 1;
         }
     }
     Ok(())

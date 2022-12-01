@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::protocol::v1_18_2::play::TradeListResponse;
 pub use crate::protocol::v1_18_2::play::UseEntityKind;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct PositionInt {
     pub x: i32,
     pub y: i32,
