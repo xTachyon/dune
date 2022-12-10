@@ -26,9 +26,7 @@ pub mod handshaking {
         pub server_port: u16,
         pub next_state: i32,
     }
-    pub(super) fn packet_set_protocol_request(
-        mut reader: &mut Reader,
-    ) -> Result<SetProtocolRequest> {
+    pub(super) fn read_set_protocol_request(mut reader: &mut Reader) -> Result<SetProtocolRequest> {
         let protocol_version: i32 = read_varint(&mut reader)?;
         let server_host: IndexedString = MD::deserialize(reader)?;
         let server_port: u16 = MD::deserialize(reader)?;
@@ -46,7 +44,7 @@ pub mod handshaking {
     pub struct LegacyServerListPingRequest {
         pub payload: u8,
     }
-    pub(super) fn packet_legacy_server_list_ping_request(
+    pub(super) fn read_legacy_server_list_ping_request(
         mut reader: &mut Reader,
     ) -> Result<LegacyServerListPingRequest> {
         let payload: u8 = MD::deserialize(reader)?;
@@ -60,7 +58,7 @@ pub mod status {
 
     #[derive(Debug)]
     pub struct PingStartRequest {}
-    pub(super) fn packet_ping_start_request(mut _reader: &mut Reader) -> Result<PingStartRequest> {
+    pub(super) fn read_ping_start_request(mut _reader: &mut Reader) -> Result<PingStartRequest> {
         let result = PingStartRequest {};
         Ok(result)
     }
@@ -68,7 +66,7 @@ pub mod status {
     pub struct PingRequest {
         pub time: i64,
     }
-    pub(super) fn packet_ping_request(mut reader: &mut Reader) -> Result<PingRequest> {
+    pub(super) fn read_ping_request(mut reader: &mut Reader) -> Result<PingRequest> {
         let time: i64 = MD::deserialize(reader)?;
 
         let result = PingRequest { time };
@@ -78,9 +76,7 @@ pub mod status {
     pub struct ServerInfoResponse {
         pub response: IndexedString,
     }
-    pub(super) fn packet_server_info_response(
-        mut reader: &mut Reader,
-    ) -> Result<ServerInfoResponse> {
+    pub(super) fn read_server_info_response(mut reader: &mut Reader) -> Result<ServerInfoResponse> {
         let response: IndexedString = MD::deserialize(reader)?;
 
         let result = ServerInfoResponse { response };
@@ -90,7 +86,7 @@ pub mod status {
     pub struct PingResponse {
         pub time: i64,
     }
-    pub(super) fn packet_ping_response(mut reader: &mut Reader) -> Result<PingResponse> {
+    pub(super) fn read_ping_response(mut reader: &mut Reader) -> Result<PingResponse> {
         let time: i64 = MD::deserialize(reader)?;
 
         let result = PingResponse { time };
@@ -104,7 +100,7 @@ pub mod login {
     pub struct LoginStartRequest {
         pub username: IndexedString,
     }
-    pub(super) fn packet_login_start_request(mut reader: &mut Reader) -> Result<LoginStartRequest> {
+    pub(super) fn read_login_start_request(mut reader: &mut Reader) -> Result<LoginStartRequest> {
         let username: IndexedString = MD::deserialize(reader)?;
 
         let result = LoginStartRequest { username };
@@ -115,7 +111,7 @@ pub mod login {
         pub shared_secret: IndexedBuffer,
         pub verify_token: IndexedBuffer,
     }
-    pub(super) fn packet_encryption_begin_request(
+    pub(super) fn read_encryption_begin_request(
         mut reader: &mut Reader,
     ) -> Result<EncryptionBeginRequest> {
         let shared_secret: IndexedBuffer = MD::deserialize(reader)?;
@@ -132,7 +128,7 @@ pub mod login {
         pub message_id: i32,
         pub data: Option<IndexedBuffer>,
     }
-    pub(super) fn packet_login_plugin_response(
+    pub(super) fn read_login_plugin_response(
         mut reader: &mut Reader,
     ) -> Result<LoginPluginResponse> {
         let message_id: i32 = read_varint(&mut reader)?;
@@ -145,9 +141,7 @@ pub mod login {
     pub struct DisconnectResponse {
         pub reason: IndexedString,
     }
-    pub(super) fn packet_disconnect_response(
-        mut reader: &mut Reader,
-    ) -> Result<DisconnectResponse> {
+    pub(super) fn read_disconnect_response(mut reader: &mut Reader) -> Result<DisconnectResponse> {
         let reason: IndexedString = MD::deserialize(reader)?;
 
         let result = DisconnectResponse { reason };
@@ -159,7 +153,7 @@ pub mod login {
         pub public_key: IndexedBuffer,
         pub verify_token: IndexedBuffer,
     }
-    pub(super) fn packet_encryption_begin_response(
+    pub(super) fn read_encryption_begin_response(
         mut reader: &mut Reader,
     ) -> Result<EncryptionBeginResponse> {
         let server_id: IndexedString = MD::deserialize(reader)?;
@@ -178,7 +172,7 @@ pub mod login {
         pub uuid: u128,
         pub username: IndexedString,
     }
-    pub(super) fn packet_success_response(mut reader: &mut Reader) -> Result<SuccessResponse> {
+    pub(super) fn read_success_response(mut reader: &mut Reader) -> Result<SuccessResponse> {
         let uuid: u128 = MD::deserialize(reader)?;
         let username: IndexedString = MD::deserialize(reader)?;
 
@@ -189,7 +183,7 @@ pub mod login {
     pub struct CompressResponse {
         pub threshold: i32,
     }
-    pub(super) fn packet_compress_response(mut reader: &mut Reader) -> Result<CompressResponse> {
+    pub(super) fn read_compress_response(mut reader: &mut Reader) -> Result<CompressResponse> {
         let threshold: i32 = read_varint(&mut reader)?;
 
         let result = CompressResponse { threshold };
@@ -201,9 +195,7 @@ pub mod login {
         pub channel: IndexedString,
         pub data: IndexedBuffer,
     }
-    pub(super) fn packet_login_plugin_request(
-        mut reader: &mut Reader,
-    ) -> Result<LoginPluginRequest> {
+    pub(super) fn read_login_plugin_request(mut reader: &mut Reader) -> Result<LoginPluginRequest> {
         let message_id: i32 = read_varint(&mut reader)?;
         let channel: IndexedString = MD::deserialize(reader)?;
         let data: IndexedBuffer = reader.read_rest_buffer();
@@ -223,7 +215,7 @@ pub mod play {
     pub struct TeleportConfirmRequest {
         pub teleport_id: i32,
     }
-    pub(super) fn packet_teleport_confirm_request(
+    pub(super) fn read_teleport_confirm_request(
         mut reader: &mut Reader,
     ) -> Result<TeleportConfirmRequest> {
         let teleport_id: i32 = read_varint(&mut reader)?;
@@ -236,7 +228,7 @@ pub mod play {
         pub transaction_id: i32,
         pub location: Position,
     }
-    pub(super) fn packet_query_block_nbt_request(
+    pub(super) fn read_query_block_nbt_request(
         mut reader: &mut Reader,
     ) -> Result<QueryBlockNbtRequest> {
         let transaction_id: i32 = read_varint(&mut reader)?;
@@ -252,7 +244,7 @@ pub mod play {
     pub struct SetDifficultyRequest {
         pub new_difficulty: u8,
     }
-    pub(super) fn packet_set_difficulty_request(
+    pub(super) fn read_set_difficulty_request(
         mut reader: &mut Reader,
     ) -> Result<SetDifficultyRequest> {
         let new_difficulty: u8 = MD::deserialize(reader)?;
@@ -266,7 +258,7 @@ pub mod play {
         pub pages: Vec<IndexedString>,
         pub title: Option<IndexedString>,
     }
-    pub(super) fn packet_edit_book_request(mut reader: &mut Reader) -> Result<EditBookRequest> {
+    pub(super) fn read_edit_book_request(mut reader: &mut Reader) -> Result<EditBookRequest> {
         let hand: i32 = read_varint(&mut reader)?;
         let count_array: i32 = read_varint(&mut reader)?;
         let mut pages = Vec::with_capacity(count_array as usize);
@@ -284,7 +276,7 @@ pub mod play {
         pub transaction_id: i32,
         pub entity_id: i32,
     }
-    pub(super) fn packet_query_entity_nbt_request(
+    pub(super) fn read_query_entity_nbt_request(
         mut reader: &mut Reader,
     ) -> Result<QueryEntityNbtRequest> {
         let transaction_id: i32 = read_varint(&mut reader)?;
@@ -300,7 +292,7 @@ pub mod play {
     pub struct PickItemRequest {
         pub slot: i32,
     }
-    pub(super) fn packet_pick_item_request(mut reader: &mut Reader) -> Result<PickItemRequest> {
+    pub(super) fn read_pick_item_request(mut reader: &mut Reader) -> Result<PickItemRequest> {
         let slot: i32 = read_varint(&mut reader)?;
 
         let result = PickItemRequest { slot };
@@ -310,7 +302,7 @@ pub mod play {
     pub struct NameItemRequest {
         pub name: IndexedString,
     }
-    pub(super) fn packet_name_item_request(mut reader: &mut Reader) -> Result<NameItemRequest> {
+    pub(super) fn read_name_item_request(mut reader: &mut Reader) -> Result<NameItemRequest> {
         let name: IndexedString = MD::deserialize(reader)?;
 
         let result = NameItemRequest { name };
@@ -320,9 +312,7 @@ pub mod play {
     pub struct SelectTradeRequest {
         pub slot: i32,
     }
-    pub(super) fn packet_select_trade_request(
-        mut reader: &mut Reader,
-    ) -> Result<SelectTradeRequest> {
+    pub(super) fn read_select_trade_request(mut reader: &mut Reader) -> Result<SelectTradeRequest> {
         let slot: i32 = read_varint(&mut reader)?;
 
         let result = SelectTradeRequest { slot };
@@ -333,7 +323,7 @@ pub mod play {
         pub primary_effect: i32,
         pub secondary_effect: i32,
     }
-    pub(super) fn packet_set_beacon_effect_request(
+    pub(super) fn read_set_beacon_effect_request(
         mut reader: &mut Reader,
     ) -> Result<SetBeaconEffectRequest> {
         let primary_effect: i32 = read_varint(&mut reader)?;
@@ -352,7 +342,7 @@ pub mod play {
         pub mode: i32,
         pub flags: u8,
     }
-    pub(super) fn packet_update_command_block_request(
+    pub(super) fn read_update_command_block_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateCommandBlockRequest> {
         let location: Position = MD::deserialize(reader)?;
@@ -374,7 +364,7 @@ pub mod play {
         pub command: IndexedString,
         pub track_output: bool,
     }
-    pub(super) fn packet_update_command_block_minecart_request(
+    pub(super) fn read_update_command_block_minecart_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateCommandBlockMinecartRequest> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -407,7 +397,7 @@ pub mod play {
         pub seed: i64,
         pub flags: u8,
     }
-    pub(super) fn packet_update_structure_block_request(
+    pub(super) fn read_update_structure_block_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateStructureBlockRequest> {
         let location: Position = MD::deserialize(reader)?;
@@ -452,9 +442,7 @@ pub mod play {
         pub transaction_id: i32,
         pub text: IndexedString,
     }
-    pub(super) fn packet_tab_complete_request(
-        mut reader: &mut Reader,
-    ) -> Result<TabCompleteRequest> {
+    pub(super) fn read_tab_complete_request(mut reader: &mut Reader) -> Result<TabCompleteRequest> {
         let transaction_id: i32 = read_varint(&mut reader)?;
         let text: IndexedString = MD::deserialize(reader)?;
 
@@ -468,7 +456,7 @@ pub mod play {
     pub struct ChatRequest {
         pub message: IndexedString,
     }
-    pub(super) fn packet_chat_request(mut reader: &mut Reader) -> Result<ChatRequest> {
+    pub(super) fn read_chat_request(mut reader: &mut Reader) -> Result<ChatRequest> {
         let message: IndexedString = MD::deserialize(reader)?;
 
         let result = ChatRequest { message };
@@ -478,7 +466,7 @@ pub mod play {
     pub struct ClientCommandRequest {
         pub action_id: i32,
     }
-    pub(super) fn packet_client_command_request(
+    pub(super) fn read_client_command_request(
         mut reader: &mut Reader,
     ) -> Result<ClientCommandRequest> {
         let action_id: i32 = read_varint(&mut reader)?;
@@ -497,7 +485,7 @@ pub mod play {
         pub enable_text_filtering: bool,
         pub enable_server_listing: bool,
     }
-    pub(super) fn packet_settings_request(mut reader: &mut Reader) -> Result<SettingsRequest> {
+    pub(super) fn read_settings_request(mut reader: &mut Reader) -> Result<SettingsRequest> {
         let locale: IndexedString = MD::deserialize(reader)?;
         let view_distance: i8 = MD::deserialize(reader)?;
         let chat_flags: i32 = read_varint(&mut reader)?;
@@ -524,9 +512,7 @@ pub mod play {
         pub window_id: i8,
         pub enchantment: i8,
     }
-    pub(super) fn packet_enchant_item_request(
-        mut reader: &mut Reader,
-    ) -> Result<EnchantItemRequest> {
+    pub(super) fn read_enchant_item_request(mut reader: &mut Reader) -> Result<EnchantItemRequest> {
         let window_id: i8 = MD::deserialize(reader)?;
         let enchantment: i8 = MD::deserialize(reader)?;
 
@@ -541,7 +527,7 @@ pub mod play {
         pub location: i16,
         pub item: InventorySlot,
     }
-    pub(super) fn packet_window_click_request_changed_slots(
+    pub(super) fn read_window_click_request_changed_slots(
         mut reader: &mut Reader,
     ) -> Result<WindowClickRequest_ChangedSlots> {
         let location: i16 = MD::deserialize(reader)?;
@@ -560,9 +546,7 @@ pub mod play {
         pub changed_slots: Vec<WindowClickRequest_ChangedSlots>,
         pub cursor_item: InventorySlot,
     }
-    pub(super) fn packet_window_click_request(
-        mut reader: &mut Reader,
-    ) -> Result<WindowClickRequest> {
+    pub(super) fn read_window_click_request(mut reader: &mut Reader) -> Result<WindowClickRequest> {
         let window_id: u8 = MD::deserialize(reader)?;
         let state_id: i32 = read_varint(&mut reader)?;
         let slot: i16 = MD::deserialize(reader)?;
@@ -572,7 +556,7 @@ pub mod play {
         let mut changed_slots = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
             let x: WindowClickRequest_ChangedSlots =
-                packet_window_click_request_changed_slots(reader)?;
+                read_window_click_request_changed_slots(reader)?;
             changed_slots.push(x);
         }
         let cursor_item: InventorySlot = MD::deserialize(reader)?;
@@ -592,9 +576,7 @@ pub mod play {
     pub struct CloseWindowRequest {
         pub window_id: u8,
     }
-    pub(super) fn packet_close_window_request(
-        mut reader: &mut Reader,
-    ) -> Result<CloseWindowRequest> {
+    pub(super) fn read_close_window_request(mut reader: &mut Reader) -> Result<CloseWindowRequest> {
         let window_id: u8 = MD::deserialize(reader)?;
 
         let result = CloseWindowRequest { window_id };
@@ -605,7 +587,7 @@ pub mod play {
         pub channel: IndexedString,
         pub data: IndexedBuffer,
     }
-    pub(super) fn packet_custom_payload_request(
+    pub(super) fn read_custom_payload_request(
         mut reader: &mut Reader,
     ) -> Result<CustomPayloadRequest> {
         let channel: IndexedString = MD::deserialize(reader)?;
@@ -634,7 +616,7 @@ pub mod play {
         pub sneaking: bool,
     }
 
-    pub(super) fn packet_use_entity_request(mut reader: &mut Reader) -> Result<UseEntityRequest> {
+    pub(super) fn read_use_entity_request(mut reader: &mut Reader) -> Result<UseEntityRequest> {
         let entity_id = read_varint(&mut reader)?;
         let kind = read_varint(&mut reader)?;
         let kind = match kind {
@@ -667,7 +649,7 @@ pub mod play {
         pub levels: i32,
         pub keep_jigsaws: bool,
     }
-    pub(super) fn packet_generate_structure_request(
+    pub(super) fn read_generate_structure_request(
         mut reader: &mut Reader,
     ) -> Result<GenerateStructureRequest> {
         let location: Position = MD::deserialize(reader)?;
@@ -685,7 +667,7 @@ pub mod play {
     pub struct KeepAliveRequest {
         pub keep_alive_id: i64,
     }
-    pub(super) fn packet_keep_alive_request(mut reader: &mut Reader) -> Result<KeepAliveRequest> {
+    pub(super) fn read_keep_alive_request(mut reader: &mut Reader) -> Result<KeepAliveRequest> {
         let keep_alive_id: i64 = MD::deserialize(reader)?;
 
         let result = KeepAliveRequest { keep_alive_id };
@@ -695,7 +677,7 @@ pub mod play {
     pub struct LockDifficultyRequest {
         pub locked: bool,
     }
-    pub(super) fn packet_lock_difficulty_request(
+    pub(super) fn read_lock_difficulty_request(
         mut reader: &mut Reader,
     ) -> Result<LockDifficultyRequest> {
         let locked: bool = MD::deserialize(reader)?;
@@ -710,7 +692,7 @@ pub mod play {
         pub z: f64,
         pub on_ground: bool,
     }
-    pub(super) fn packet_position_request(mut reader: &mut Reader) -> Result<PositionRequest> {
+    pub(super) fn read_position_request(mut reader: &mut Reader) -> Result<PositionRequest> {
         let x: f64 = MD::deserialize(reader)?;
         let y: f64 = MD::deserialize(reader)?;
         let z: f64 = MD::deserialize(reader)?;
@@ -728,7 +710,7 @@ pub mod play {
         pub pitch: f32,
         pub on_ground: bool,
     }
-    pub(super) fn packet_position_look_request(
+    pub(super) fn read_position_look_request(
         mut reader: &mut Reader,
     ) -> Result<PositionLookRequest> {
         let x: f64 = MD::deserialize(reader)?;
@@ -754,7 +736,7 @@ pub mod play {
         pub pitch: f32,
         pub on_ground: bool,
     }
-    pub(super) fn packet_look_request(mut reader: &mut Reader) -> Result<LookRequest> {
+    pub(super) fn read_look_request(mut reader: &mut Reader) -> Result<LookRequest> {
         let yaw: f32 = MD::deserialize(reader)?;
         let pitch: f32 = MD::deserialize(reader)?;
         let on_ground: bool = MD::deserialize(reader)?;
@@ -770,7 +752,7 @@ pub mod play {
     pub struct FlyingRequest {
         pub on_ground: bool,
     }
-    pub(super) fn packet_flying_request(mut reader: &mut Reader) -> Result<FlyingRequest> {
+    pub(super) fn read_flying_request(mut reader: &mut Reader) -> Result<FlyingRequest> {
         let on_ground: bool = MD::deserialize(reader)?;
 
         let result = FlyingRequest { on_ground };
@@ -784,9 +766,7 @@ pub mod play {
         pub yaw: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_vehicle_move_request(
-        mut reader: &mut Reader,
-    ) -> Result<VehicleMoveRequest> {
+    pub(super) fn read_vehicle_move_request(mut reader: &mut Reader) -> Result<VehicleMoveRequest> {
         let x: f64 = MD::deserialize(reader)?;
         let y: f64 = MD::deserialize(reader)?;
         let z: f64 = MD::deserialize(reader)?;
@@ -807,7 +787,7 @@ pub mod play {
         pub left_paddle: bool,
         pub right_paddle: bool,
     }
-    pub(super) fn packet_steer_boat_request(mut reader: &mut Reader) -> Result<SteerBoatRequest> {
+    pub(super) fn read_steer_boat_request(mut reader: &mut Reader) -> Result<SteerBoatRequest> {
         let left_paddle: bool = MD::deserialize(reader)?;
         let right_paddle: bool = MD::deserialize(reader)?;
 
@@ -823,9 +803,7 @@ pub mod play {
         pub recipe: IndexedString,
         pub make_all: bool,
     }
-    pub(super) fn packet_craft_recipe_request(
-        mut reader: &mut Reader,
-    ) -> Result<CraftRecipeRequest> {
+    pub(super) fn read_craft_recipe_request(mut reader: &mut Reader) -> Result<CraftRecipeRequest> {
         let window_id: i8 = MD::deserialize(reader)?;
         let recipe: IndexedString = MD::deserialize(reader)?;
         let make_all: bool = MD::deserialize(reader)?;
@@ -841,7 +819,7 @@ pub mod play {
     pub struct AbilitiesRequest {
         pub flags: i8,
     }
-    pub(super) fn packet_abilities_request(mut reader: &mut Reader) -> Result<AbilitiesRequest> {
+    pub(super) fn read_abilities_request(mut reader: &mut Reader) -> Result<AbilitiesRequest> {
         let flags: i8 = MD::deserialize(reader)?;
 
         let result = AbilitiesRequest { flags };
@@ -853,7 +831,7 @@ pub mod play {
         pub location: Position,
         pub face: i8,
     }
-    pub(super) fn packet_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
+    pub(super) fn read_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
         let status: i32 = read_varint(&mut reader)?;
         let location: Position = MD::deserialize(reader)?;
         let face: i8 = MD::deserialize(reader)?;
@@ -871,7 +849,7 @@ pub mod play {
         pub action_id: i32,
         pub jump_boost: i32,
     }
-    pub(super) fn packet_entity_action_request(
+    pub(super) fn read_entity_action_request(
         mut reader: &mut Reader,
     ) -> Result<EntityActionRequest> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -891,7 +869,7 @@ pub mod play {
         pub forward: f32,
         pub jump: u8,
     }
-    pub(super) fn packet_steer_vehicle_request(
+    pub(super) fn read_steer_vehicle_request(
         mut reader: &mut Reader,
     ) -> Result<SteerVehicleRequest> {
         let sideways: f32 = MD::deserialize(reader)?;
@@ -909,7 +887,7 @@ pub mod play {
     pub struct DisplayedRecipeRequest {
         pub recipe_id: IndexedString,
     }
-    pub(super) fn packet_displayed_recipe_request(
+    pub(super) fn read_displayed_recipe_request(
         mut reader: &mut Reader,
     ) -> Result<DisplayedRecipeRequest> {
         let recipe_id: IndexedString = MD::deserialize(reader)?;
@@ -923,7 +901,7 @@ pub mod play {
         pub book_open: bool,
         pub filter_active: bool,
     }
-    pub(super) fn packet_recipe_book_request(mut reader: &mut Reader) -> Result<RecipeBookRequest> {
+    pub(super) fn read_recipe_book_request(mut reader: &mut Reader) -> Result<RecipeBookRequest> {
         let book_id: i32 = read_varint(&mut reader)?;
         let book_open: bool = MD::deserialize(reader)?;
         let filter_active: bool = MD::deserialize(reader)?;
@@ -939,7 +917,7 @@ pub mod play {
     pub struct ResourcePackReceiveRequest {
         pub result: i32,
     }
-    pub(super) fn packet_resource_pack_receive_request(
+    pub(super) fn read_resource_pack_receive_request(
         mut reader: &mut Reader,
     ) -> Result<ResourcePackReceiveRequest> {
         let result: i32 = read_varint(&mut reader)?;
@@ -951,7 +929,7 @@ pub mod play {
     pub struct HeldItemSlotRequest {
         pub slot_id: i16,
     }
-    pub(super) fn packet_held_item_slot_request(
+    pub(super) fn read_held_item_slot_request(
         mut reader: &mut Reader,
     ) -> Result<HeldItemSlotRequest> {
         let slot_id: i16 = MD::deserialize(reader)?;
@@ -964,7 +942,7 @@ pub mod play {
         pub slot: i16,
         pub item: InventorySlot,
     }
-    pub(super) fn packet_set_creative_slot_request(
+    pub(super) fn read_set_creative_slot_request(
         mut reader: &mut Reader,
     ) -> Result<SetCreativeSlotRequest> {
         let slot: i16 = MD::deserialize(reader)?;
@@ -982,7 +960,7 @@ pub mod play {
         pub final_state: IndexedString,
         pub joint_type: IndexedString,
     }
-    pub(super) fn packet_update_jigsaw_block_request(
+    pub(super) fn read_update_jigsaw_block_request(
         mut reader: &mut Reader,
     ) -> Result<UpdateJigsawBlockRequest> {
         let location: Position = MD::deserialize(reader)?;
@@ -1010,7 +988,7 @@ pub mod play {
         pub text3: IndexedString,
         pub text4: IndexedString,
     }
-    pub(super) fn packet_update_sign_request(mut reader: &mut Reader) -> Result<UpdateSignRequest> {
+    pub(super) fn read_update_sign_request(mut reader: &mut Reader) -> Result<UpdateSignRequest> {
         let location: Position = MD::deserialize(reader)?;
         let text1: IndexedString = MD::deserialize(reader)?;
         let text2: IndexedString = MD::deserialize(reader)?;
@@ -1030,7 +1008,7 @@ pub mod play {
     pub struct ArmAnimationRequest {
         pub hand: i32,
     }
-    pub(super) fn packet_arm_animation_request(
+    pub(super) fn read_arm_animation_request(
         mut reader: &mut Reader,
     ) -> Result<ArmAnimationRequest> {
         let hand: i32 = read_varint(&mut reader)?;
@@ -1042,7 +1020,7 @@ pub mod play {
     pub struct SpectateRequest {
         pub target: u128,
     }
-    pub(super) fn packet_spectate_request(mut reader: &mut Reader) -> Result<SpectateRequest> {
+    pub(super) fn read_spectate_request(mut reader: &mut Reader) -> Result<SpectateRequest> {
         let target: u128 = MD::deserialize(reader)?;
 
         let result = SpectateRequest { target };
@@ -1058,7 +1036,7 @@ pub mod play {
         pub cursor_z: f32,
         pub inside_block: bool,
     }
-    pub(super) fn packet_block_place_request(mut reader: &mut Reader) -> Result<BlockPlaceRequest> {
+    pub(super) fn read_block_place_request(mut reader: &mut Reader) -> Result<BlockPlaceRequest> {
         let hand: i32 = read_varint(&mut reader)?;
         let location: Position = MD::deserialize(reader)?;
         let direction: i32 = read_varint(&mut reader)?;
@@ -1082,7 +1060,7 @@ pub mod play {
     pub struct UseItemRequest {
         pub hand: i32,
     }
-    pub(super) fn packet_use_item_request(mut reader: &mut Reader) -> Result<UseItemRequest> {
+    pub(super) fn read_use_item_request(mut reader: &mut Reader) -> Result<UseItemRequest> {
         let hand: i32 = read_varint(&mut reader)?;
 
         let result = UseItemRequest { hand };
@@ -1090,7 +1068,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct AdvancementTabRequest {}
-    pub(super) fn packet_advancement_tab_request(
+    pub(super) fn read_advancement_tab_request(
         mut _reader: &mut Reader,
     ) -> Result<AdvancementTabRequest> {
         let result = AdvancementTabRequest {};
@@ -1100,7 +1078,7 @@ pub mod play {
     pub struct PongRequest {
         pub id: i32,
     }
-    pub(super) fn packet_pong_request(mut reader: &mut Reader) -> Result<PongRequest> {
+    pub(super) fn read_pong_request(mut reader: &mut Reader) -> Result<PongRequest> {
         let id: i32 = MD::deserialize(reader)?;
 
         let result = PongRequest { id };
@@ -1121,7 +1099,7 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn packet_spawn_entity_response(
+    pub(super) fn read_spawn_entity_response(
         mut reader: &mut Reader,
     ) -> Result<SpawnEntityResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -1161,7 +1139,7 @@ pub mod play {
         pub z: f64,
         pub count: i16,
     }
-    pub(super) fn packet_spawn_entity_experience_orb_response(
+    pub(super) fn read_spawn_entity_experience_orb_response(
         mut reader: &mut Reader,
     ) -> Result<SpawnEntityExperienceOrbResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -1194,7 +1172,7 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn packet_spawn_entity_living_response(
+    pub(super) fn read_spawn_entity_living_response(
         mut reader: &mut Reader,
     ) -> Result<SpawnEntityLivingResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -1234,7 +1212,7 @@ pub mod play {
         pub location: Position,
         pub direction: u8,
     }
-    pub(super) fn packet_spawn_entity_painting_response(
+    pub(super) fn read_spawn_entity_painting_response(
         mut reader: &mut Reader,
     ) -> Result<SpawnEntityPaintingResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -1262,7 +1240,7 @@ pub mod play {
         pub yaw: i8,
         pub pitch: i8,
     }
-    pub(super) fn packet_named_entity_spawn_response(
+    pub(super) fn read_named_entity_spawn_response(
         mut reader: &mut Reader,
     ) -> Result<NamedEntitySpawnResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -1289,7 +1267,7 @@ pub mod play {
         pub entity_id: i32,
         pub animation: u8,
     }
-    pub(super) fn packet_animation_response(mut reader: &mut Reader) -> Result<AnimationResponse> {
+    pub(super) fn read_animation_response(mut reader: &mut Reader) -> Result<AnimationResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
         let animation: u8 = MD::deserialize(reader)?;
 
@@ -1305,7 +1283,7 @@ pub mod play {
         pub statistic_id: i32,
         pub value: i32,
     }
-    pub(super) fn packet_statistics_response_entries(
+    pub(super) fn read_statistics_response_entries(
         mut reader: &mut Reader,
     ) -> Result<StatisticsResponse_Entries> {
         let category_id: i32 = read_varint(&mut reader)?;
@@ -1323,13 +1301,11 @@ pub mod play {
     pub struct StatisticsResponse {
         pub entries: Vec<StatisticsResponse_Entries>,
     }
-    pub(super) fn packet_statistics_response(
-        mut reader: &mut Reader,
-    ) -> Result<StatisticsResponse> {
+    pub(super) fn read_statistics_response(mut reader: &mut Reader) -> Result<StatisticsResponse> {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut entries = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: StatisticsResponse_Entries = packet_statistics_response_entries(reader)?;
+            let x: StatisticsResponse_Entries = read_statistics_response_entries(reader)?;
             entries.push(x);
         }
 
@@ -1338,7 +1314,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct AdvancementsResponse {}
-    pub(super) fn packet_advancements_response(
+    pub(super) fn read_advancements_response(
         mut _reader: &mut Reader,
     ) -> Result<AdvancementsResponse> {
         let result = AdvancementsResponse {};
@@ -1350,7 +1326,7 @@ pub mod play {
         pub location: Position,
         pub destroy_stage: i8,
     }
-    pub(super) fn packet_block_break_animation_response(
+    pub(super) fn read_block_break_animation_response(
         mut reader: &mut Reader,
     ) -> Result<BlockBreakAnimationResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -1370,7 +1346,7 @@ pub mod play {
         pub action: i32,
         pub nbt_data: IndexedOptionNbt,
     }
-    pub(super) fn packet_tile_entity_data_response(
+    pub(super) fn read_tile_entity_data_response(
         mut reader: &mut Reader,
     ) -> Result<TileEntityDataResponse> {
         let location: Position = MD::deserialize(reader)?;
@@ -1391,7 +1367,7 @@ pub mod play {
         pub byte2: u8,
         pub block_id: i32,
     }
-    pub(super) fn packet_block_action_response(
+    pub(super) fn read_block_action_response(
         mut reader: &mut Reader,
     ) -> Result<BlockActionResponse> {
         let location: Position = MD::deserialize(reader)?;
@@ -1412,7 +1388,7 @@ pub mod play {
         pub location: Position,
         pub type_: i32,
     }
-    pub(super) fn packet_block_change_response(
+    pub(super) fn read_block_change_response(
         mut reader: &mut Reader,
     ) -> Result<BlockChangeResponse> {
         let location: Position = MD::deserialize(reader)?;
@@ -1423,7 +1399,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct BossBarResponse {}
-    pub(super) fn packet_boss_bar_response(mut _reader: &mut Reader) -> Result<BossBarResponse> {
+    pub(super) fn read_boss_bar_response(mut _reader: &mut Reader) -> Result<BossBarResponse> {
         let result = BossBarResponse {};
         Ok(result)
     }
@@ -1432,9 +1408,7 @@ pub mod play {
         pub difficulty: u8,
         pub difficulty_locked: bool,
     }
-    pub(super) fn packet_difficulty_response(
-        mut reader: &mut Reader,
-    ) -> Result<DifficultyResponse> {
+    pub(super) fn read_difficulty_response(mut reader: &mut Reader) -> Result<DifficultyResponse> {
         let difficulty: u8 = MD::deserialize(reader)?;
         let difficulty_locked: bool = MD::deserialize(reader)?;
 
@@ -1449,7 +1423,7 @@ pub mod play {
         pub match_: IndexedString,
         pub tooltip: Option<IndexedString>,
     }
-    pub(super) fn packet_tab_complete_response_matches(
+    pub(super) fn read_tab_complete_response_matches(
         mut reader: &mut Reader,
     ) -> Result<TabCompleteResponse_Matches> {
         let match_: IndexedString = MD::deserialize(reader)?;
@@ -1465,7 +1439,7 @@ pub mod play {
         pub length: i32,
         pub matches: Vec<TabCompleteResponse_Matches>,
     }
-    pub(super) fn packet_tab_complete_response(
+    pub(super) fn read_tab_complete_response(
         mut reader: &mut Reader,
     ) -> Result<TabCompleteResponse> {
         let transaction_id: i32 = read_varint(&mut reader)?;
@@ -1474,7 +1448,7 @@ pub mod play {
         let count_array: i32 = read_varint(&mut reader)?;
         let mut matches = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: TabCompleteResponse_Matches = packet_tab_complete_response_matches(reader)?;
+            let x: TabCompleteResponse_Matches = read_tab_complete_response_matches(reader)?;
             matches.push(x);
         }
 
@@ -1488,7 +1462,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct DeclareCommandsResponse {}
-    pub(super) fn packet_declare_commands_response(
+    pub(super) fn read_declare_commands_response(
         mut _reader: &mut Reader,
     ) -> Result<DeclareCommandsResponse> {
         let result = DeclareCommandsResponse {};
@@ -1496,7 +1470,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct FacePlayerResponse {}
-    pub(super) fn packet_face_player_response(
+    pub(super) fn read_face_player_response(
         mut _reader: &mut Reader,
     ) -> Result<FacePlayerResponse> {
         let result = FacePlayerResponse {};
@@ -1507,7 +1481,7 @@ pub mod play {
         pub transaction_id: i32,
         pub nbt: IndexedOptionNbt,
     }
-    pub(super) fn packet_nbt_query_response(mut reader: &mut Reader) -> Result<NbtQueryResponse> {
+    pub(super) fn read_nbt_query_response(mut reader: &mut Reader) -> Result<NbtQueryResponse> {
         let transaction_id: i32 = read_varint(&mut reader)?;
         let nbt: IndexedOptionNbt = MD::deserialize(reader)?;
 
@@ -1523,7 +1497,7 @@ pub mod play {
         pub position: i8,
         pub sender: u128,
     }
-    pub(super) fn packet_chat_response(mut reader: &mut Reader) -> Result<ChatResponse> {
+    pub(super) fn read_chat_response(mut reader: &mut Reader) -> Result<ChatResponse> {
         let message: IndexedString = MD::deserialize(reader)?;
         let position: i8 = MD::deserialize(reader)?;
         let sender: u128 = MD::deserialize(reader)?;
@@ -1537,7 +1511,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct MultiBlockChangeResponse {}
-    pub(super) fn packet_multi_block_change_response(
+    pub(super) fn read_multi_block_change_response(
         mut _reader: &mut Reader,
     ) -> Result<MultiBlockChangeResponse> {
         let result = MultiBlockChangeResponse {};
@@ -1547,7 +1521,7 @@ pub mod play {
     pub struct CloseWindowResponse {
         pub window_id: u8,
     }
-    pub(super) fn packet_close_window_response(
+    pub(super) fn read_close_window_response(
         mut reader: &mut Reader,
     ) -> Result<CloseWindowResponse> {
         let window_id: u8 = MD::deserialize(reader)?;
@@ -1561,9 +1535,7 @@ pub mod play {
         pub inventory_type: i32,
         pub window_title: IndexedString,
     }
-    pub(super) fn packet_open_window_response(
-        mut reader: &mut Reader,
-    ) -> Result<OpenWindowResponse> {
+    pub(super) fn read_open_window_response(mut reader: &mut Reader) -> Result<OpenWindowResponse> {
         let window_id: i32 = read_varint(&mut reader)?;
         let inventory_type: i32 = read_varint(&mut reader)?;
         let window_title: IndexedString = MD::deserialize(reader)?;
@@ -1582,7 +1554,7 @@ pub mod play {
         pub items: Vec<InventorySlot>,
         pub carried_item: InventorySlot,
     }
-    pub(super) fn packet_window_items_response(
+    pub(super) fn read_window_items_response(
         mut reader: &mut Reader,
     ) -> Result<WindowItemsResponse> {
         let window_id: u8 = MD::deserialize(reader)?;
@@ -1609,7 +1581,7 @@ pub mod play {
         pub property: i16,
         pub value: i16,
     }
-    pub(super) fn packet_craft_progress_bar_response(
+    pub(super) fn read_craft_progress_bar_response(
         mut reader: &mut Reader,
     ) -> Result<CraftProgressBarResponse> {
         let window_id: u8 = MD::deserialize(reader)?;
@@ -1630,7 +1602,7 @@ pub mod play {
         pub slot: i16,
         pub item: InventorySlot,
     }
-    pub(super) fn packet_set_slot_response(mut reader: &mut Reader) -> Result<SetSlotResponse> {
+    pub(super) fn read_set_slot_response(mut reader: &mut Reader) -> Result<SetSlotResponse> {
         let window_id: i8 = MD::deserialize(reader)?;
         let state_id: i32 = read_varint(&mut reader)?;
         let slot: i16 = MD::deserialize(reader)?;
@@ -1649,7 +1621,7 @@ pub mod play {
         pub item_id: i32,
         pub cooldown_ticks: i32,
     }
-    pub(super) fn packet_set_cooldown_response(
+    pub(super) fn read_set_cooldown_response(
         mut reader: &mut Reader,
     ) -> Result<SetCooldownResponse> {
         let item_id: i32 = read_varint(&mut reader)?;
@@ -1666,7 +1638,7 @@ pub mod play {
         pub channel: IndexedString,
         pub data: IndexedBuffer,
     }
-    pub(super) fn packet_custom_payload_response(
+    pub(super) fn read_custom_payload_response(
         mut reader: &mut Reader,
     ) -> Result<CustomPayloadResponse> {
         let channel: IndexedString = MD::deserialize(reader)?;
@@ -1685,7 +1657,7 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_named_sound_effect_response(
+    pub(super) fn read_named_sound_effect_response(
         mut reader: &mut Reader,
     ) -> Result<NamedSoundEffectResponse> {
         let sound_name: IndexedString = MD::deserialize(reader)?;
@@ -1711,7 +1683,7 @@ pub mod play {
     pub struct KickDisconnectResponse {
         pub reason: IndexedString,
     }
-    pub(super) fn packet_kick_disconnect_response(
+    pub(super) fn read_kick_disconnect_response(
         mut reader: &mut Reader,
     ) -> Result<KickDisconnectResponse> {
         let reason: IndexedString = MD::deserialize(reader)?;
@@ -1724,7 +1696,7 @@ pub mod play {
         pub entity_id: i32,
         pub entity_status: i8,
     }
-    pub(super) fn packet_entity_status_response(
+    pub(super) fn read_entity_status_response(
         mut reader: &mut Reader,
     ) -> Result<EntityStatusResponse> {
         let entity_id: i32 = MD::deserialize(reader)?;
@@ -1742,7 +1714,7 @@ pub mod play {
         pub y: i8,
         pub z: i8,
     }
-    pub(super) fn packet_explosion_response_affected_block_offsets(
+    pub(super) fn read_explosion_response_affected_block_offsets(
         mut reader: &mut Reader,
     ) -> Result<ExplosionResponse_AffectedBlockOffsets> {
         let x: i8 = MD::deserialize(reader)?;
@@ -1763,7 +1735,7 @@ pub mod play {
         pub player_motion_y: f32,
         pub player_motion_z: f32,
     }
-    pub(super) fn packet_explosion_response(mut reader: &mut Reader) -> Result<ExplosionResponse> {
+    pub(super) fn read_explosion_response(mut reader: &mut Reader) -> Result<ExplosionResponse> {
         let x: f32 = MD::deserialize(reader)?;
         let y: f32 = MD::deserialize(reader)?;
         let z: f32 = MD::deserialize(reader)?;
@@ -1772,7 +1744,7 @@ pub mod play {
         let mut affected_block_offsets = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
             let x: ExplosionResponse_AffectedBlockOffsets =
-                packet_explosion_response_affected_block_offsets(reader)?;
+                read_explosion_response_affected_block_offsets(reader)?;
             affected_block_offsets.push(x);
         }
         let player_motion_x: f32 = MD::deserialize(reader)?;
@@ -1796,7 +1768,7 @@ pub mod play {
         pub chunk_x: i32,
         pub chunk_z: i32,
     }
-    pub(super) fn packet_unload_chunk_response(
+    pub(super) fn read_unload_chunk_response(
         mut reader: &mut Reader,
     ) -> Result<UnloadChunkResponse> {
         let chunk_x: i32 = MD::deserialize(reader)?;
@@ -1810,7 +1782,7 @@ pub mod play {
         pub reason: u8,
         pub game_mode: f32,
     }
-    pub(super) fn packet_game_state_change_response(
+    pub(super) fn read_game_state_change_response(
         mut reader: &mut Reader,
     ) -> Result<GameStateChangeResponse> {
         let reason: u8 = MD::deserialize(reader)?;
@@ -1825,7 +1797,7 @@ pub mod play {
         pub nb_slots: i32,
         pub entity_id: i32,
     }
-    pub(super) fn packet_open_horse_window_response(
+    pub(super) fn read_open_horse_window_response(
         mut reader: &mut Reader,
     ) -> Result<OpenHorseWindowResponse> {
         let window_id: u8 = MD::deserialize(reader)?;
@@ -1843,7 +1815,7 @@ pub mod play {
     pub struct KeepAliveResponse {
         pub keep_alive_id: i64,
     }
-    pub(super) fn packet_keep_alive_response(mut reader: &mut Reader) -> Result<KeepAliveResponse> {
+    pub(super) fn read_keep_alive_response(mut reader: &mut Reader) -> Result<KeepAliveResponse> {
         let keep_alive_id: i64 = MD::deserialize(reader)?;
 
         let result = KeepAliveResponse { keep_alive_id };
@@ -1851,7 +1823,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct MapChunkResponse {}
-    pub(super) fn packet_map_chunk_response(mut _reader: &mut Reader) -> Result<MapChunkResponse> {
+    pub(super) fn read_map_chunk_response(mut _reader: &mut Reader) -> Result<MapChunkResponse> {
         let result = MapChunkResponse {};
         Ok(result)
     }
@@ -1862,9 +1834,7 @@ pub mod play {
         pub data: i32,
         pub global: bool,
     }
-    pub(super) fn packet_world_event_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldEventResponse> {
+    pub(super) fn read_world_event_response(mut reader: &mut Reader) -> Result<WorldEventResponse> {
         let effect_id: i32 = MD::deserialize(reader)?;
         let location: Position = MD::deserialize(reader)?;
         let data: i32 = MD::deserialize(reader)?;
@@ -1880,7 +1850,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct WorldParticlesResponse {}
-    pub(super) fn packet_world_particles_response(
+    pub(super) fn read_world_particles_response(
         mut _reader: &mut Reader,
     ) -> Result<WorldParticlesResponse> {
         let result = WorldParticlesResponse {};
@@ -1898,7 +1868,7 @@ pub mod play {
         pub sky_light: Vec<Vec<u8>>,
         pub block_light: Vec<Vec<u8>>,
     }
-    pub(super) fn packet_update_light_response(
+    pub(super) fn read_update_light_response(
         mut reader: &mut Reader,
     ) -> Result<UpdateLightResponse> {
         let chunk_x: i32 = read_varint(&mut reader)?;
@@ -1983,7 +1953,7 @@ pub mod play {
         pub is_debug: bool,
         pub is_flat: bool,
     }
-    pub(super) fn packet_login_response(mut reader: &mut Reader) -> Result<LoginResponse> {
+    pub(super) fn read_login_response(mut reader: &mut Reader) -> Result<LoginResponse> {
         let entity_id: i32 = MD::deserialize(reader)?;
         let is_hardcore: bool = MD::deserialize(reader)?;
         let game_mode: u8 = MD::deserialize(reader)?;
@@ -2028,7 +1998,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct MapResponse {}
-    pub(super) fn packet_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
+    pub(super) fn read_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
         let result = MapResponse {};
         Ok(result)
     }
@@ -2045,7 +2015,7 @@ pub mod play {
         pub price_multiplier: f32,
         pub demand: i32,
     }
-    pub(super) fn packet_trade_list_response_trades(
+    pub(super) fn read_trade_list_response_trades(
         mut reader: &mut Reader,
     ) -> Result<TradeListResponse_Trades> {
         let input_item1: InventorySlot = MD::deserialize(reader)?;
@@ -2082,12 +2052,12 @@ pub mod play {
         pub is_regular_villager: bool,
         pub can_restock: bool,
     }
-    pub(super) fn packet_trade_list_response(mut reader: &mut Reader) -> Result<TradeListResponse> {
+    pub(super) fn read_trade_list_response(mut reader: &mut Reader) -> Result<TradeListResponse> {
         let window_id: i32 = read_varint(&mut reader)?;
         let count_array: u8 = MD::deserialize(reader)?;
         let mut trades = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
-            let x: TradeListResponse_Trades = packet_trade_list_response_trades(reader)?;
+            let x: TradeListResponse_Trades = read_trade_list_response_trades(reader)?;
             trades.push(x);
         }
         let villager_level: i32 = read_varint(&mut reader)?;
@@ -2113,7 +2083,7 @@ pub mod play {
         pub d_z: i16,
         pub on_ground: bool,
     }
-    pub(super) fn packet_rel_entity_move_response(
+    pub(super) fn read_rel_entity_move_response(
         mut reader: &mut Reader,
     ) -> Result<RelEntityMoveResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2141,7 +2111,7 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn packet_entity_move_look_response(
+    pub(super) fn read_entity_move_look_response(
         mut reader: &mut Reader,
     ) -> Result<EntityMoveLookResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2170,9 +2140,7 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn packet_entity_look_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityLookResponse> {
+    pub(super) fn read_entity_look_response(mut reader: &mut Reader) -> Result<EntityLookResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
         let yaw: i8 = MD::deserialize(reader)?;
         let pitch: i8 = MD::deserialize(reader)?;
@@ -2194,7 +2162,7 @@ pub mod play {
         pub yaw: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_vehicle_move_response(
+    pub(super) fn read_vehicle_move_response(
         mut reader: &mut Reader,
     ) -> Result<VehicleMoveResponse> {
         let x: f64 = MD::deserialize(reader)?;
@@ -2216,7 +2184,7 @@ pub mod play {
     pub struct OpenBookResponse {
         pub hand: i32,
     }
-    pub(super) fn packet_open_book_response(mut reader: &mut Reader) -> Result<OpenBookResponse> {
+    pub(super) fn read_open_book_response(mut reader: &mut Reader) -> Result<OpenBookResponse> {
         let hand: i32 = read_varint(&mut reader)?;
 
         let result = OpenBookResponse { hand };
@@ -2226,7 +2194,7 @@ pub mod play {
     pub struct OpenSignEntityResponse {
         pub location: Position,
     }
-    pub(super) fn packet_open_sign_entity_response(
+    pub(super) fn read_open_sign_entity_response(
         mut reader: &mut Reader,
     ) -> Result<OpenSignEntityResponse> {
         let location: Position = MD::deserialize(reader)?;
@@ -2239,7 +2207,7 @@ pub mod play {
         pub window_id: i8,
         pub recipe: IndexedString,
     }
-    pub(super) fn packet_craft_recipe_response(
+    pub(super) fn read_craft_recipe_response(
         mut reader: &mut Reader,
     ) -> Result<CraftRecipeResponse> {
         let window_id: i8 = MD::deserialize(reader)?;
@@ -2254,7 +2222,7 @@ pub mod play {
         pub flying_speed: f32,
         pub walking_speed: f32,
     }
-    pub(super) fn packet_abilities_response(mut reader: &mut Reader) -> Result<AbilitiesResponse> {
+    pub(super) fn read_abilities_response(mut reader: &mut Reader) -> Result<AbilitiesResponse> {
         let flags: i8 = MD::deserialize(reader)?;
         let flying_speed: f32 = MD::deserialize(reader)?;
         let walking_speed: f32 = MD::deserialize(reader)?;
@@ -2271,7 +2239,7 @@ pub mod play {
         pub duration: i32,
         pub entity_id: i32,
     }
-    pub(super) fn packet_end_combat_event_response(
+    pub(super) fn read_end_combat_event_response(
         mut reader: &mut Reader,
     ) -> Result<EndCombatEventResponse> {
         let duration: i32 = read_varint(&mut reader)?;
@@ -2285,7 +2253,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct EnterCombatEventResponse {}
-    pub(super) fn packet_enter_combat_event_response(
+    pub(super) fn read_enter_combat_event_response(
         mut _reader: &mut Reader,
     ) -> Result<EnterCombatEventResponse> {
         let result = EnterCombatEventResponse {};
@@ -2297,7 +2265,7 @@ pub mod play {
         pub entity_id: i32,
         pub message: IndexedString,
     }
-    pub(super) fn packet_death_combat_event_response(
+    pub(super) fn read_death_combat_event_response(
         mut reader: &mut Reader,
     ) -> Result<DeathCombatEventResponse> {
         let player_id: i32 = read_varint(&mut reader)?;
@@ -2313,7 +2281,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct PlayerInfoResponse {}
-    pub(super) fn packet_player_info_response(
+    pub(super) fn read_player_info_response(
         mut _reader: &mut Reader,
     ) -> Result<PlayerInfoResponse> {
         let result = PlayerInfoResponse {};
@@ -2330,7 +2298,7 @@ pub mod play {
         pub teleport_id: i32,
         pub dismount_vehicle: bool,
     }
-    pub(super) fn packet_position_response(mut reader: &mut Reader) -> Result<PositionResponse> {
+    pub(super) fn read_position_response(mut reader: &mut Reader) -> Result<PositionResponse> {
         let x: f64 = MD::deserialize(reader)?;
         let y: f64 = MD::deserialize(reader)?;
         let z: f64 = MD::deserialize(reader)?;
@@ -2354,7 +2322,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct UnlockRecipesResponse {}
-    pub(super) fn packet_unlock_recipes_response(
+    pub(super) fn read_unlock_recipes_response(
         mut _reader: &mut Reader,
     ) -> Result<UnlockRecipesResponse> {
         let result = UnlockRecipesResponse {};
@@ -2364,7 +2332,7 @@ pub mod play {
     pub struct EntityDestroyResponse {
         pub entity_ids: Vec<i32>,
     }
-    pub(super) fn packet_entity_destroy_response(
+    pub(super) fn read_entity_destroy_response(
         mut reader: &mut Reader,
     ) -> Result<EntityDestroyResponse> {
         let count_array: i32 = read_varint(&mut reader)?;
@@ -2382,7 +2350,7 @@ pub mod play {
         pub entity_id: i32,
         pub effect_id: i32,
     }
-    pub(super) fn packet_remove_entity_effect_response(
+    pub(super) fn read_remove_entity_effect_response(
         mut reader: &mut Reader,
     ) -> Result<RemoveEntityEffectResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2401,7 +2369,7 @@ pub mod play {
         pub forced: bool,
         pub prompt_message: Option<IndexedString>,
     }
-    pub(super) fn packet_resource_pack_send_response(
+    pub(super) fn read_resource_pack_send_response(
         mut reader: &mut Reader,
     ) -> Result<ResourcePackSendResponse> {
         let url: IndexedString = MD::deserialize(reader)?;
@@ -2428,7 +2396,7 @@ pub mod play {
         pub is_flat: bool,
         pub copy_metadata: bool,
     }
-    pub(super) fn packet_respawn_response(mut reader: &mut Reader) -> Result<RespawnResponse> {
+    pub(super) fn read_respawn_response(mut reader: &mut Reader) -> Result<RespawnResponse> {
         let dimension: IndexedNbt = MD::deserialize(reader)?;
         let world_name: IndexedString = MD::deserialize(reader)?;
         let hashed_seed: i64 = MD::deserialize(reader)?;
@@ -2455,7 +2423,7 @@ pub mod play {
         pub entity_id: i32,
         pub head_yaw: i8,
     }
-    pub(super) fn packet_entity_head_rotation_response(
+    pub(super) fn read_entity_head_rotation_response(
         mut reader: &mut Reader,
     ) -> Result<EntityHeadRotationResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2471,7 +2439,7 @@ pub mod play {
     pub struct CameraResponse {
         pub camera_id: i32,
     }
-    pub(super) fn packet_camera_response(mut reader: &mut Reader) -> Result<CameraResponse> {
+    pub(super) fn read_camera_response(mut reader: &mut Reader) -> Result<CameraResponse> {
         let camera_id: i32 = read_varint(&mut reader)?;
 
         let result = CameraResponse { camera_id };
@@ -2481,7 +2449,7 @@ pub mod play {
     pub struct HeldItemSlotResponse {
         pub slot: i8,
     }
-    pub(super) fn packet_held_item_slot_response(
+    pub(super) fn read_held_item_slot_response(
         mut reader: &mut Reader,
     ) -> Result<HeldItemSlotResponse> {
         let slot: i8 = MD::deserialize(reader)?;
@@ -2494,7 +2462,7 @@ pub mod play {
         pub chunk_x: i32,
         pub chunk_z: i32,
     }
-    pub(super) fn packet_update_view_position_response(
+    pub(super) fn read_update_view_position_response(
         mut reader: &mut Reader,
     ) -> Result<UpdateViewPositionResponse> {
         let chunk_x: i32 = read_varint(&mut reader)?;
@@ -2507,7 +2475,7 @@ pub mod play {
     pub struct UpdateViewDistanceResponse {
         pub view_distance: i32,
     }
-    pub(super) fn packet_update_view_distance_response(
+    pub(super) fn read_update_view_distance_response(
         mut reader: &mut Reader,
     ) -> Result<UpdateViewDistanceResponse> {
         let view_distance: i32 = read_varint(&mut reader)?;
@@ -2520,7 +2488,7 @@ pub mod play {
         pub position: i8,
         pub name: IndexedString,
     }
-    pub(super) fn packet_scoreboard_display_objective_response(
+    pub(super) fn read_scoreboard_display_objective_response(
         mut reader: &mut Reader,
     ) -> Result<ScoreboardDisplayObjectiveResponse> {
         let position: i8 = MD::deserialize(reader)?;
@@ -2531,7 +2499,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct EntityMetadataResponse {}
-    pub(super) fn packet_entity_metadata_response(
+    pub(super) fn read_entity_metadata_response(
         mut _reader: &mut Reader,
     ) -> Result<EntityMetadataResponse> {
         let result = EntityMetadataResponse {};
@@ -2542,7 +2510,7 @@ pub mod play {
         pub entity_id: i32,
         pub vehicle_id: i32,
     }
-    pub(super) fn packet_attach_entity_response(
+    pub(super) fn read_attach_entity_response(
         mut reader: &mut Reader,
     ) -> Result<AttachEntityResponse> {
         let entity_id: i32 = MD::deserialize(reader)?;
@@ -2561,7 +2529,7 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn packet_entity_velocity_response(
+    pub(super) fn read_entity_velocity_response(
         mut reader: &mut Reader,
     ) -> Result<EntityVelocityResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2579,7 +2547,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct EntityEquipmentResponse {}
-    pub(super) fn packet_entity_equipment_response(
+    pub(super) fn read_entity_equipment_response(
         mut _reader: &mut Reader,
     ) -> Result<EntityEquipmentResponse> {
         let result = EntityEquipmentResponse {};
@@ -2591,9 +2559,7 @@ pub mod play {
         pub level: i32,
         pub total_experience: i32,
     }
-    pub(super) fn packet_experience_response(
-        mut reader: &mut Reader,
-    ) -> Result<ExperienceResponse> {
+    pub(super) fn read_experience_response(mut reader: &mut Reader) -> Result<ExperienceResponse> {
         let experience_bar: f32 = MD::deserialize(reader)?;
         let level: i32 = read_varint(&mut reader)?;
         let total_experience: i32 = read_varint(&mut reader)?;
@@ -2611,7 +2577,7 @@ pub mod play {
         pub food: i32,
         pub food_saturation: f32,
     }
-    pub(super) fn packet_update_health_response(
+    pub(super) fn read_update_health_response(
         mut reader: &mut Reader,
     ) -> Result<UpdateHealthResponse> {
         let health: f32 = MD::deserialize(reader)?;
@@ -2627,7 +2593,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct ScoreboardObjectiveResponse {}
-    pub(super) fn packet_scoreboard_objective_response(
+    pub(super) fn read_scoreboard_objective_response(
         mut _reader: &mut Reader,
     ) -> Result<ScoreboardObjectiveResponse> {
         let result = ScoreboardObjectiveResponse {};
@@ -2638,7 +2604,7 @@ pub mod play {
         pub entity_id: i32,
         pub passengers: Vec<i32>,
     }
-    pub(super) fn packet_set_passengers_response(
+    pub(super) fn read_set_passengers_response(
         mut reader: &mut Reader,
     ) -> Result<SetPassengersResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2657,13 +2623,13 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct TeamsResponse {}
-    pub(super) fn packet_teams_response(mut _reader: &mut Reader) -> Result<TeamsResponse> {
+    pub(super) fn read_teams_response(mut _reader: &mut Reader) -> Result<TeamsResponse> {
         let result = TeamsResponse {};
         Ok(result)
     }
     #[derive(Debug)]
     pub struct ScoreboardScoreResponse {}
-    pub(super) fn packet_scoreboard_score_response(
+    pub(super) fn read_scoreboard_score_response(
         mut _reader: &mut Reader,
     ) -> Result<ScoreboardScoreResponse> {
         let result = ScoreboardScoreResponse {};
@@ -2674,7 +2640,7 @@ pub mod play {
         pub location: Position,
         pub angle: f32,
     }
-    pub(super) fn packet_spawn_position_response(
+    pub(super) fn read_spawn_position_response(
         mut reader: &mut Reader,
     ) -> Result<SpawnPositionResponse> {
         let location: Position = MD::deserialize(reader)?;
@@ -2688,9 +2654,7 @@ pub mod play {
         pub age: i64,
         pub time: i64,
     }
-    pub(super) fn packet_update_time_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateTimeResponse> {
+    pub(super) fn read_update_time_response(mut reader: &mut Reader) -> Result<UpdateTimeResponse> {
         let age: i64 = MD::deserialize(reader)?;
         let time: i64 = MD::deserialize(reader)?;
 
@@ -2705,7 +2669,7 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_entity_sound_effect_response(
+    pub(super) fn read_entity_sound_effect_response(
         mut reader: &mut Reader,
     ) -> Result<EntitySoundEffectResponse> {
         let sound_id: i32 = read_varint(&mut reader)?;
@@ -2725,9 +2689,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct StopSoundResponse {}
-    pub(super) fn packet_stop_sound_response(
-        mut _reader: &mut Reader,
-    ) -> Result<StopSoundResponse> {
+    pub(super) fn read_stop_sound_response(mut _reader: &mut Reader) -> Result<StopSoundResponse> {
         let result = StopSoundResponse {};
         Ok(result)
     }
@@ -2741,7 +2703,7 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn packet_sound_effect_response(
+    pub(super) fn read_sound_effect_response(
         mut reader: &mut Reader,
     ) -> Result<SoundEffectResponse> {
         let sound_id: i32 = read_varint(&mut reader)?;
@@ -2768,7 +2730,7 @@ pub mod play {
         pub header: IndexedString,
         pub footer: IndexedString,
     }
-    pub(super) fn packet_playerlist_header_response(
+    pub(super) fn read_playerlist_header_response(
         mut reader: &mut Reader,
     ) -> Result<PlayerlistHeaderResponse> {
         let header: IndexedString = MD::deserialize(reader)?;
@@ -2783,7 +2745,7 @@ pub mod play {
         pub collector_entity_id: i32,
         pub pickup_item_count: i32,
     }
-    pub(super) fn packet_collect_response(mut reader: &mut Reader) -> Result<CollectResponse> {
+    pub(super) fn read_collect_response(mut reader: &mut Reader) -> Result<CollectResponse> {
         let collected_entity_id: i32 = read_varint(&mut reader)?;
         let collector_entity_id: i32 = read_varint(&mut reader)?;
         let pickup_item_count: i32 = read_varint(&mut reader)?;
@@ -2805,7 +2767,7 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn packet_entity_teleport_response(
+    pub(super) fn read_entity_teleport_response(
         mut reader: &mut Reader,
     ) -> Result<EntityTeleportResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2833,7 +2795,7 @@ pub mod play {
         pub amount: f64,
         pub operation: i8,
     }
-    pub(super) fn packet_entity_update_attributes_response_modifiers(
+    pub(super) fn read_entity_update_attributes_response_modifiers(
         mut reader: &mut Reader,
     ) -> Result<EntityUpdateAttributesResponse_Modifiers> {
         let uuid: u128 = MD::deserialize(reader)?;
@@ -2853,7 +2815,7 @@ pub mod play {
         pub value: f64,
         pub modifiers: Vec<EntityUpdateAttributesResponse_Modifiers>,
     }
-    pub(super) fn packet_entity_update_attributes_response_properties(
+    pub(super) fn read_entity_update_attributes_response_properties(
         mut reader: &mut Reader,
     ) -> Result<EntityUpdateAttributesResponse_Properties> {
         let key: IndexedString = MD::deserialize(reader)?;
@@ -2862,7 +2824,7 @@ pub mod play {
         let mut modifiers = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
             let x: EntityUpdateAttributesResponse_Modifiers =
-                packet_entity_update_attributes_response_modifiers(reader)?;
+                read_entity_update_attributes_response_modifiers(reader)?;
             modifiers.push(x);
         }
 
@@ -2878,7 +2840,7 @@ pub mod play {
         pub entity_id: i32,
         pub properties: Vec<EntityUpdateAttributesResponse_Properties>,
     }
-    pub(super) fn packet_entity_update_attributes_response(
+    pub(super) fn read_entity_update_attributes_response(
         mut reader: &mut Reader,
     ) -> Result<EntityUpdateAttributesResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2886,7 +2848,7 @@ pub mod play {
         let mut properties = Vec::with_capacity(count_array as usize);
         for _ in 0..count_array {
             let x: EntityUpdateAttributesResponse_Properties =
-                packet_entity_update_attributes_response_properties(reader)?;
+                read_entity_update_attributes_response_properties(reader)?;
             properties.push(x);
         }
 
@@ -2904,7 +2866,7 @@ pub mod play {
         pub duration: i32,
         pub hide_particles: i8,
     }
-    pub(super) fn packet_entity_effect_response(
+    pub(super) fn read_entity_effect_response(
         mut reader: &mut Reader,
     ) -> Result<EntityEffectResponse> {
         let entity_id: i32 = read_varint(&mut reader)?;
@@ -2926,7 +2888,7 @@ pub mod play {
     pub struct SelectAdvancementTabResponse {
         pub id: Option<IndexedString>,
     }
-    pub(super) fn packet_select_advancement_tab_response(
+    pub(super) fn read_select_advancement_tab_response(
         mut reader: &mut Reader,
     ) -> Result<SelectAdvancementTabResponse> {
         let id: Option<IndexedString> = MD::deserialize(reader)?;
@@ -2936,7 +2898,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct DeclareRecipesResponse {}
-    pub(super) fn packet_declare_recipes_response(
+    pub(super) fn read_declare_recipes_response(
         mut _reader: &mut Reader,
     ) -> Result<DeclareRecipesResponse> {
         let result = DeclareRecipesResponse {};
@@ -2944,7 +2906,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct TagsResponse {}
-    pub(super) fn packet_tags_response(mut _reader: &mut Reader) -> Result<TagsResponse> {
+    pub(super) fn read_tags_response(mut _reader: &mut Reader) -> Result<TagsResponse> {
         let result = TagsResponse {};
         Ok(result)
     }
@@ -2955,7 +2917,7 @@ pub mod play {
         pub status: i32,
         pub successful: bool,
     }
-    pub(super) fn packet_acknowledge_player_digging_response(
+    pub(super) fn read_acknowledge_player_digging_response(
         mut reader: &mut Reader,
     ) -> Result<AcknowledgePlayerDiggingResponse> {
         let location: Position = MD::deserialize(reader)?;
@@ -2973,7 +2935,7 @@ pub mod play {
     }
     #[derive(Debug)]
     pub struct SculkVibrationSignalResponse {}
-    pub(super) fn packet_sculk_vibration_signal_response(
+    pub(super) fn read_sculk_vibration_signal_response(
         mut _reader: &mut Reader,
     ) -> Result<SculkVibrationSignalResponse> {
         let result = SculkVibrationSignalResponse {};
@@ -2983,7 +2945,7 @@ pub mod play {
     pub struct ClearTitlesResponse {
         pub reset: bool,
     }
-    pub(super) fn packet_clear_titles_response(
+    pub(super) fn read_clear_titles_response(
         mut reader: &mut Reader,
     ) -> Result<ClearTitlesResponse> {
         let reset: bool = MD::deserialize(reader)?;
@@ -3002,7 +2964,7 @@ pub mod play {
         pub warning_blocks: i32,
         pub warning_time: i32,
     }
-    pub(super) fn packet_initialize_world_border_response(
+    pub(super) fn read_initialize_world_border_response(
         mut reader: &mut Reader,
     ) -> Result<InitializeWorldBorderResponse> {
         let x: f64 = MD::deserialize(reader)?;
@@ -3030,7 +2992,7 @@ pub mod play {
     pub struct ActionBarResponse {
         pub text: IndexedString,
     }
-    pub(super) fn packet_action_bar_response(mut reader: &mut Reader) -> Result<ActionBarResponse> {
+    pub(super) fn read_action_bar_response(mut reader: &mut Reader) -> Result<ActionBarResponse> {
         let text: IndexedString = MD::deserialize(reader)?;
 
         let result = ActionBarResponse { text };
@@ -3041,7 +3003,7 @@ pub mod play {
         pub x: f64,
         pub z: f64,
     }
-    pub(super) fn packet_world_border_center_response(
+    pub(super) fn read_world_border_center_response(
         mut reader: &mut Reader,
     ) -> Result<WorldBorderCenterResponse> {
         let x: f64 = MD::deserialize(reader)?;
@@ -3056,7 +3018,7 @@ pub mod play {
         pub new_diameter: f64,
         pub speed: i64,
     }
-    pub(super) fn packet_world_border_lerp_size_response(
+    pub(super) fn read_world_border_lerp_size_response(
         mut reader: &mut Reader,
     ) -> Result<WorldBorderLerpSizeResponse> {
         let old_diameter: f64 = MD::deserialize(reader)?;
@@ -3074,7 +3036,7 @@ pub mod play {
     pub struct WorldBorderSizeResponse {
         pub diameter: f64,
     }
-    pub(super) fn packet_world_border_size_response(
+    pub(super) fn read_world_border_size_response(
         mut reader: &mut Reader,
     ) -> Result<WorldBorderSizeResponse> {
         let diameter: f64 = MD::deserialize(reader)?;
@@ -3086,7 +3048,7 @@ pub mod play {
     pub struct WorldBorderWarningDelayResponse {
         pub warning_time: i32,
     }
-    pub(super) fn packet_world_border_warning_delay_response(
+    pub(super) fn read_world_border_warning_delay_response(
         mut reader: &mut Reader,
     ) -> Result<WorldBorderWarningDelayResponse> {
         let warning_time: i32 = read_varint(&mut reader)?;
@@ -3098,7 +3060,7 @@ pub mod play {
     pub struct WorldBorderWarningReachResponse {
         pub warning_blocks: i32,
     }
-    pub(super) fn packet_world_border_warning_reach_response(
+    pub(super) fn read_world_border_warning_reach_response(
         mut reader: &mut Reader,
     ) -> Result<WorldBorderWarningReachResponse> {
         let warning_blocks: i32 = read_varint(&mut reader)?;
@@ -3110,7 +3072,7 @@ pub mod play {
     pub struct PlayPingResponse {
         pub id: i32,
     }
-    pub(super) fn packet_play_ping_response(mut reader: &mut Reader) -> Result<PlayPingResponse> {
+    pub(super) fn read_play_ping_response(mut reader: &mut Reader) -> Result<PlayPingResponse> {
         let id: i32 = MD::deserialize(reader)?;
 
         let result = PlayPingResponse { id };
@@ -3120,7 +3082,7 @@ pub mod play {
     pub struct SetTitleSubtitleResponse {
         pub text: IndexedString,
     }
-    pub(super) fn packet_set_title_subtitle_response(
+    pub(super) fn read_set_title_subtitle_response(
         mut reader: &mut Reader,
     ) -> Result<SetTitleSubtitleResponse> {
         let text: IndexedString = MD::deserialize(reader)?;
@@ -3132,7 +3094,7 @@ pub mod play {
     pub struct SetTitleTextResponse {
         pub text: IndexedString,
     }
-    pub(super) fn packet_set_title_text_response(
+    pub(super) fn read_set_title_text_response(
         mut reader: &mut Reader,
     ) -> Result<SetTitleTextResponse> {
         let text: IndexedString = MD::deserialize(reader)?;
@@ -3146,7 +3108,7 @@ pub mod play {
         pub stay: i32,
         pub fade_out: i32,
     }
-    pub(super) fn packet_set_title_time_response(
+    pub(super) fn read_set_title_time_response(
         mut reader: &mut Reader,
     ) -> Result<SetTitleTimeResponse> {
         let fade_in: i32 = MD::deserialize(reader)?;
@@ -3164,7 +3126,7 @@ pub mod play {
     pub struct SimulationDistanceResponse {
         pub distance: i32,
     }
-    pub(super) fn packet_simulation_distance_response(
+    pub(super) fn read_simulation_distance_response(
         mut reader: &mut Reader,
     ) -> Result<SimulationDistanceResponse> {
         let distance: i32 = read_varint(&mut reader)?;
@@ -3354,667 +3316,667 @@ pub fn de_packets<'r>(
 
     let packet = match (state, direction, id) {
         (S::Handshaking, D::ClientToServer, 0x0) => {
-            let p = handshaking::packet_set_protocol_request(reader)?;
+            let p = handshaking::read_set_protocol_request(reader)?;
             Packet::SetProtocolRequest(p)
         }
         (S::Handshaking, D::ClientToServer, 0xfe) => {
-            let p = handshaking::packet_legacy_server_list_ping_request(reader)?;
+            let p = handshaking::read_legacy_server_list_ping_request(reader)?;
             Packet::LegacyServerListPingRequest(p)
         }
         (S::Status, D::ClientToServer, 0x0) => {
-            let p = status::packet_ping_start_request(reader)?;
+            let p = status::read_ping_start_request(reader)?;
             Packet::PingStartRequest(p)
         }
         (S::Status, D::ClientToServer, 0x1) => {
-            let p = status::packet_ping_request(reader)?;
+            let p = status::read_ping_request(reader)?;
             Packet::PingRequest(p)
         }
         (S::Status, D::ServerToClient, 0x0) => {
-            let p = status::packet_server_info_response(reader)?;
+            let p = status::read_server_info_response(reader)?;
             Packet::ServerInfoResponse(p)
         }
         (S::Status, D::ServerToClient, 0x1) => {
-            let p = status::packet_ping_response(reader)?;
+            let p = status::read_ping_response(reader)?;
             Packet::PingResponse(p)
         }
         (S::Login, D::ClientToServer, 0x0) => {
-            let p = login::packet_login_start_request(reader)?;
+            let p = login::read_login_start_request(reader)?;
             Packet::LoginStartRequest(p)
         }
         (S::Login, D::ClientToServer, 0x1) => {
-            let p = login::packet_encryption_begin_request(reader)?;
+            let p = login::read_encryption_begin_request(reader)?;
             Packet::EncryptionBeginRequest(p)
         }
         (S::Login, D::ClientToServer, 0x2) => {
-            let p = login::packet_login_plugin_response(reader)?;
+            let p = login::read_login_plugin_response(reader)?;
             Packet::LoginPluginResponse(p)
         }
         (S::Login, D::ServerToClient, 0x0) => {
-            let p = login::packet_disconnect_response(reader)?;
+            let p = login::read_disconnect_response(reader)?;
             Packet::DisconnectResponse(p)
         }
         (S::Login, D::ServerToClient, 0x1) => {
-            let p = login::packet_encryption_begin_response(reader)?;
+            let p = login::read_encryption_begin_response(reader)?;
             Packet::EncryptionBeginResponse(p)
         }
         (S::Login, D::ServerToClient, 0x2) => {
-            let p = login::packet_success_response(reader)?;
+            let p = login::read_success_response(reader)?;
             Packet::SuccessResponse(p)
         }
         (S::Login, D::ServerToClient, 0x3) => {
-            let p = login::packet_compress_response(reader)?;
+            let p = login::read_compress_response(reader)?;
             Packet::CompressResponse(p)
         }
         (S::Login, D::ServerToClient, 0x4) => {
-            let p = login::packet_login_plugin_request(reader)?;
+            let p = login::read_login_plugin_request(reader)?;
             Packet::LoginPluginRequest(p)
         }
         (S::Play, D::ClientToServer, 0x0) => {
-            let p = play::packet_teleport_confirm_request(reader)?;
+            let p = play::read_teleport_confirm_request(reader)?;
             Packet::TeleportConfirmRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1) => {
-            let p = play::packet_query_block_nbt_request(reader)?;
+            let p = play::read_query_block_nbt_request(reader)?;
             Packet::QueryBlockNbtRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2) => {
-            let p = play::packet_set_difficulty_request(reader)?;
+            let p = play::read_set_difficulty_request(reader)?;
             Packet::SetDifficultyRequest(p)
         }
         (S::Play, D::ClientToServer, 0x3) => {
-            let p = play::packet_chat_request(reader)?;
+            let p = play::read_chat_request(reader)?;
             Packet::ChatRequest(p)
         }
         (S::Play, D::ClientToServer, 0x4) => {
-            let p = play::packet_client_command_request(reader)?;
+            let p = play::read_client_command_request(reader)?;
             Packet::ClientCommandRequest(p)
         }
         (S::Play, D::ClientToServer, 0x5) => {
-            let p = play::packet_settings_request(reader)?;
+            let p = play::read_settings_request(reader)?;
             Packet::SettingsRequest(p)
         }
         (S::Play, D::ClientToServer, 0x6) => {
-            let p = play::packet_tab_complete_request(reader)?;
+            let p = play::read_tab_complete_request(reader)?;
             Packet::TabCompleteRequest(p)
         }
         (S::Play, D::ClientToServer, 0x7) => {
-            let p = play::packet_enchant_item_request(reader)?;
+            let p = play::read_enchant_item_request(reader)?;
             Packet::EnchantItemRequest(p)
         }
         (S::Play, D::ClientToServer, 0x8) => {
-            let p = play::packet_window_click_request(reader)?;
+            let p = play::read_window_click_request(reader)?;
             Packet::WindowClickRequest(p)
         }
         (S::Play, D::ClientToServer, 0x9) => {
-            let p = play::packet_close_window_request(reader)?;
+            let p = play::read_close_window_request(reader)?;
             Packet::CloseWindowRequest(p)
         }
         (S::Play, D::ClientToServer, 0xa) => {
-            let p = play::packet_custom_payload_request(reader)?;
+            let p = play::read_custom_payload_request(reader)?;
             Packet::CustomPayloadRequest(p)
         }
         (S::Play, D::ClientToServer, 0xb) => {
-            let p = play::packet_edit_book_request(reader)?;
+            let p = play::read_edit_book_request(reader)?;
             Packet::EditBookRequest(p)
         }
         (S::Play, D::ClientToServer, 0xc) => {
-            let p = play::packet_query_entity_nbt_request(reader)?;
+            let p = play::read_query_entity_nbt_request(reader)?;
             Packet::QueryEntityNbtRequest(p)
         }
         (S::Play, D::ClientToServer, 0xd) => {
-            let p = play::packet_use_entity_request(reader)?;
+            let p = play::read_use_entity_request(reader)?;
             Packet::UseEntityRequest(p)
         }
         (S::Play, D::ClientToServer, 0xe) => {
-            let p = play::packet_generate_structure_request(reader)?;
+            let p = play::read_generate_structure_request(reader)?;
             Packet::GenerateStructureRequest(p)
         }
         (S::Play, D::ClientToServer, 0xf) => {
-            let p = play::packet_keep_alive_request(reader)?;
+            let p = play::read_keep_alive_request(reader)?;
             Packet::KeepAliveRequest(p)
         }
         (S::Play, D::ClientToServer, 0x10) => {
-            let p = play::packet_lock_difficulty_request(reader)?;
+            let p = play::read_lock_difficulty_request(reader)?;
             Packet::LockDifficultyRequest(p)
         }
         (S::Play, D::ClientToServer, 0x11) => {
-            let p = play::packet_position_request(reader)?;
+            let p = play::read_position_request(reader)?;
             Packet::PositionRequest(p)
         }
         (S::Play, D::ClientToServer, 0x12) => {
-            let p = play::packet_position_look_request(reader)?;
+            let p = play::read_position_look_request(reader)?;
             Packet::PositionLookRequest(p)
         }
         (S::Play, D::ClientToServer, 0x13) => {
-            let p = play::packet_look_request(reader)?;
+            let p = play::read_look_request(reader)?;
             Packet::LookRequest(p)
         }
         (S::Play, D::ClientToServer, 0x14) => {
-            let p = play::packet_flying_request(reader)?;
+            let p = play::read_flying_request(reader)?;
             Packet::FlyingRequest(p)
         }
         (S::Play, D::ClientToServer, 0x15) => {
-            let p = play::packet_vehicle_move_request(reader)?;
+            let p = play::read_vehicle_move_request(reader)?;
             Packet::VehicleMoveRequest(p)
         }
         (S::Play, D::ClientToServer, 0x16) => {
-            let p = play::packet_steer_boat_request(reader)?;
+            let p = play::read_steer_boat_request(reader)?;
             Packet::SteerBoatRequest(p)
         }
         (S::Play, D::ClientToServer, 0x17) => {
-            let p = play::packet_pick_item_request(reader)?;
+            let p = play::read_pick_item_request(reader)?;
             Packet::PickItemRequest(p)
         }
         (S::Play, D::ClientToServer, 0x18) => {
-            let p = play::packet_craft_recipe_request(reader)?;
+            let p = play::read_craft_recipe_request(reader)?;
             Packet::CraftRecipeRequest(p)
         }
         (S::Play, D::ClientToServer, 0x19) => {
-            let p = play::packet_abilities_request(reader)?;
+            let p = play::read_abilities_request(reader)?;
             Packet::AbilitiesRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1a) => {
-            let p = play::packet_block_dig_request(reader)?;
+            let p = play::read_block_dig_request(reader)?;
             Packet::BlockDigRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1b) => {
-            let p = play::packet_entity_action_request(reader)?;
+            let p = play::read_entity_action_request(reader)?;
             Packet::EntityActionRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1c) => {
-            let p = play::packet_steer_vehicle_request(reader)?;
+            let p = play::read_steer_vehicle_request(reader)?;
             Packet::SteerVehicleRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1d) => {
-            let p = play::packet_pong_request(reader)?;
+            let p = play::read_pong_request(reader)?;
             Packet::PongRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1e) => {
-            let p = play::packet_recipe_book_request(reader)?;
+            let p = play::read_recipe_book_request(reader)?;
             Packet::RecipeBookRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1f) => {
-            let p = play::packet_displayed_recipe_request(reader)?;
+            let p = play::read_displayed_recipe_request(reader)?;
             Packet::DisplayedRecipeRequest(p)
         }
         (S::Play, D::ClientToServer, 0x20) => {
-            let p = play::packet_name_item_request(reader)?;
+            let p = play::read_name_item_request(reader)?;
             Packet::NameItemRequest(p)
         }
         (S::Play, D::ClientToServer, 0x21) => {
-            let p = play::packet_resource_pack_receive_request(reader)?;
+            let p = play::read_resource_pack_receive_request(reader)?;
             Packet::ResourcePackReceiveRequest(p)
         }
         (S::Play, D::ClientToServer, 0x22) => {
-            let p = play::packet_advancement_tab_request(reader)?;
+            let p = play::read_advancement_tab_request(reader)?;
             Packet::AdvancementTabRequest(p)
         }
         (S::Play, D::ClientToServer, 0x23) => {
-            let p = play::packet_select_trade_request(reader)?;
+            let p = play::read_select_trade_request(reader)?;
             Packet::SelectTradeRequest(p)
         }
         (S::Play, D::ClientToServer, 0x24) => {
-            let p = play::packet_set_beacon_effect_request(reader)?;
+            let p = play::read_set_beacon_effect_request(reader)?;
             Packet::SetBeaconEffectRequest(p)
         }
         (S::Play, D::ClientToServer, 0x25) => {
-            let p = play::packet_held_item_slot_request(reader)?;
+            let p = play::read_held_item_slot_request(reader)?;
             Packet::HeldItemSlotRequest(p)
         }
         (S::Play, D::ClientToServer, 0x26) => {
-            let p = play::packet_update_command_block_request(reader)?;
+            let p = play::read_update_command_block_request(reader)?;
             Packet::UpdateCommandBlockRequest(p)
         }
         (S::Play, D::ClientToServer, 0x27) => {
-            let p = play::packet_update_command_block_minecart_request(reader)?;
+            let p = play::read_update_command_block_minecart_request(reader)?;
             Packet::UpdateCommandBlockMinecartRequest(p)
         }
         (S::Play, D::ClientToServer, 0x28) => {
-            let p = play::packet_set_creative_slot_request(reader)?;
+            let p = play::read_set_creative_slot_request(reader)?;
             Packet::SetCreativeSlotRequest(p)
         }
         (S::Play, D::ClientToServer, 0x29) => {
-            let p = play::packet_update_jigsaw_block_request(reader)?;
+            let p = play::read_update_jigsaw_block_request(reader)?;
             Packet::UpdateJigsawBlockRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2a) => {
-            let p = play::packet_update_structure_block_request(reader)?;
+            let p = play::read_update_structure_block_request(reader)?;
             Packet::UpdateStructureBlockRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2b) => {
-            let p = play::packet_update_sign_request(reader)?;
+            let p = play::read_update_sign_request(reader)?;
             Packet::UpdateSignRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2c) => {
-            let p = play::packet_arm_animation_request(reader)?;
+            let p = play::read_arm_animation_request(reader)?;
             Packet::ArmAnimationRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2d) => {
-            let p = play::packet_spectate_request(reader)?;
+            let p = play::read_spectate_request(reader)?;
             Packet::SpectateRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2e) => {
-            let p = play::packet_block_place_request(reader)?;
+            let p = play::read_block_place_request(reader)?;
             Packet::BlockPlaceRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2f) => {
-            let p = play::packet_use_item_request(reader)?;
+            let p = play::read_use_item_request(reader)?;
             Packet::UseItemRequest(p)
         }
         (S::Play, D::ServerToClient, 0x0) => {
-            let p = play::packet_spawn_entity_response(reader)?;
+            let p = play::read_spawn_entity_response(reader)?;
             Packet::SpawnEntityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1) => {
-            let p = play::packet_spawn_entity_experience_orb_response(reader)?;
+            let p = play::read_spawn_entity_experience_orb_response(reader)?;
             Packet::SpawnEntityExperienceOrbResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2) => {
-            let p = play::packet_spawn_entity_living_response(reader)?;
+            let p = play::read_spawn_entity_living_response(reader)?;
             Packet::SpawnEntityLivingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3) => {
-            let p = play::packet_spawn_entity_painting_response(reader)?;
+            let p = play::read_spawn_entity_painting_response(reader)?;
             Packet::SpawnEntityPaintingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4) => {
-            let p = play::packet_named_entity_spawn_response(reader)?;
+            let p = play::read_named_entity_spawn_response(reader)?;
             Packet::NamedEntitySpawnResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5) => {
-            let p = play::packet_sculk_vibration_signal_response(reader)?;
+            let p = play::read_sculk_vibration_signal_response(reader)?;
             Packet::SculkVibrationSignalResponse(p)
         }
         (S::Play, D::ServerToClient, 0x6) => {
-            let p = play::packet_animation_response(reader)?;
+            let p = play::read_animation_response(reader)?;
             Packet::AnimationResponse(p)
         }
         (S::Play, D::ServerToClient, 0x7) => {
-            let p = play::packet_statistics_response(reader)?;
+            let p = play::read_statistics_response(reader)?;
             Packet::StatisticsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x8) => {
-            let p = play::packet_acknowledge_player_digging_response(reader)?;
+            let p = play::read_acknowledge_player_digging_response(reader)?;
             Packet::AcknowledgePlayerDiggingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x9) => {
-            let p = play::packet_block_break_animation_response(reader)?;
+            let p = play::read_block_break_animation_response(reader)?;
             Packet::BlockBreakAnimationResponse(p)
         }
         (S::Play, D::ServerToClient, 0xa) => {
-            let p = play::packet_tile_entity_data_response(reader)?;
+            let p = play::read_tile_entity_data_response(reader)?;
             Packet::TileEntityDataResponse(p)
         }
         (S::Play, D::ServerToClient, 0xb) => {
-            let p = play::packet_block_action_response(reader)?;
+            let p = play::read_block_action_response(reader)?;
             Packet::BlockActionResponse(p)
         }
         (S::Play, D::ServerToClient, 0xc) => {
-            let p = play::packet_block_change_response(reader)?;
+            let p = play::read_block_change_response(reader)?;
             Packet::BlockChangeResponse(p)
         }
         (S::Play, D::ServerToClient, 0xd) => {
-            let p = play::packet_boss_bar_response(reader)?;
+            let p = play::read_boss_bar_response(reader)?;
             Packet::BossBarResponse(p)
         }
         (S::Play, D::ServerToClient, 0xe) => {
-            let p = play::packet_difficulty_response(reader)?;
+            let p = play::read_difficulty_response(reader)?;
             Packet::DifficultyResponse(p)
         }
         (S::Play, D::ServerToClient, 0xf) => {
-            let p = play::packet_chat_response(reader)?;
+            let p = play::read_chat_response(reader)?;
             Packet::ChatResponse(p)
         }
         (S::Play, D::ServerToClient, 0x10) => {
-            let p = play::packet_clear_titles_response(reader)?;
+            let p = play::read_clear_titles_response(reader)?;
             Packet::ClearTitlesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x11) => {
-            let p = play::packet_tab_complete_response(reader)?;
+            let p = play::read_tab_complete_response(reader)?;
             Packet::TabCompleteResponse(p)
         }
         (S::Play, D::ServerToClient, 0x12) => {
-            let p = play::packet_declare_commands_response(reader)?;
+            let p = play::read_declare_commands_response(reader)?;
             Packet::DeclareCommandsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x13) => {
-            let p = play::packet_close_window_response(reader)?;
+            let p = play::read_close_window_response(reader)?;
             Packet::CloseWindowResponse(p)
         }
         (S::Play, D::ServerToClient, 0x14) => {
-            let p = play::packet_window_items_response(reader)?;
+            let p = play::read_window_items_response(reader)?;
             Packet::WindowItemsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x15) => {
-            let p = play::packet_craft_progress_bar_response(reader)?;
+            let p = play::read_craft_progress_bar_response(reader)?;
             Packet::CraftProgressBarResponse(p)
         }
         (S::Play, D::ServerToClient, 0x16) => {
-            let p = play::packet_set_slot_response(reader)?;
+            let p = play::read_set_slot_response(reader)?;
             Packet::SetSlotResponse(p)
         }
         (S::Play, D::ServerToClient, 0x17) => {
-            let p = play::packet_set_cooldown_response(reader)?;
+            let p = play::read_set_cooldown_response(reader)?;
             Packet::SetCooldownResponse(p)
         }
         (S::Play, D::ServerToClient, 0x18) => {
-            let p = play::packet_custom_payload_response(reader)?;
+            let p = play::read_custom_payload_response(reader)?;
             Packet::CustomPayloadResponse(p)
         }
         (S::Play, D::ServerToClient, 0x19) => {
-            let p = play::packet_named_sound_effect_response(reader)?;
+            let p = play::read_named_sound_effect_response(reader)?;
             Packet::NamedSoundEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1a) => {
-            let p = play::packet_kick_disconnect_response(reader)?;
+            let p = play::read_kick_disconnect_response(reader)?;
             Packet::KickDisconnectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1b) => {
-            let p = play::packet_entity_status_response(reader)?;
+            let p = play::read_entity_status_response(reader)?;
             Packet::EntityStatusResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1c) => {
-            let p = play::packet_explosion_response(reader)?;
+            let p = play::read_explosion_response(reader)?;
             Packet::ExplosionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1d) => {
-            let p = play::packet_unload_chunk_response(reader)?;
+            let p = play::read_unload_chunk_response(reader)?;
             Packet::UnloadChunkResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1e) => {
-            let p = play::packet_game_state_change_response(reader)?;
+            let p = play::read_game_state_change_response(reader)?;
             Packet::GameStateChangeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1f) => {
-            let p = play::packet_open_horse_window_response(reader)?;
+            let p = play::read_open_horse_window_response(reader)?;
             Packet::OpenHorseWindowResponse(p)
         }
         (S::Play, D::ServerToClient, 0x20) => {
-            let p = play::packet_initialize_world_border_response(reader)?;
+            let p = play::read_initialize_world_border_response(reader)?;
             Packet::InitializeWorldBorderResponse(p)
         }
         (S::Play, D::ServerToClient, 0x21) => {
-            let p = play::packet_keep_alive_response(reader)?;
+            let p = play::read_keep_alive_response(reader)?;
             Packet::KeepAliveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x22) => {
-            let p = play::packet_map_chunk_response(reader)?;
+            let p = play::read_map_chunk_response(reader)?;
             Packet::MapChunkResponse(p)
         }
         (S::Play, D::ServerToClient, 0x23) => {
-            let p = play::packet_world_event_response(reader)?;
+            let p = play::read_world_event_response(reader)?;
             Packet::WorldEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x24) => {
-            let p = play::packet_world_particles_response(reader)?;
+            let p = play::read_world_particles_response(reader)?;
             Packet::WorldParticlesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x25) => {
-            let p = play::packet_update_light_response(reader)?;
+            let p = play::read_update_light_response(reader)?;
             Packet::UpdateLightResponse(p)
         }
         (S::Play, D::ServerToClient, 0x26) => {
-            let p = play::packet_login_response(reader)?;
+            let p = play::read_login_response(reader)?;
             Packet::LoginResponse(p)
         }
         (S::Play, D::ServerToClient, 0x27) => {
-            let p = play::packet_map_response(reader)?;
+            let p = play::read_map_response(reader)?;
             Packet::MapResponse(p)
         }
         (S::Play, D::ServerToClient, 0x28) => {
-            let p = play::packet_trade_list_response(reader)?;
+            let p = play::read_trade_list_response(reader)?;
             Packet::TradeListResponse(p)
         }
         (S::Play, D::ServerToClient, 0x29) => {
-            let p = play::packet_rel_entity_move_response(reader)?;
+            let p = play::read_rel_entity_move_response(reader)?;
             Packet::RelEntityMoveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2a) => {
-            let p = play::packet_entity_move_look_response(reader)?;
+            let p = play::read_entity_move_look_response(reader)?;
             Packet::EntityMoveLookResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2b) => {
-            let p = play::packet_entity_look_response(reader)?;
+            let p = play::read_entity_look_response(reader)?;
             Packet::EntityLookResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2c) => {
-            let p = play::packet_vehicle_move_response(reader)?;
+            let p = play::read_vehicle_move_response(reader)?;
             Packet::VehicleMoveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2d) => {
-            let p = play::packet_open_book_response(reader)?;
+            let p = play::read_open_book_response(reader)?;
             Packet::OpenBookResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2e) => {
-            let p = play::packet_open_window_response(reader)?;
+            let p = play::read_open_window_response(reader)?;
             Packet::OpenWindowResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2f) => {
-            let p = play::packet_open_sign_entity_response(reader)?;
+            let p = play::read_open_sign_entity_response(reader)?;
             Packet::OpenSignEntityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x30) => {
-            let p = play::packet_play_ping_response(reader)?;
+            let p = play::read_play_ping_response(reader)?;
             Packet::PlayPingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x31) => {
-            let p = play::packet_craft_recipe_response(reader)?;
+            let p = play::read_craft_recipe_response(reader)?;
             Packet::CraftRecipeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x32) => {
-            let p = play::packet_abilities_response(reader)?;
+            let p = play::read_abilities_response(reader)?;
             Packet::AbilitiesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x33) => {
-            let p = play::packet_end_combat_event_response(reader)?;
+            let p = play::read_end_combat_event_response(reader)?;
             Packet::EndCombatEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x34) => {
-            let p = play::packet_enter_combat_event_response(reader)?;
+            let p = play::read_enter_combat_event_response(reader)?;
             Packet::EnterCombatEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x35) => {
-            let p = play::packet_death_combat_event_response(reader)?;
+            let p = play::read_death_combat_event_response(reader)?;
             Packet::DeathCombatEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x36) => {
-            let p = play::packet_player_info_response(reader)?;
+            let p = play::read_player_info_response(reader)?;
             Packet::PlayerInfoResponse(p)
         }
         (S::Play, D::ServerToClient, 0x37) => {
-            let p = play::packet_face_player_response(reader)?;
+            let p = play::read_face_player_response(reader)?;
             Packet::FacePlayerResponse(p)
         }
         (S::Play, D::ServerToClient, 0x38) => {
-            let p = play::packet_position_response(reader)?;
+            let p = play::read_position_response(reader)?;
             Packet::PositionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x39) => {
-            let p = play::packet_unlock_recipes_response(reader)?;
+            let p = play::read_unlock_recipes_response(reader)?;
             Packet::UnlockRecipesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3a) => {
-            let p = play::packet_entity_destroy_response(reader)?;
+            let p = play::read_entity_destroy_response(reader)?;
             Packet::EntityDestroyResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3b) => {
-            let p = play::packet_remove_entity_effect_response(reader)?;
+            let p = play::read_remove_entity_effect_response(reader)?;
             Packet::RemoveEntityEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3c) => {
-            let p = play::packet_resource_pack_send_response(reader)?;
+            let p = play::read_resource_pack_send_response(reader)?;
             Packet::ResourcePackSendResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3d) => {
-            let p = play::packet_respawn_response(reader)?;
+            let p = play::read_respawn_response(reader)?;
             Packet::RespawnResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3e) => {
-            let p = play::packet_entity_head_rotation_response(reader)?;
+            let p = play::read_entity_head_rotation_response(reader)?;
             Packet::EntityHeadRotationResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3f) => {
-            let p = play::packet_multi_block_change_response(reader)?;
+            let p = play::read_multi_block_change_response(reader)?;
             Packet::MultiBlockChangeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x40) => {
-            let p = play::packet_select_advancement_tab_response(reader)?;
+            let p = play::read_select_advancement_tab_response(reader)?;
             Packet::SelectAdvancementTabResponse(p)
         }
         (S::Play, D::ServerToClient, 0x41) => {
-            let p = play::packet_action_bar_response(reader)?;
+            let p = play::read_action_bar_response(reader)?;
             Packet::ActionBarResponse(p)
         }
         (S::Play, D::ServerToClient, 0x42) => {
-            let p = play::packet_world_border_center_response(reader)?;
+            let p = play::read_world_border_center_response(reader)?;
             Packet::WorldBorderCenterResponse(p)
         }
         (S::Play, D::ServerToClient, 0x43) => {
-            let p = play::packet_world_border_lerp_size_response(reader)?;
+            let p = play::read_world_border_lerp_size_response(reader)?;
             Packet::WorldBorderLerpSizeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x44) => {
-            let p = play::packet_world_border_size_response(reader)?;
+            let p = play::read_world_border_size_response(reader)?;
             Packet::WorldBorderSizeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x45) => {
-            let p = play::packet_world_border_warning_delay_response(reader)?;
+            let p = play::read_world_border_warning_delay_response(reader)?;
             Packet::WorldBorderWarningDelayResponse(p)
         }
         (S::Play, D::ServerToClient, 0x46) => {
-            let p = play::packet_world_border_warning_reach_response(reader)?;
+            let p = play::read_world_border_warning_reach_response(reader)?;
             Packet::WorldBorderWarningReachResponse(p)
         }
         (S::Play, D::ServerToClient, 0x47) => {
-            let p = play::packet_camera_response(reader)?;
+            let p = play::read_camera_response(reader)?;
             Packet::CameraResponse(p)
         }
         (S::Play, D::ServerToClient, 0x48) => {
-            let p = play::packet_held_item_slot_response(reader)?;
+            let p = play::read_held_item_slot_response(reader)?;
             Packet::HeldItemSlotResponse(p)
         }
         (S::Play, D::ServerToClient, 0x49) => {
-            let p = play::packet_update_view_position_response(reader)?;
+            let p = play::read_update_view_position_response(reader)?;
             Packet::UpdateViewPositionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4a) => {
-            let p = play::packet_update_view_distance_response(reader)?;
+            let p = play::read_update_view_distance_response(reader)?;
             Packet::UpdateViewDistanceResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4b) => {
-            let p = play::packet_spawn_position_response(reader)?;
+            let p = play::read_spawn_position_response(reader)?;
             Packet::SpawnPositionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4c) => {
-            let p = play::packet_scoreboard_display_objective_response(reader)?;
+            let p = play::read_scoreboard_display_objective_response(reader)?;
             Packet::ScoreboardDisplayObjectiveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4d) => {
-            let p = play::packet_entity_metadata_response(reader)?;
+            let p = play::read_entity_metadata_response(reader)?;
             Packet::EntityMetadataResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4e) => {
-            let p = play::packet_attach_entity_response(reader)?;
+            let p = play::read_attach_entity_response(reader)?;
             Packet::AttachEntityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4f) => {
-            let p = play::packet_entity_velocity_response(reader)?;
+            let p = play::read_entity_velocity_response(reader)?;
             Packet::EntityVelocityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x50) => {
-            let p = play::packet_entity_equipment_response(reader)?;
+            let p = play::read_entity_equipment_response(reader)?;
             Packet::EntityEquipmentResponse(p)
         }
         (S::Play, D::ServerToClient, 0x51) => {
-            let p = play::packet_experience_response(reader)?;
+            let p = play::read_experience_response(reader)?;
             Packet::ExperienceResponse(p)
         }
         (S::Play, D::ServerToClient, 0x52) => {
-            let p = play::packet_update_health_response(reader)?;
+            let p = play::read_update_health_response(reader)?;
             Packet::UpdateHealthResponse(p)
         }
         (S::Play, D::ServerToClient, 0x53) => {
-            let p = play::packet_scoreboard_objective_response(reader)?;
+            let p = play::read_scoreboard_objective_response(reader)?;
             Packet::ScoreboardObjectiveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x54) => {
-            let p = play::packet_set_passengers_response(reader)?;
+            let p = play::read_set_passengers_response(reader)?;
             Packet::SetPassengersResponse(p)
         }
         (S::Play, D::ServerToClient, 0x55) => {
-            let p = play::packet_teams_response(reader)?;
+            let p = play::read_teams_response(reader)?;
             Packet::TeamsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x56) => {
-            let p = play::packet_scoreboard_score_response(reader)?;
+            let p = play::read_scoreboard_score_response(reader)?;
             Packet::ScoreboardScoreResponse(p)
         }
         (S::Play, D::ServerToClient, 0x57) => {
-            let p = play::packet_simulation_distance_response(reader)?;
+            let p = play::read_simulation_distance_response(reader)?;
             Packet::SimulationDistanceResponse(p)
         }
         (S::Play, D::ServerToClient, 0x58) => {
-            let p = play::packet_set_title_subtitle_response(reader)?;
+            let p = play::read_set_title_subtitle_response(reader)?;
             Packet::SetTitleSubtitleResponse(p)
         }
         (S::Play, D::ServerToClient, 0x59) => {
-            let p = play::packet_update_time_response(reader)?;
+            let p = play::read_update_time_response(reader)?;
             Packet::UpdateTimeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5a) => {
-            let p = play::packet_set_title_text_response(reader)?;
+            let p = play::read_set_title_text_response(reader)?;
             Packet::SetTitleTextResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5b) => {
-            let p = play::packet_set_title_time_response(reader)?;
+            let p = play::read_set_title_time_response(reader)?;
             Packet::SetTitleTimeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5c) => {
-            let p = play::packet_entity_sound_effect_response(reader)?;
+            let p = play::read_entity_sound_effect_response(reader)?;
             Packet::EntitySoundEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5d) => {
-            let p = play::packet_sound_effect_response(reader)?;
+            let p = play::read_sound_effect_response(reader)?;
             Packet::SoundEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5e) => {
-            let p = play::packet_stop_sound_response(reader)?;
+            let p = play::read_stop_sound_response(reader)?;
             Packet::StopSoundResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5f) => {
-            let p = play::packet_playerlist_header_response(reader)?;
+            let p = play::read_playerlist_header_response(reader)?;
             Packet::PlayerlistHeaderResponse(p)
         }
         (S::Play, D::ServerToClient, 0x60) => {
-            let p = play::packet_nbt_query_response(reader)?;
+            let p = play::read_nbt_query_response(reader)?;
             Packet::NbtQueryResponse(p)
         }
         (S::Play, D::ServerToClient, 0x61) => {
-            let p = play::packet_collect_response(reader)?;
+            let p = play::read_collect_response(reader)?;
             Packet::CollectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x62) => {
-            let p = play::packet_entity_teleport_response(reader)?;
+            let p = play::read_entity_teleport_response(reader)?;
             Packet::EntityTeleportResponse(p)
         }
         (S::Play, D::ServerToClient, 0x63) => {
-            let p = play::packet_advancements_response(reader)?;
+            let p = play::read_advancements_response(reader)?;
             Packet::AdvancementsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x64) => {
-            let p = play::packet_entity_update_attributes_response(reader)?;
+            let p = play::read_entity_update_attributes_response(reader)?;
             Packet::EntityUpdateAttributesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x65) => {
-            let p = play::packet_entity_effect_response(reader)?;
+            let p = play::read_entity_effect_response(reader)?;
             Packet::EntityEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x66) => {
-            let p = play::packet_declare_recipes_response(reader)?;
+            let p = play::read_declare_recipes_response(reader)?;
             Packet::DeclareRecipesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x67) => {
-            let p = play::packet_tags_response(reader)?;
+            let p = play::read_tags_response(reader)?;
             Packet::TagsResponse(p)
         }
         _ => {

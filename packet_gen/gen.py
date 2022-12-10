@@ -324,7 +324,7 @@ def deserialize_type(name, ty, current_element_count):
         return out
     out = f"let {name}: {get_type(ty)} = "
     if is_struct(ty):
-        out += f"packet_{pascal_to_snake(ty.name)}(reader)?;"
+        out += f"read_{pascal_to_snake(ty.name)}(reader)?;"
     elif ty == BuiltinType.REST_BUFFER:
         out += "reader.read_rest_buffer();"
     elif ty == BuiltinType.VARINT:
@@ -382,7 +382,7 @@ pub struct UseEntityRequest {
     pub sneaking: bool,
 }
 
-pub(super) fn packet_use_entity_request(mut reader: &mut Reader) -> Result<UseEntityRequest> {
+pub(super) fn read_use_entity_request(mut reader: &mut Reader) -> Result<UseEntityRequest> {
     let entity_id = read_varint(&mut reader)?;
     let kind = read_varint(&mut reader)?;
     let kind = match kind {
@@ -419,7 +419,7 @@ pub(super) fn packet_use_entity_request(mut reader: &mut Reader) -> Result<UseEn
 
         self.out += "}"
         underscore = "_" if len(struct.fields) == 0 else ""
-        self.out += f'''pub(super) fn packet_{pascal_to_snake(struct.name)}(mut {underscore}reader: &mut Reader) -> Result<{struct.name}> {{ '''
+        self.out += f'''pub(super) fn read_{pascal_to_snake(struct.name)}(mut {underscore}reader: &mut Reader) -> Result<{struct.name}> {{ '''
         for i in struct.fields:
             self.out += deserialize_type(i.name, i.ty, 1)
 
@@ -471,7 +471,7 @@ pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u3
 
                     state_name = state.state.value.title()
                     dir_name = "ClientToServer" if direction.direction == Direction.C2S else "ServerToClient"
-                    self.out += f"(S::{state_name}, D::{dir_name}, {m_id:#x}) => {{ let p = {state.state.value}::packet_{name}(reader)?; Packet::{snake_to_pascal(name)}(p) }}"
+                    self.out += f"(S::{state_name}, D::{dir_name}, {m_id:#x}) => {{ let p = {state.state.value}::read_{name}(reader)?; Packet::{snake_to_pascal(name)}(p) }}"
 
         self.out += '''_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }'''
 
