@@ -6,7 +6,9 @@ import os
 import enum
 
 
-def unreachable():
+def unreachable(err = None):
+    if err is not None:
+        print(f"unreachable: {err}")
     assert False
 
 
@@ -47,7 +49,6 @@ class BuiltinType(enum.Enum):
     F32 = "f32"
     F64 = "f64"
 
-
 class ArrayType:
     def __init__(self, subtype, count_type):
         self.subtype = subtype
@@ -68,6 +69,10 @@ class StructType:
 def is_builtin(x):
     return isinstance(x, BuiltinType)
 
+def is_std_number(x):
+    return x == BuiltinType.U8 or x == BuiltinType.U16 or x == BuiltinType.UUID \
+        or x == BuiltinType.I8 or x == BuiltinType.I16 or x == BuiltinType.I32 or x == BuiltinType.I64 \
+        or x == BuiltinType.F32 or x == BuiltinType.F64
 
 def is_array(x):
     return isinstance(x, ArrayType)
@@ -315,7 +320,9 @@ def get_type(ty):
 def deserialize_type(name, ty, current_element_count):
     if is_array(ty):
         out = deserialize_type("count_array", ty.count_type, current_element_count + 1)
-        out += f'''let mut {name} = Vec::with_capacity(count_array as usize); for _ in 0..count_array {{'''
+        out += f'''
+        let mut {name} = Vec::with_capacity(count_array as usize);
+        for _ in 0..count_array {{'''
         elem_name = "x"
         if current_element_count > 1:
             elem_name += f"_{current_element_count}"
@@ -335,13 +342,87 @@ def deserialize_type(name, ty, current_element_count):
         out += "MD::deserialize(reader)?;"
     return out
 
+def get_type_for_serializer(ty):
+    if is_array(ty):
+        return f"&[{get_type_for_serializer(ty.subtype)}]"
+    if is_option(ty):
+        return f"Option<{get_type_for_serializer(ty.subtype)}>"
+    if is_struct(ty):
+        return ty.name
+
+    if ty == BuiltinType.VARINT:
+        return "i32"
+    if ty == BuiltinType.VARLONG:
+        return "i64"
+    if ty == BuiltinType.STRING:
+        return "&str"
+    if ty == BuiltinType.BUFFER or ty == BuiltinType.REST_BUFFER:
+        return "&[u8]"
+    return ty.value
+
+def serialize_type(name: str, ty, current_element_count: int):
+    if is_array(ty):
+        return "unimplemented!();"
+#         out = f"let count_{current_element_count} = {name}.len() as {get_type(ty.count_type)};"
+#         out += serialize_type(f"count_{current_element_count}", ty.count_type, current_element_count + 1)
+#         elem_name = f"x_{current_element_count}"
+#         out += f'''
+# for {elem_name} in {name} {{'''
+
+#         # out += serialize_type(elem_name, ty.subtype, current_element_count + 1)
+#         out += "unimplemented!();"
+#         out += f'''}}'''
+#         return out
+    if is_std_number(ty):
+        be = "" if ty == BuiltinType.U8 or ty == BuiltinType.I8 else "::<BE>"
+        return f"writer.write_{get_type(ty)}{be}({name})?;"
+    
+    if is_option(ty):
+        return f'''
+            match {name} {{
+                Some({name}_{current_element_count}) => {{
+                    writer.write_all(&[1])?;
+                    {serialize_type(f"{name}_{current_element_count}", ty.subtype, current_element_count + 1)}
+                }}
+                None => writer.write_all(&[0])?
+            }}
+        '''
+        
+
+    match ty:
+        case BuiltinType.BOOL:
+            return f"writer.write_all(&[{name} as u8])?;"
+        case BuiltinType.STRING:
+            return f'''
+            write_varint(&mut writer, {name}.len() as u32)?;
+            writer.write_all({name}.as_bytes())?;'''
+        case BuiltinType.BUFFER:
+            return f'''
+            write_varint(&mut writer, {name}.len() as u32)?;
+            writer.write_all({name})?;'''
+        case BuiltinType.REST_BUFFER:
+            return f"writer.write_all({name})?;"
+        case BuiltinType.VARINT:
+            return f"write_varint(&mut writer, {name} as u32)?;"
+        case BuiltinType.VARLONG:
+            return f"write_varlong(&mut writer, {name} as u64)?;"
+        case BuiltinType.POSITION:
+            return f"{name}.write(&mut writer)?;"
+        case _:
+            return "unimplemented!();"
 
 class Generator:
     def __init__(self):
         self.out = '''
 #![allow(unused_mut)]
+#![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(clippy::needless_borrow)]
+
+// fix
+#![allow(unreachable_code)]
+#![allow(unused_variables)]
+// fix
 
 use crate::protocol::IndexedBuffer;
 use crate::protocol::IndexedString;
@@ -355,8 +436,12 @@ use crate::protocol::ConnectionState;
 use crate::protocol::PacketDirection;
 use crate::protocol::IndexedNbt;
 use crate::protocol::IndexedOptionNbt;
+use crate::protocol::varint::write_varint;
+use crate::protocol::varint::write_varlong;
 use anyhow::{{anyhow, Result}};
-
+use byteorder::WriteBytesExt;
+use byteorder::BE;
+use std::io::{Write, Result as IoResult};
 '''
 
     def gen_struct(self, struct):
@@ -430,6 +515,36 @@ pub(super) fn read_use_entity_request(mut reader: &mut Reader) -> Result<UseEnti
         self.out += "};"
         self.out += "Ok(result)"
         self.out += "}"
+
+        has_unimplemented = False
+        for i in struct.fields:
+            if is_array(i.ty):
+                has_unimplemented = True
+                underscore = "_"
+                break;
+
+        self.out += f'''
+impl {struct.name} {{
+    pub(super) fn write<W: Write>(mut {underscore}writer: &mut W,
+'''
+        for i in struct.fields:
+            self.out += f"{underscore}{i.name}: {get_type_for_serializer(i.ty)},"
+
+        self.out += ") -> IoResult<()> {"
+
+
+        if has_unimplemented:
+            self.out += "unimplemented!();"
+        else:
+            for i in struct.fields:
+                if is_array(i.ty):
+                    has_unimplemented = True
+                    break;
+                self.out += serialize_type(i.name, i.ty, 1)
+            self.out += "Ok(())"
+
+        self.out += "}}"
+
 
     def gen(self, states):
         for state in states:

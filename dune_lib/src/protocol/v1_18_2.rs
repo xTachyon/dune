@@ -1,12 +1,19 @@
 #![allow(unused_mut)]
+#![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(clippy::needless_borrow)]
+// fix
+#![allow(unreachable_code)]
+#![allow(unused_variables)]
+// fix
 
 use crate::protocol::de::Position;
 use crate::protocol::de::Reader;
 use crate::protocol::de::MD;
 use crate::protocol::varint::read_varint;
 use crate::protocol::varint::read_varlong;
+use crate::protocol::varint::write_varint;
+use crate::protocol::varint::write_varlong;
 use crate::protocol::ConnectionState;
 use crate::protocol::IndexedBuffer;
 use crate::protocol::IndexedNbt;
@@ -15,6 +22,9 @@ use crate::protocol::IndexedString;
 use crate::protocol::InventorySlot;
 use crate::protocol::PacketDirection;
 use anyhow::{anyhow, Result};
+use byteorder::WriteBytesExt;
+use byteorder::BE;
+use std::io::{Result as IoResult, Write};
 
 pub mod handshaking {
     use super::*;
@@ -40,6 +50,22 @@ pub mod handshaking {
         };
         Ok(result)
     }
+    impl SetProtocolRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            protocol_version: i32,
+            server_host: &str,
+            server_port: u16,
+            next_state: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, protocol_version as u32)?;
+            write_varint(&mut writer, server_host.len() as u32)?;
+            writer.write_all(server_host.as_bytes())?;
+            writer.write_u16::<BE>(server_port)?;
+            write_varint(&mut writer, next_state as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct LegacyServerListPingRequest {
         pub payload: u8,
@@ -52,6 +78,12 @@ pub mod handshaking {
         let result = LegacyServerListPingRequest { payload };
         Ok(result)
     }
+    impl LegacyServerListPingRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, payload: u8) -> IoResult<()> {
+            writer.write_u8(payload)?;
+            Ok(())
+        }
+    }
 }
 pub mod status {
     use super::*;
@@ -61,6 +93,11 @@ pub mod status {
     pub(super) fn read_ping_start_request(mut _reader: &mut Reader) -> Result<PingStartRequest> {
         let result = PingStartRequest {};
         Ok(result)
+    }
+    impl PingStartRequest {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct PingRequest {
@@ -72,6 +109,12 @@ pub mod status {
         let result = PingRequest { time };
         Ok(result)
     }
+    impl PingRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, time: i64) -> IoResult<()> {
+            writer.write_i64::<BE>(time)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ServerInfoResponse {
         pub response: IndexedString,
@@ -82,6 +125,13 @@ pub mod status {
         let result = ServerInfoResponse { response };
         Ok(result)
     }
+    impl ServerInfoResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, response: &str) -> IoResult<()> {
+            write_varint(&mut writer, response.len() as u32)?;
+            writer.write_all(response.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct PingResponse {
         pub time: i64,
@@ -91,6 +141,12 @@ pub mod status {
 
         let result = PingResponse { time };
         Ok(result)
+    }
+    impl PingResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, time: i64) -> IoResult<()> {
+            writer.write_i64::<BE>(time)?;
+            Ok(())
+        }
     }
 }
 pub mod login {
@@ -105,6 +161,13 @@ pub mod login {
 
         let result = LoginStartRequest { username };
         Ok(result)
+    }
+    impl LoginStartRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, username: &str) -> IoResult<()> {
+            write_varint(&mut writer, username.len() as u32)?;
+            writer.write_all(username.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EncryptionBeginRequest {
@@ -123,6 +186,19 @@ pub mod login {
         };
         Ok(result)
     }
+    impl EncryptionBeginRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            shared_secret: &[u8],
+            verify_token: &[u8],
+        ) -> IoResult<()> {
+            write_varint(&mut writer, shared_secret.len() as u32)?;
+            writer.write_all(shared_secret)?;
+            write_varint(&mut writer, verify_token.len() as u32)?;
+            writer.write_all(verify_token)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct LoginPluginResponse {
         pub message_id: i32,
@@ -137,6 +213,23 @@ pub mod login {
         let result = LoginPluginResponse { message_id, data };
         Ok(result)
     }
+    impl LoginPluginResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            message_id: i32,
+            data: Option<&[u8]>,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, message_id as u32)?;
+            match data {
+                Some(data_1) => {
+                    writer.write_all(&[1])?;
+                    writer.write_all(data_1)?;
+                }
+                None => writer.write_all(&[0])?,
+            }
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct DisconnectResponse {
         pub reason: IndexedString,
@@ -146,6 +239,13 @@ pub mod login {
 
         let result = DisconnectResponse { reason };
         Ok(result)
+    }
+    impl DisconnectResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, reason: &str) -> IoResult<()> {
+            write_varint(&mut writer, reason.len() as u32)?;
+            writer.write_all(reason.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EncryptionBeginResponse {
@@ -167,6 +267,22 @@ pub mod login {
         };
         Ok(result)
     }
+    impl EncryptionBeginResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            server_id: &str,
+            public_key: &[u8],
+            verify_token: &[u8],
+        ) -> IoResult<()> {
+            write_varint(&mut writer, server_id.len() as u32)?;
+            writer.write_all(server_id.as_bytes())?;
+            write_varint(&mut writer, public_key.len() as u32)?;
+            writer.write_all(public_key)?;
+            write_varint(&mut writer, verify_token.len() as u32)?;
+            writer.write_all(verify_token)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SuccessResponse {
         pub uuid: u128,
@@ -179,6 +295,18 @@ pub mod login {
         let result = SuccessResponse { uuid, username };
         Ok(result)
     }
+    impl SuccessResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            uuid: u128,
+            username: &str,
+        ) -> IoResult<()> {
+            writer.write_u128::<BE>(uuid)?;
+            write_varint(&mut writer, username.len() as u32)?;
+            writer.write_all(username.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct CompressResponse {
         pub threshold: i32,
@@ -188,6 +316,12 @@ pub mod login {
 
         let result = CompressResponse { threshold };
         Ok(result)
+    }
+    impl CompressResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, threshold: i32) -> IoResult<()> {
+            write_varint(&mut writer, threshold as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct LoginPluginRequest {
@@ -207,6 +341,20 @@ pub mod login {
         };
         Ok(result)
     }
+    impl LoginPluginRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            message_id: i32,
+            channel: &str,
+            data: &[u8],
+        ) -> IoResult<()> {
+            write_varint(&mut writer, message_id as u32)?;
+            write_varint(&mut writer, channel.len() as u32)?;
+            writer.write_all(channel.as_bytes())?;
+            writer.write_all(data)?;
+            Ok(())
+        }
+    }
 }
 pub mod play {
     use super::*;
@@ -222,6 +370,12 @@ pub mod play {
 
         let result = TeleportConfirmRequest { teleport_id };
         Ok(result)
+    }
+    impl TeleportConfirmRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, teleport_id: i32) -> IoResult<()> {
+            write_varint(&mut writer, teleport_id as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct QueryBlockNbtRequest {
@@ -240,6 +394,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl QueryBlockNbtRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            transaction_id: i32,
+            location: Position,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, transaction_id as u32)?;
+            location.write(&mut writer)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SetDifficultyRequest {
         pub new_difficulty: u8,
@@ -251,6 +416,12 @@ pub mod play {
 
         let result = SetDifficultyRequest { new_difficulty };
         Ok(result)
+    }
+    impl SetDifficultyRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, new_difficulty: u8) -> IoResult<()> {
+            writer.write_u8(new_difficulty)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EditBookRequest {
@@ -271,6 +442,16 @@ pub mod play {
         let result = EditBookRequest { hand, pages, title };
         Ok(result)
     }
+    impl EditBookRequest {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _hand: i32,
+            _pages: &[&str],
+            _title: Option<&str>,
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct QueryEntityNbtRequest {
         pub transaction_id: i32,
@@ -288,6 +469,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl QueryEntityNbtRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            transaction_id: i32,
+            entity_id: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, transaction_id as u32)?;
+            write_varint(&mut writer, entity_id as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct PickItemRequest {
         pub slot: i32,
@@ -297,6 +489,12 @@ pub mod play {
 
         let result = PickItemRequest { slot };
         Ok(result)
+    }
+    impl PickItemRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, slot: i32) -> IoResult<()> {
+            write_varint(&mut writer, slot as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct NameItemRequest {
@@ -308,6 +506,13 @@ pub mod play {
         let result = NameItemRequest { name };
         Ok(result)
     }
+    impl NameItemRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, name: &str) -> IoResult<()> {
+            write_varint(&mut writer, name.len() as u32)?;
+            writer.write_all(name.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SelectTradeRequest {
         pub slot: i32,
@@ -317,6 +522,12 @@ pub mod play {
 
         let result = SelectTradeRequest { slot };
         Ok(result)
+    }
+    impl SelectTradeRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, slot: i32) -> IoResult<()> {
+            write_varint(&mut writer, slot as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SetBeaconEffectRequest {
@@ -334,6 +545,17 @@ pub mod play {
             secondary_effect,
         };
         Ok(result)
+    }
+    impl SetBeaconEffectRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            primary_effect: i32,
+            secondary_effect: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, primary_effect as u32)?;
+            write_varint(&mut writer, secondary_effect as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct UpdateCommandBlockRequest {
@@ -358,6 +580,22 @@ pub mod play {
         };
         Ok(result)
     }
+    impl UpdateCommandBlockRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            command: &str,
+            mode: i32,
+            flags: u8,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, command.len() as u32)?;
+            writer.write_all(command.as_bytes())?;
+            write_varint(&mut writer, mode as u32)?;
+            writer.write_u8(flags)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct UpdateCommandBlockMinecartRequest {
         pub entity_id: i32,
@@ -377,6 +615,20 @@ pub mod play {
             track_output,
         };
         Ok(result)
+    }
+    impl UpdateCommandBlockMinecartRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            command: &str,
+            track_output: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            write_varint(&mut writer, command.len() as u32)?;
+            writer.write_all(command.as_bytes())?;
+            writer.write_all(&[track_output as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct UpdateStructureBlockRequest {
@@ -437,6 +689,47 @@ pub mod play {
         };
         Ok(result)
     }
+    impl UpdateStructureBlockRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            action: i32,
+            mode: i32,
+            name: &str,
+            offset_x: i8,
+            offset_y: i8,
+            offset_z: i8,
+            size_x: i8,
+            size_y: i8,
+            size_z: i8,
+            mirror: i32,
+            rotation: i32,
+            metadata: &str,
+            integrity: f32,
+            seed: i64,
+            flags: u8,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, action as u32)?;
+            write_varint(&mut writer, mode as u32)?;
+            write_varint(&mut writer, name.len() as u32)?;
+            writer.write_all(name.as_bytes())?;
+            writer.write_i8(offset_x)?;
+            writer.write_i8(offset_y)?;
+            writer.write_i8(offset_z)?;
+            writer.write_i8(size_x)?;
+            writer.write_i8(size_y)?;
+            writer.write_i8(size_z)?;
+            write_varint(&mut writer, mirror as u32)?;
+            write_varint(&mut writer, rotation as u32)?;
+            write_varint(&mut writer, metadata.len() as u32)?;
+            writer.write_all(metadata.as_bytes())?;
+            writer.write_f32::<BE>(integrity)?;
+            write_varlong(&mut writer, seed as u64)?;
+            writer.write_u8(flags)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct TabCompleteRequest {
         pub transaction_id: i32,
@@ -452,6 +745,18 @@ pub mod play {
         };
         Ok(result)
     }
+    impl TabCompleteRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            transaction_id: i32,
+            text: &str,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, transaction_id as u32)?;
+            write_varint(&mut writer, text.len() as u32)?;
+            writer.write_all(text.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ChatRequest {
         pub message: IndexedString,
@@ -461,6 +766,13 @@ pub mod play {
 
         let result = ChatRequest { message };
         Ok(result)
+    }
+    impl ChatRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, message: &str) -> IoResult<()> {
+            write_varint(&mut writer, message.len() as u32)?;
+            writer.write_all(message.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ClientCommandRequest {
@@ -473,6 +785,12 @@ pub mod play {
 
         let result = ClientCommandRequest { action_id };
         Ok(result)
+    }
+    impl ClientCommandRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, action_id: i32) -> IoResult<()> {
+            write_varint(&mut writer, action_id as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SettingsRequest {
@@ -507,6 +825,30 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SettingsRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            locale: &str,
+            view_distance: i8,
+            chat_flags: i32,
+            chat_colors: bool,
+            skin_parts: u8,
+            main_hand: i32,
+            enable_text_filtering: bool,
+            enable_server_listing: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, locale.len() as u32)?;
+            writer.write_all(locale.as_bytes())?;
+            writer.write_i8(view_distance)?;
+            write_varint(&mut writer, chat_flags as u32)?;
+            writer.write_all(&[chat_colors as u8])?;
+            writer.write_u8(skin_parts)?;
+            write_varint(&mut writer, main_hand as u32)?;
+            writer.write_all(&[enable_text_filtering as u8])?;
+            writer.write_all(&[enable_server_listing as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EnchantItemRequest {
         pub window_id: i8,
@@ -522,6 +864,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EnchantItemRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: i8,
+            enchantment: i8,
+        ) -> IoResult<()> {
+            writer.write_i8(window_id)?;
+            writer.write_i8(enchantment)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct WindowClickRequest_ChangedSlots {
         pub location: i16,
@@ -535,6 +888,17 @@ pub mod play {
 
         let result = WindowClickRequest_ChangedSlots { location, item };
         Ok(result)
+    }
+    impl WindowClickRequest_ChangedSlots {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: i16,
+            item: InventorySlot,
+        ) -> IoResult<()> {
+            writer.write_i16::<BE>(location)?;
+            unimplemented!();
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct WindowClickRequest {
@@ -572,6 +936,20 @@ pub mod play {
         };
         Ok(result)
     }
+    impl WindowClickRequest {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _window_id: u8,
+            _state_id: i32,
+            _slot: i16,
+            _mouse_button: i8,
+            _mode: i32,
+            _changed_slots: &[WindowClickRequest_ChangedSlots],
+            _cursor_item: InventorySlot,
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct CloseWindowRequest {
         pub window_id: u8,
@@ -581,6 +959,12 @@ pub mod play {
 
         let result = CloseWindowRequest { window_id };
         Ok(result)
+    }
+    impl CloseWindowRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, window_id: u8) -> IoResult<()> {
+            writer.write_u8(window_id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct CustomPayloadRequest {
@@ -595,6 +979,18 @@ pub mod play {
 
         let result = CustomPayloadRequest { channel, data };
         Ok(result)
+    }
+    impl CustomPayloadRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            channel: &str,
+            data: &[u8],
+        ) -> IoResult<()> {
+            write_varint(&mut writer, channel.len() as u32)?;
+            writer.write_all(channel.as_bytes())?;
+            writer.write_all(data)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct Coords {
@@ -663,6 +1059,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl GenerateStructureRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            levels: i32,
+            keep_jigsaws: bool,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, levels as u32)?;
+            writer.write_all(&[keep_jigsaws as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct KeepAliveRequest {
         pub keep_alive_id: i64,
@@ -672,6 +1081,12 @@ pub mod play {
 
         let result = KeepAliveRequest { keep_alive_id };
         Ok(result)
+    }
+    impl KeepAliveRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, keep_alive_id: i64) -> IoResult<()> {
+            writer.write_i64::<BE>(keep_alive_id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct LockDifficultyRequest {
@@ -684,6 +1099,12 @@ pub mod play {
 
         let result = LockDifficultyRequest { locked };
         Ok(result)
+    }
+    impl LockDifficultyRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, locked: bool) -> IoResult<()> {
+            writer.write_all(&[locked as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct PositionRequest {
@@ -700,6 +1121,21 @@ pub mod play {
 
         let result = PositionRequest { x, y, z, on_ground };
         Ok(result)
+    }
+    impl PositionRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            x: f64,
+            y: f64,
+            z: f64,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct PositionLookRequest {
@@ -730,6 +1166,25 @@ pub mod play {
         };
         Ok(result)
     }
+    impl PositionLookRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: f32,
+            pitch: f32,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_f32::<BE>(yaw)?;
+            writer.write_f32::<BE>(pitch)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct LookRequest {
         pub yaw: f32,
@@ -748,6 +1203,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl LookRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            yaw: f32,
+            pitch: f32,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            writer.write_f32::<BE>(yaw)?;
+            writer.write_f32::<BE>(pitch)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct FlyingRequest {
         pub on_ground: bool,
@@ -757,6 +1225,12 @@ pub mod play {
 
         let result = FlyingRequest { on_ground };
         Ok(result)
+    }
+    impl FlyingRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, on_ground: bool) -> IoResult<()> {
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct VehicleMoveRequest {
@@ -782,6 +1256,23 @@ pub mod play {
         };
         Ok(result)
     }
+    impl VehicleMoveRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: f32,
+            pitch: f32,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_f32::<BE>(yaw)?;
+            writer.write_f32::<BE>(pitch)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SteerBoatRequest {
         pub left_paddle: bool,
@@ -796,6 +1287,17 @@ pub mod play {
             right_paddle,
         };
         Ok(result)
+    }
+    impl SteerBoatRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            left_paddle: bool,
+            right_paddle: bool,
+        ) -> IoResult<()> {
+            writer.write_all(&[left_paddle as u8])?;
+            writer.write_all(&[right_paddle as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct CraftRecipeRequest {
@@ -815,6 +1317,20 @@ pub mod play {
         };
         Ok(result)
     }
+    impl CraftRecipeRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: i8,
+            recipe: &str,
+            make_all: bool,
+        ) -> IoResult<()> {
+            writer.write_i8(window_id)?;
+            write_varint(&mut writer, recipe.len() as u32)?;
+            writer.write_all(recipe.as_bytes())?;
+            writer.write_all(&[make_all as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct AbilitiesRequest {
         pub flags: i8,
@@ -824,6 +1340,12 @@ pub mod play {
 
         let result = AbilitiesRequest { flags };
         Ok(result)
+    }
+    impl AbilitiesRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, flags: i8) -> IoResult<()> {
+            writer.write_i8(flags)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct BlockDigRequest {
@@ -842,6 +1364,19 @@ pub mod play {
             face,
         };
         Ok(result)
+    }
+    impl BlockDigRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            status: i32,
+            location: Position,
+            face: i8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, status as u32)?;
+            location.write(&mut writer)?;
+            writer.write_i8(face)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityActionRequest {
@@ -863,6 +1398,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityActionRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            action_id: i32,
+            jump_boost: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            write_varint(&mut writer, action_id as u32)?;
+            write_varint(&mut writer, jump_boost as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SteerVehicleRequest {
         pub sideways: f32,
@@ -883,6 +1431,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SteerVehicleRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            sideways: f32,
+            forward: f32,
+            jump: u8,
+        ) -> IoResult<()> {
+            writer.write_f32::<BE>(sideways)?;
+            writer.write_f32::<BE>(forward)?;
+            writer.write_u8(jump)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct DisplayedRecipeRequest {
         pub recipe_id: IndexedString,
@@ -894,6 +1455,13 @@ pub mod play {
 
         let result = DisplayedRecipeRequest { recipe_id };
         Ok(result)
+    }
+    impl DisplayedRecipeRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, recipe_id: &str) -> IoResult<()> {
+            write_varint(&mut writer, recipe_id.len() as u32)?;
+            writer.write_all(recipe_id.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct RecipeBookRequest {
@@ -913,6 +1481,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl RecipeBookRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            book_id: i32,
+            book_open: bool,
+            filter_active: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, book_id as u32)?;
+            writer.write_all(&[book_open as u8])?;
+            writer.write_all(&[filter_active as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ResourcePackReceiveRequest {
         pub result: i32,
@@ -925,6 +1506,12 @@ pub mod play {
         let result = ResourcePackReceiveRequest { result };
         Ok(result)
     }
+    impl ResourcePackReceiveRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, result: i32) -> IoResult<()> {
+            write_varint(&mut writer, result as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct HeldItemSlotRequest {
         pub slot_id: i16,
@@ -936,6 +1523,12 @@ pub mod play {
 
         let result = HeldItemSlotRequest { slot_id };
         Ok(result)
+    }
+    impl HeldItemSlotRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, slot_id: i16) -> IoResult<()> {
+            writer.write_i16::<BE>(slot_id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SetCreativeSlotRequest {
@@ -950,6 +1543,17 @@ pub mod play {
 
         let result = SetCreativeSlotRequest { slot, item };
         Ok(result)
+    }
+    impl SetCreativeSlotRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            slot: i16,
+            item: InventorySlot,
+        ) -> IoResult<()> {
+            writer.write_i16::<BE>(slot)?;
+            unimplemented!();
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct UpdateJigsawBlockRequest {
@@ -980,6 +1584,30 @@ pub mod play {
         };
         Ok(result)
     }
+    impl UpdateJigsawBlockRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            name: &str,
+            target: &str,
+            pool: &str,
+            final_state: &str,
+            joint_type: &str,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, name.len() as u32)?;
+            writer.write_all(name.as_bytes())?;
+            write_varint(&mut writer, target.len() as u32)?;
+            writer.write_all(target.as_bytes())?;
+            write_varint(&mut writer, pool.len() as u32)?;
+            writer.write_all(pool.as_bytes())?;
+            write_varint(&mut writer, final_state.len() as u32)?;
+            writer.write_all(final_state.as_bytes())?;
+            write_varint(&mut writer, joint_type.len() as u32)?;
+            writer.write_all(joint_type.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct UpdateSignRequest {
         pub location: Position,
@@ -1004,6 +1632,27 @@ pub mod play {
         };
         Ok(result)
     }
+    impl UpdateSignRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            text1: &str,
+            text2: &str,
+            text3: &str,
+            text4: &str,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, text1.len() as u32)?;
+            writer.write_all(text1.as_bytes())?;
+            write_varint(&mut writer, text2.len() as u32)?;
+            writer.write_all(text2.as_bytes())?;
+            write_varint(&mut writer, text3.len() as u32)?;
+            writer.write_all(text3.as_bytes())?;
+            write_varint(&mut writer, text4.len() as u32)?;
+            writer.write_all(text4.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ArmAnimationRequest {
         pub hand: i32,
@@ -1016,6 +1665,12 @@ pub mod play {
         let result = ArmAnimationRequest { hand };
         Ok(result)
     }
+    impl ArmAnimationRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, hand: i32) -> IoResult<()> {
+            write_varint(&mut writer, hand as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SpectateRequest {
         pub target: u128,
@@ -1025,6 +1680,12 @@ pub mod play {
 
         let result = SpectateRequest { target };
         Ok(result)
+    }
+    impl SpectateRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, target: u128) -> IoResult<()> {
+            writer.write_u128::<BE>(target)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct BlockPlaceRequest {
@@ -1056,6 +1717,27 @@ pub mod play {
         };
         Ok(result)
     }
+    impl BlockPlaceRequest {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            hand: i32,
+            location: Position,
+            direction: i32,
+            cursor_x: f32,
+            cursor_y: f32,
+            cursor_z: f32,
+            inside_block: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, hand as u32)?;
+            location.write(&mut writer)?;
+            write_varint(&mut writer, direction as u32)?;
+            writer.write_f32::<BE>(cursor_x)?;
+            writer.write_f32::<BE>(cursor_y)?;
+            writer.write_f32::<BE>(cursor_z)?;
+            writer.write_all(&[inside_block as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct UseItemRequest {
         pub hand: i32,
@@ -1066,6 +1748,12 @@ pub mod play {
         let result = UseItemRequest { hand };
         Ok(result)
     }
+    impl UseItemRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, hand: i32) -> IoResult<()> {
+            write_varint(&mut writer, hand as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct AdvancementTabRequest {}
     pub(super) fn read_advancement_tab_request(
@@ -1073,6 +1761,11 @@ pub mod play {
     ) -> Result<AdvancementTabRequest> {
         let result = AdvancementTabRequest {};
         Ok(result)
+    }
+    impl AdvancementTabRequest {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct PongRequest {
@@ -1083,6 +1776,12 @@ pub mod play {
 
         let result = PongRequest { id };
         Ok(result)
+    }
+    impl PongRequest {
+        pub(super) fn write<W: Write>(mut writer: &mut W, id: i32) -> IoResult<()> {
+            writer.write_i32::<BE>(id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SpawnEntityResponse {
@@ -1131,6 +1830,37 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SpawnEntityResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            object_uuid: u128,
+            type_: i32,
+            x: f64,
+            y: f64,
+            z: f64,
+            pitch: i8,
+            yaw: i8,
+            object_data: i32,
+            velocity_x: i16,
+            velocity_y: i16,
+            velocity_z: i16,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_u128::<BE>(object_uuid)?;
+            write_varint(&mut writer, type_ as u32)?;
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_i8(pitch)?;
+            writer.write_i8(yaw)?;
+            writer.write_i32::<BE>(object_data)?;
+            writer.write_i16::<BE>(velocity_x)?;
+            writer.write_i16::<BE>(velocity_y)?;
+            writer.write_i16::<BE>(velocity_z)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SpawnEntityExperienceOrbResponse {
         pub entity_id: i32,
@@ -1156,6 +1886,23 @@ pub mod play {
             count,
         };
         Ok(result)
+    }
+    impl SpawnEntityExperienceOrbResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            x: f64,
+            y: f64,
+            z: f64,
+            count: i16,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_i16::<BE>(count)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SpawnEntityLivingResponse {
@@ -1204,6 +1951,37 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SpawnEntityLivingResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            entity_uuid: u128,
+            type_: i32,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: i8,
+            pitch: i8,
+            head_pitch: i8,
+            velocity_x: i16,
+            velocity_y: i16,
+            velocity_z: i16,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_u128::<BE>(entity_uuid)?;
+            write_varint(&mut writer, type_ as u32)?;
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_i8(yaw)?;
+            writer.write_i8(pitch)?;
+            writer.write_i8(head_pitch)?;
+            writer.write_i16::<BE>(velocity_x)?;
+            writer.write_i16::<BE>(velocity_y)?;
+            writer.write_i16::<BE>(velocity_z)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SpawnEntityPaintingResponse {
         pub entity_id: i32,
@@ -1229,6 +2007,23 @@ pub mod play {
             direction,
         };
         Ok(result)
+    }
+    impl SpawnEntityPaintingResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            entity_uuid: u128,
+            title: i32,
+            location: Position,
+            direction: u8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_u128::<BE>(entity_uuid)?;
+            write_varint(&mut writer, title as u32)?;
+            location.write(&mut writer)?;
+            writer.write_u8(direction)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct NamedEntitySpawnResponse {
@@ -1262,6 +2057,27 @@ pub mod play {
         };
         Ok(result)
     }
+    impl NamedEntitySpawnResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            player_uuid: u128,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: i8,
+            pitch: i8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_u128::<BE>(player_uuid)?;
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_i8(yaw)?;
+            writer.write_i8(pitch)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct AnimationResponse {
         pub entity_id: i32,
@@ -1276,6 +2092,17 @@ pub mod play {
             animation,
         };
         Ok(result)
+    }
+    impl AnimationResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            animation: u8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_u8(animation)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct StatisticsResponse_Entries {
@@ -1297,6 +2124,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl StatisticsResponse_Entries {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            category_id: i32,
+            statistic_id: i32,
+            value: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, category_id as u32)?;
+            write_varint(&mut writer, statistic_id as u32)?;
+            write_varint(&mut writer, value as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct StatisticsResponse {
         pub entries: Vec<StatisticsResponse_Entries>,
@@ -1312,6 +2152,14 @@ pub mod play {
         let result = StatisticsResponse { entries };
         Ok(result)
     }
+    impl StatisticsResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _entries: &[StatisticsResponse_Entries],
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct AdvancementsResponse {}
     pub(super) fn read_advancements_response(
@@ -1319,6 +2167,11 @@ pub mod play {
     ) -> Result<AdvancementsResponse> {
         let result = AdvancementsResponse {};
         Ok(result)
+    }
+    impl AdvancementsResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct BlockBreakAnimationResponse {
@@ -1340,6 +2193,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl BlockBreakAnimationResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            location: Position,
+            destroy_stage: i8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            location.write(&mut writer)?;
+            writer.write_i8(destroy_stage)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct TileEntityDataResponse {
         pub location: Position,
@@ -1359,6 +2225,19 @@ pub mod play {
             nbt_data,
         };
         Ok(result)
+    }
+    impl TileEntityDataResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            action: i32,
+            nbt_data: IndexedOptionNbt,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, action as u32)?;
+            unimplemented!();
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct BlockActionResponse {
@@ -1383,6 +2262,21 @@ pub mod play {
         };
         Ok(result)
     }
+    impl BlockActionResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            byte1: u8,
+            byte2: u8,
+            block_id: i32,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            writer.write_u8(byte1)?;
+            writer.write_u8(byte2)?;
+            write_varint(&mut writer, block_id as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct BlockChangeResponse {
         pub location: Position,
@@ -1397,11 +2291,27 @@ pub mod play {
         let result = BlockChangeResponse { location, type_ };
         Ok(result)
     }
+    impl BlockChangeResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            type_: i32,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, type_ as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct BossBarResponse {}
     pub(super) fn read_boss_bar_response(mut _reader: &mut Reader) -> Result<BossBarResponse> {
         let result = BossBarResponse {};
         Ok(result)
+    }
+    impl BossBarResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct DifficultyResponse {
@@ -1418,6 +2328,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl DifficultyResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            difficulty: u8,
+            difficulty_locked: bool,
+        ) -> IoResult<()> {
+            writer.write_u8(difficulty)?;
+            writer.write_all(&[difficulty_locked as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct TabCompleteResponse_Matches {
         pub match_: IndexedString,
@@ -1431,6 +2352,26 @@ pub mod play {
 
         let result = TabCompleteResponse_Matches { match_, tooltip };
         Ok(result)
+    }
+    impl TabCompleteResponse_Matches {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            match_: &str,
+            tooltip: Option<&str>,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, match_.len() as u32)?;
+            writer.write_all(match_.as_bytes())?;
+            match tooltip {
+                Some(tooltip_1) => {
+                    writer.write_all(&[1])?;
+
+                    write_varint(&mut writer, tooltip_1.len() as u32)?;
+                    writer.write_all(tooltip_1.as_bytes())?;
+                }
+                None => writer.write_all(&[0])?,
+            }
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct TabCompleteResponse {
@@ -1460,6 +2401,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl TabCompleteResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _transaction_id: i32,
+            _start: i32,
+            _length: i32,
+            _matches: &[TabCompleteResponse_Matches],
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct DeclareCommandsResponse {}
     pub(super) fn read_declare_commands_response(
@@ -1468,6 +2420,11 @@ pub mod play {
         let result = DeclareCommandsResponse {};
         Ok(result)
     }
+    impl DeclareCommandsResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct FacePlayerResponse {}
     pub(super) fn read_face_player_response(
@@ -1475,6 +2432,11 @@ pub mod play {
     ) -> Result<FacePlayerResponse> {
         let result = FacePlayerResponse {};
         Ok(result)
+    }
+    impl FacePlayerResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct NbtQueryResponse {
@@ -1490,6 +2452,17 @@ pub mod play {
             nbt,
         };
         Ok(result)
+    }
+    impl NbtQueryResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            transaction_id: i32,
+            nbt: IndexedOptionNbt,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, transaction_id as u32)?;
+            unimplemented!();
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ChatResponse {
@@ -1509,6 +2482,20 @@ pub mod play {
         };
         Ok(result)
     }
+    impl ChatResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            message: &str,
+            position: i8,
+            sender: u128,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, message.len() as u32)?;
+            writer.write_all(message.as_bytes())?;
+            writer.write_i8(position)?;
+            writer.write_u128::<BE>(sender)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct MultiBlockChangeResponse {}
     pub(super) fn read_multi_block_change_response(
@@ -1516,6 +2503,11 @@ pub mod play {
     ) -> Result<MultiBlockChangeResponse> {
         let result = MultiBlockChangeResponse {};
         Ok(result)
+    }
+    impl MultiBlockChangeResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct CloseWindowResponse {
@@ -1528,6 +2520,12 @@ pub mod play {
 
         let result = CloseWindowResponse { window_id };
         Ok(result)
+    }
+    impl CloseWindowResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, window_id: u8) -> IoResult<()> {
+            writer.write_u8(window_id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct OpenWindowResponse {
@@ -1546,6 +2544,20 @@ pub mod play {
             window_title,
         };
         Ok(result)
+    }
+    impl OpenWindowResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: i32,
+            inventory_type: i32,
+            window_title: &str,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, window_id as u32)?;
+            write_varint(&mut writer, inventory_type as u32)?;
+            write_varint(&mut writer, window_title.len() as u32)?;
+            writer.write_all(window_title.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct WindowItemsResponse {
@@ -1575,6 +2587,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl WindowItemsResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _window_id: u8,
+            _state_id: i32,
+            _items: &[InventorySlot],
+            _carried_item: InventorySlot,
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct CraftProgressBarResponse {
         pub window_id: u8,
@@ -1594,6 +2617,19 @@ pub mod play {
             value,
         };
         Ok(result)
+    }
+    impl CraftProgressBarResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: u8,
+            property: i16,
+            value: i16,
+        ) -> IoResult<()> {
+            writer.write_u8(window_id)?;
+            writer.write_i16::<BE>(property)?;
+            writer.write_i16::<BE>(value)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SetSlotResponse {
@@ -1616,6 +2652,21 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SetSlotResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: i8,
+            state_id: i32,
+            slot: i16,
+            item: InventorySlot,
+        ) -> IoResult<()> {
+            writer.write_i8(window_id)?;
+            write_varint(&mut writer, state_id as u32)?;
+            writer.write_i16::<BE>(slot)?;
+            unimplemented!();
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SetCooldownResponse {
         pub item_id: i32,
@@ -1633,6 +2684,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SetCooldownResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            item_id: i32,
+            cooldown_ticks: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, item_id as u32)?;
+            write_varint(&mut writer, cooldown_ticks as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct CustomPayloadResponse {
         pub channel: IndexedString,
@@ -1646,6 +2708,18 @@ pub mod play {
 
         let result = CustomPayloadResponse { channel, data };
         Ok(result)
+    }
+    impl CustomPayloadResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            channel: &str,
+            data: &[u8],
+        ) -> IoResult<()> {
+            write_varint(&mut writer, channel.len() as u32)?;
+            writer.write_all(channel.as_bytes())?;
+            writer.write_all(data)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct NamedSoundEffectResponse {
@@ -1679,6 +2753,28 @@ pub mod play {
         };
         Ok(result)
     }
+    impl NamedSoundEffectResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            sound_name: &str,
+            sound_category: i32,
+            x: i32,
+            y: i32,
+            z: i32,
+            volume: f32,
+            pitch: f32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, sound_name.len() as u32)?;
+            writer.write_all(sound_name.as_bytes())?;
+            write_varint(&mut writer, sound_category as u32)?;
+            writer.write_i32::<BE>(x)?;
+            writer.write_i32::<BE>(y)?;
+            writer.write_i32::<BE>(z)?;
+            writer.write_f32::<BE>(volume)?;
+            writer.write_f32::<BE>(pitch)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct KickDisconnectResponse {
         pub reason: IndexedString,
@@ -1690,6 +2786,13 @@ pub mod play {
 
         let result = KickDisconnectResponse { reason };
         Ok(result)
+    }
+    impl KickDisconnectResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, reason: &str) -> IoResult<()> {
+            write_varint(&mut writer, reason.len() as u32)?;
+            writer.write_all(reason.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityStatusResponse {
@@ -1708,6 +2811,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityStatusResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            entity_status: i8,
+        ) -> IoResult<()> {
+            writer.write_i32::<BE>(entity_id)?;
+            writer.write_i8(entity_status)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ExplosionResponse_AffectedBlockOffsets {
         pub x: i8,
@@ -1723,6 +2837,14 @@ pub mod play {
 
         let result = ExplosionResponse_AffectedBlockOffsets { x, y, z };
         Ok(result)
+    }
+    impl ExplosionResponse_AffectedBlockOffsets {
+        pub(super) fn write<W: Write>(mut writer: &mut W, x: i8, y: i8, z: i8) -> IoResult<()> {
+            writer.write_i8(x)?;
+            writer.write_i8(y)?;
+            writer.write_i8(z)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ExplosionResponse {
@@ -1763,6 +2885,21 @@ pub mod play {
         };
         Ok(result)
     }
+    impl ExplosionResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _x: f32,
+            _y: f32,
+            _z: f32,
+            _radius: f32,
+            _affected_block_offsets: &[ExplosionResponse_AffectedBlockOffsets],
+            _player_motion_x: f32,
+            _player_motion_y: f32,
+            _player_motion_z: f32,
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct UnloadChunkResponse {
         pub chunk_x: i32,
@@ -1777,6 +2914,17 @@ pub mod play {
         let result = UnloadChunkResponse { chunk_x, chunk_z };
         Ok(result)
     }
+    impl UnloadChunkResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            chunk_x: i32,
+            chunk_z: i32,
+        ) -> IoResult<()> {
+            writer.write_i32::<BE>(chunk_x)?;
+            writer.write_i32::<BE>(chunk_z)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct GameStateChangeResponse {
         pub reason: u8,
@@ -1790,6 +2938,17 @@ pub mod play {
 
         let result = GameStateChangeResponse { reason, game_mode };
         Ok(result)
+    }
+    impl GameStateChangeResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            reason: u8,
+            game_mode: f32,
+        ) -> IoResult<()> {
+            writer.write_u8(reason)?;
+            writer.write_f32::<BE>(game_mode)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct OpenHorseWindowResponse {
@@ -1811,6 +2970,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl OpenHorseWindowResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: u8,
+            nb_slots: i32,
+            entity_id: i32,
+        ) -> IoResult<()> {
+            writer.write_u8(window_id)?;
+            write_varint(&mut writer, nb_slots as u32)?;
+            writer.write_i32::<BE>(entity_id)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct KeepAliveResponse {
         pub keep_alive_id: i64,
@@ -1821,11 +2993,22 @@ pub mod play {
         let result = KeepAliveResponse { keep_alive_id };
         Ok(result)
     }
+    impl KeepAliveResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, keep_alive_id: i64) -> IoResult<()> {
+            writer.write_i64::<BE>(keep_alive_id)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct MapChunkResponse {}
     pub(super) fn read_map_chunk_response(mut _reader: &mut Reader) -> Result<MapChunkResponse> {
         let result = MapChunkResponse {};
         Ok(result)
+    }
+    impl MapChunkResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct WorldEventResponse {
@@ -1848,6 +3031,21 @@ pub mod play {
         };
         Ok(result)
     }
+    impl WorldEventResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            effect_id: i32,
+            location: Position,
+            data: i32,
+            global: bool,
+        ) -> IoResult<()> {
+            writer.write_i32::<BE>(effect_id)?;
+            location.write(&mut writer)?;
+            writer.write_i32::<BE>(data)?;
+            writer.write_all(&[global as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct WorldParticlesResponse {}
     pub(super) fn read_world_particles_response(
@@ -1855,6 +3053,11 @@ pub mod play {
     ) -> Result<WorldParticlesResponse> {
         let result = WorldParticlesResponse {};
         Ok(result)
+    }
+    impl WorldParticlesResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct UpdateLightResponse {
@@ -1934,6 +3137,22 @@ pub mod play {
         };
         Ok(result)
     }
+    impl UpdateLightResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _chunk_x: i32,
+            _chunk_z: i32,
+            _trust_edges: bool,
+            _sky_light_mask: &[i64],
+            _block_light_mask: &[i64],
+            _empty_sky_light_mask: &[i64],
+            _empty_block_light_mask: &[i64],
+            _sky_light: &[&[u8]],
+            _block_light: &[&[u8]],
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct LoginResponse {
         pub entity_id: i32,
@@ -1996,11 +3215,39 @@ pub mod play {
         };
         Ok(result)
     }
+    impl LoginResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _entity_id: i32,
+            _is_hardcore: bool,
+            _game_mode: u8,
+            _previous_game_mode: i8,
+            _world_names: &[&str],
+            _dimension_codec: IndexedNbt,
+            _dimension: IndexedNbt,
+            _world_name: &str,
+            _hashed_seed: i64,
+            _max_players: i32,
+            _view_distance: i32,
+            _simulation_distance: i32,
+            _reduced_debug_info: bool,
+            _enable_respawn_screen: bool,
+            _is_debug: bool,
+            _is_flat: bool,
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct MapResponse {}
     pub(super) fn read_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
         let result = MapResponse {};
         Ok(result)
+    }
+    impl MapResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct TradeListResponse_Trades {
@@ -2043,6 +3290,39 @@ pub mod play {
         };
         Ok(result)
     }
+    impl TradeListResponse_Trades {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            input_item1: InventorySlot,
+            output_item: InventorySlot,
+            input_item2: Option<InventorySlot>,
+            trade_disabled: bool,
+            nb_trade_uses: i32,
+            maximum_nb_trade_uses: i32,
+            xp: i32,
+            special_price: i32,
+            price_multiplier: f32,
+            demand: i32,
+        ) -> IoResult<()> {
+            unimplemented!();
+            unimplemented!();
+            match input_item2 {
+                Some(input_item2_1) => {
+                    writer.write_all(&[1])?;
+                    unimplemented!();
+                }
+                None => writer.write_all(&[0])?,
+            }
+            writer.write_all(&[trade_disabled as u8])?;
+            writer.write_i32::<BE>(nb_trade_uses)?;
+            writer.write_i32::<BE>(maximum_nb_trade_uses)?;
+            writer.write_i32::<BE>(xp)?;
+            writer.write_i32::<BE>(special_price)?;
+            writer.write_f32::<BE>(price_multiplier)?;
+            writer.write_i32::<BE>(demand)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct TradeListResponse {
         pub window_id: i32,
@@ -2075,6 +3355,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl TradeListResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _window_id: i32,
+            _trades: &[TradeListResponse_Trades],
+            _villager_level: i32,
+            _experience: i32,
+            _is_regular_villager: bool,
+            _can_restock: bool,
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct RelEntityMoveResponse {
         pub entity_id: i32,
@@ -2100,6 +3393,23 @@ pub mod play {
             on_ground,
         };
         Ok(result)
+    }
+    impl RelEntityMoveResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            d_x: i16,
+            d_y: i16,
+            d_z: i16,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_i16::<BE>(d_x)?;
+            writer.write_i16::<BE>(d_y)?;
+            writer.write_i16::<BE>(d_z)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityMoveLookResponse {
@@ -2133,6 +3443,27 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityMoveLookResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            d_x: i16,
+            d_y: i16,
+            d_z: i16,
+            yaw: i8,
+            pitch: i8,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_i16::<BE>(d_x)?;
+            writer.write_i16::<BE>(d_y)?;
+            writer.write_i16::<BE>(d_z)?;
+            writer.write_i8(yaw)?;
+            writer.write_i8(pitch)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EntityLookResponse {
         pub entity_id: i32,
@@ -2153,6 +3484,21 @@ pub mod play {
             on_ground,
         };
         Ok(result)
+    }
+    impl EntityLookResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            yaw: i8,
+            pitch: i8,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_i8(yaw)?;
+            writer.write_i8(pitch)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct VehicleMoveResponse {
@@ -2180,6 +3526,23 @@ pub mod play {
         };
         Ok(result)
     }
+    impl VehicleMoveResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: f32,
+            pitch: f32,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_f32::<BE>(yaw)?;
+            writer.write_f32::<BE>(pitch)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct OpenBookResponse {
         pub hand: i32,
@@ -2189,6 +3552,12 @@ pub mod play {
 
         let result = OpenBookResponse { hand };
         Ok(result)
+    }
+    impl OpenBookResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, hand: i32) -> IoResult<()> {
+            write_varint(&mut writer, hand as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct OpenSignEntityResponse {
@@ -2201,6 +3570,12 @@ pub mod play {
 
         let result = OpenSignEntityResponse { location };
         Ok(result)
+    }
+    impl OpenSignEntityResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, location: Position) -> IoResult<()> {
+            location.write(&mut writer)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct CraftRecipeResponse {
@@ -2215,6 +3590,18 @@ pub mod play {
 
         let result = CraftRecipeResponse { window_id, recipe };
         Ok(result)
+    }
+    impl CraftRecipeResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            window_id: i8,
+            recipe: &str,
+        ) -> IoResult<()> {
+            writer.write_i8(window_id)?;
+            write_varint(&mut writer, recipe.len() as u32)?;
+            writer.write_all(recipe.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct AbilitiesResponse {
@@ -2234,6 +3621,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl AbilitiesResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            flags: i8,
+            flying_speed: f32,
+            walking_speed: f32,
+        ) -> IoResult<()> {
+            writer.write_i8(flags)?;
+            writer.write_f32::<BE>(flying_speed)?;
+            writer.write_f32::<BE>(walking_speed)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EndCombatEventResponse {
         pub duration: i32,
@@ -2251,6 +3651,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EndCombatEventResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            duration: i32,
+            entity_id: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, duration as u32)?;
+            writer.write_i32::<BE>(entity_id)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EnterCombatEventResponse {}
     pub(super) fn read_enter_combat_event_response(
@@ -2258,6 +3669,11 @@ pub mod play {
     ) -> Result<EnterCombatEventResponse> {
         let result = EnterCombatEventResponse {};
         Ok(result)
+    }
+    impl EnterCombatEventResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct DeathCombatEventResponse {
@@ -2279,6 +3695,20 @@ pub mod play {
         };
         Ok(result)
     }
+    impl DeathCombatEventResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            player_id: i32,
+            entity_id: i32,
+            message: &str,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, player_id as u32)?;
+            writer.write_i32::<BE>(entity_id)?;
+            write_varint(&mut writer, message.len() as u32)?;
+            writer.write_all(message.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct PlayerInfoResponse {}
     pub(super) fn read_player_info_response(
@@ -2286,6 +3716,11 @@ pub mod play {
     ) -> Result<PlayerInfoResponse> {
         let result = PlayerInfoResponse {};
         Ok(result)
+    }
+    impl PlayerInfoResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct PositionResponse {
@@ -2320,6 +3755,29 @@ pub mod play {
         };
         Ok(result)
     }
+    impl PositionResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: f32,
+            pitch: f32,
+            flags: i8,
+            teleport_id: i32,
+            dismount_vehicle: bool,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_f32::<BE>(yaw)?;
+            writer.write_f32::<BE>(pitch)?;
+            writer.write_i8(flags)?;
+            write_varint(&mut writer, teleport_id as u32)?;
+            writer.write_all(&[dismount_vehicle as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct UnlockRecipesResponse {}
     pub(super) fn read_unlock_recipes_response(
@@ -2327,6 +3785,11 @@ pub mod play {
     ) -> Result<UnlockRecipesResponse> {
         let result = UnlockRecipesResponse {};
         Ok(result)
+    }
+    impl UnlockRecipesResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityDestroyResponse {
@@ -2345,6 +3808,11 @@ pub mod play {
         let result = EntityDestroyResponse { entity_ids };
         Ok(result)
     }
+    impl EntityDestroyResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W, _entity_ids: &[i32]) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct RemoveEntityEffectResponse {
         pub entity_id: i32,
@@ -2361,6 +3829,17 @@ pub mod play {
             effect_id,
         };
         Ok(result)
+    }
+    impl RemoveEntityEffectResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            effect_id: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            write_varint(&mut writer, effect_id as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ResourcePackSendResponse {
@@ -2384,6 +3863,31 @@ pub mod play {
             prompt_message,
         };
         Ok(result)
+    }
+    impl ResourcePackSendResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            url: &str,
+            hash: &str,
+            forced: bool,
+            prompt_message: Option<&str>,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, url.len() as u32)?;
+            writer.write_all(url.as_bytes())?;
+            write_varint(&mut writer, hash.len() as u32)?;
+            writer.write_all(hash.as_bytes())?;
+            writer.write_all(&[forced as u8])?;
+            match prompt_message {
+                Some(prompt_message_1) => {
+                    writer.write_all(&[1])?;
+
+                    write_varint(&mut writer, prompt_message_1.len() as u32)?;
+                    writer.write_all(prompt_message_1.as_bytes())?;
+                }
+                None => writer.write_all(&[0])?,
+            }
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct RespawnResponse {
@@ -2418,6 +3922,30 @@ pub mod play {
         };
         Ok(result)
     }
+    impl RespawnResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            dimension: IndexedNbt,
+            world_name: &str,
+            hashed_seed: i64,
+            gamemode: u8,
+            previous_gamemode: u8,
+            is_debug: bool,
+            is_flat: bool,
+            copy_metadata: bool,
+        ) -> IoResult<()> {
+            unimplemented!();
+            write_varint(&mut writer, world_name.len() as u32)?;
+            writer.write_all(world_name.as_bytes())?;
+            writer.write_i64::<BE>(hashed_seed)?;
+            writer.write_u8(gamemode)?;
+            writer.write_u8(previous_gamemode)?;
+            writer.write_all(&[is_debug as u8])?;
+            writer.write_all(&[is_flat as u8])?;
+            writer.write_all(&[copy_metadata as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EntityHeadRotationResponse {
         pub entity_id: i32,
@@ -2435,6 +3963,17 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityHeadRotationResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            head_yaw: i8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_i8(head_yaw)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct CameraResponse {
         pub camera_id: i32,
@@ -2444,6 +3983,12 @@ pub mod play {
 
         let result = CameraResponse { camera_id };
         Ok(result)
+    }
+    impl CameraResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, camera_id: i32) -> IoResult<()> {
+            write_varint(&mut writer, camera_id as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct HeldItemSlotResponse {
@@ -2456,6 +4001,12 @@ pub mod play {
 
         let result = HeldItemSlotResponse { slot };
         Ok(result)
+    }
+    impl HeldItemSlotResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, slot: i8) -> IoResult<()> {
+            writer.write_i8(slot)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct UpdateViewPositionResponse {
@@ -2471,6 +4022,17 @@ pub mod play {
         let result = UpdateViewPositionResponse { chunk_x, chunk_z };
         Ok(result)
     }
+    impl UpdateViewPositionResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            chunk_x: i32,
+            chunk_z: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, chunk_x as u32)?;
+            write_varint(&mut writer, chunk_z as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct UpdateViewDistanceResponse {
         pub view_distance: i32,
@@ -2482,6 +4044,12 @@ pub mod play {
 
         let result = UpdateViewDistanceResponse { view_distance };
         Ok(result)
+    }
+    impl UpdateViewDistanceResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, view_distance: i32) -> IoResult<()> {
+            write_varint(&mut writer, view_distance as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ScoreboardDisplayObjectiveResponse {
@@ -2497,6 +4065,18 @@ pub mod play {
         let result = ScoreboardDisplayObjectiveResponse { position, name };
         Ok(result)
     }
+    impl ScoreboardDisplayObjectiveResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            position: i8,
+            name: &str,
+        ) -> IoResult<()> {
+            writer.write_i8(position)?;
+            write_varint(&mut writer, name.len() as u32)?;
+            writer.write_all(name.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EntityMetadataResponse {}
     pub(super) fn read_entity_metadata_response(
@@ -2504,6 +4084,11 @@ pub mod play {
     ) -> Result<EntityMetadataResponse> {
         let result = EntityMetadataResponse {};
         Ok(result)
+    }
+    impl EntityMetadataResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct AttachEntityResponse {
@@ -2521,6 +4106,17 @@ pub mod play {
             vehicle_id,
         };
         Ok(result)
+    }
+    impl AttachEntityResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            vehicle_id: i32,
+        ) -> IoResult<()> {
+            writer.write_i32::<BE>(entity_id)?;
+            writer.write_i32::<BE>(vehicle_id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityVelocityResponse {
@@ -2545,6 +4141,21 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityVelocityResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            velocity_x: i16,
+            velocity_y: i16,
+            velocity_z: i16,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_i16::<BE>(velocity_x)?;
+            writer.write_i16::<BE>(velocity_y)?;
+            writer.write_i16::<BE>(velocity_z)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EntityEquipmentResponse {}
     pub(super) fn read_entity_equipment_response(
@@ -2552,6 +4163,11 @@ pub mod play {
     ) -> Result<EntityEquipmentResponse> {
         let result = EntityEquipmentResponse {};
         Ok(result)
+    }
+    impl EntityEquipmentResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ExperienceResponse {
@@ -2570,6 +4186,19 @@ pub mod play {
             total_experience,
         };
         Ok(result)
+    }
+    impl ExperienceResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            experience_bar: f32,
+            level: i32,
+            total_experience: i32,
+        ) -> IoResult<()> {
+            writer.write_f32::<BE>(experience_bar)?;
+            write_varint(&mut writer, level as u32)?;
+            write_varint(&mut writer, total_experience as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct UpdateHealthResponse {
@@ -2591,6 +4220,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl UpdateHealthResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            health: f32,
+            food: i32,
+            food_saturation: f32,
+        ) -> IoResult<()> {
+            writer.write_f32::<BE>(health)?;
+            write_varint(&mut writer, food as u32)?;
+            writer.write_f32::<BE>(food_saturation)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ScoreboardObjectiveResponse {}
     pub(super) fn read_scoreboard_objective_response(
@@ -2598,6 +4240,11 @@ pub mod play {
     ) -> Result<ScoreboardObjectiveResponse> {
         let result = ScoreboardObjectiveResponse {};
         Ok(result)
+    }
+    impl ScoreboardObjectiveResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SetPassengersResponse {
@@ -2621,11 +4268,25 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SetPassengersResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _entity_id: i32,
+            _passengers: &[i32],
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct TeamsResponse {}
     pub(super) fn read_teams_response(mut _reader: &mut Reader) -> Result<TeamsResponse> {
         let result = TeamsResponse {};
         Ok(result)
+    }
+    impl TeamsResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ScoreboardScoreResponse {}
@@ -2634,6 +4295,11 @@ pub mod play {
     ) -> Result<ScoreboardScoreResponse> {
         let result = ScoreboardScoreResponse {};
         Ok(result)
+    }
+    impl ScoreboardScoreResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SpawnPositionResponse {
@@ -2649,6 +4315,17 @@ pub mod play {
         let result = SpawnPositionResponse { location, angle };
         Ok(result)
     }
+    impl SpawnPositionResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            angle: f32,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            writer.write_f32::<BE>(angle)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct UpdateTimeResponse {
         pub age: i64,
@@ -2660,6 +4337,13 @@ pub mod play {
 
         let result = UpdateTimeResponse { age, time };
         Ok(result)
+    }
+    impl UpdateTimeResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, age: i64, time: i64) -> IoResult<()> {
+            writer.write_i64::<BE>(age)?;
+            writer.write_i64::<BE>(time)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntitySoundEffectResponse {
@@ -2687,11 +4371,33 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntitySoundEffectResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            sound_id: i32,
+            sound_category: i32,
+            entity_id: i32,
+            volume: f32,
+            pitch: f32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, sound_id as u32)?;
+            write_varint(&mut writer, sound_category as u32)?;
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_f32::<BE>(volume)?;
+            writer.write_f32::<BE>(pitch)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct StopSoundResponse {}
     pub(super) fn read_stop_sound_response(mut _reader: &mut Reader) -> Result<StopSoundResponse> {
         let result = StopSoundResponse {};
         Ok(result)
+    }
+    impl StopSoundResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SoundEffectResponse {
@@ -2725,6 +4431,27 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SoundEffectResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            sound_id: i32,
+            sound_category: i32,
+            x: i32,
+            y: i32,
+            z: i32,
+            volume: f32,
+            pitch: f32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, sound_id as u32)?;
+            write_varint(&mut writer, sound_category as u32)?;
+            writer.write_i32::<BE>(x)?;
+            writer.write_i32::<BE>(y)?;
+            writer.write_i32::<BE>(z)?;
+            writer.write_f32::<BE>(volume)?;
+            writer.write_f32::<BE>(pitch)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct PlayerlistHeaderResponse {
         pub header: IndexedString,
@@ -2738,6 +4465,19 @@ pub mod play {
 
         let result = PlayerlistHeaderResponse { header, footer };
         Ok(result)
+    }
+    impl PlayerlistHeaderResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            header: &str,
+            footer: &str,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, header.len() as u32)?;
+            writer.write_all(header.as_bytes())?;
+            write_varint(&mut writer, footer.len() as u32)?;
+            writer.write_all(footer.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct CollectResponse {
@@ -2756,6 +4496,19 @@ pub mod play {
             pickup_item_count,
         };
         Ok(result)
+    }
+    impl CollectResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            collected_entity_id: i32,
+            collector_entity_id: i32,
+            pickup_item_count: i32,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, collected_entity_id as u32)?;
+            write_varint(&mut writer, collector_entity_id as u32)?;
+            write_varint(&mut writer, pickup_item_count as u32)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityTeleportResponse {
@@ -2789,6 +4542,27 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityTeleportResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: i8,
+            pitch: i8,
+            on_ground: bool,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(y)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_i8(yaw)?;
+            writer.write_i8(pitch)?;
+            writer.write_all(&[on_ground as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct EntityUpdateAttributesResponse_Modifiers {
         pub uuid: u128,
@@ -2808,6 +4582,19 @@ pub mod play {
             operation,
         };
         Ok(result)
+    }
+    impl EntityUpdateAttributesResponse_Modifiers {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            uuid: u128,
+            amount: f64,
+            operation: i8,
+        ) -> IoResult<()> {
+            writer.write_u128::<BE>(uuid)?;
+            writer.write_f64::<BE>(amount)?;
+            writer.write_i8(operation)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct EntityUpdateAttributesResponse_Properties {
@@ -2835,6 +4622,16 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityUpdateAttributesResponse_Properties {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _key: &str,
+            _value: f64,
+            _modifiers: &[EntityUpdateAttributesResponse_Modifiers],
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
     pub struct EntityUpdateAttributesResponse {
         pub entity_id: i32,
@@ -2857,6 +4654,15 @@ pub mod play {
             properties,
         };
         Ok(result)
+    }
+    impl EntityUpdateAttributesResponse {
+        pub(super) fn write<W: Write>(
+            mut _writer: &mut W,
+            _entity_id: i32,
+            _properties: &[EntityUpdateAttributesResponse_Properties],
+        ) -> IoResult<()> {
+            unimplemented!();
+        }
     }
     #[derive(Debug)]
     pub struct EntityEffectResponse {
@@ -2884,6 +4690,23 @@ pub mod play {
         };
         Ok(result)
     }
+    impl EntityEffectResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            entity_id: i32,
+            effect_id: i32,
+            amplifier: i8,
+            duration: i32,
+            hide_particles: i8,
+        ) -> IoResult<()> {
+            write_varint(&mut writer, entity_id as u32)?;
+            write_varint(&mut writer, effect_id as u32)?;
+            writer.write_i8(amplifier)?;
+            write_varint(&mut writer, duration as u32)?;
+            writer.write_i8(hide_particles)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SelectAdvancementTabResponse {
         pub id: Option<IndexedString>,
@@ -2896,6 +4719,20 @@ pub mod play {
         let result = SelectAdvancementTabResponse { id };
         Ok(result)
     }
+    impl SelectAdvancementTabResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, id: Option<&str>) -> IoResult<()> {
+            match id {
+                Some(id_1) => {
+                    writer.write_all(&[1])?;
+
+                    write_varint(&mut writer, id_1.len() as u32)?;
+                    writer.write_all(id_1.as_bytes())?;
+                }
+                None => writer.write_all(&[0])?,
+            }
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct DeclareRecipesResponse {}
     pub(super) fn read_declare_recipes_response(
@@ -2904,11 +4741,21 @@ pub mod play {
         let result = DeclareRecipesResponse {};
         Ok(result)
     }
+    impl DeclareRecipesResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct TagsResponse {}
     pub(super) fn read_tags_response(mut _reader: &mut Reader) -> Result<TagsResponse> {
         let result = TagsResponse {};
         Ok(result)
+    }
+    impl TagsResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct AcknowledgePlayerDiggingResponse {
@@ -2933,6 +4780,21 @@ pub mod play {
         };
         Ok(result)
     }
+    impl AcknowledgePlayerDiggingResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            location: Position,
+            block: i32,
+            status: i32,
+            successful: bool,
+        ) -> IoResult<()> {
+            location.write(&mut writer)?;
+            write_varint(&mut writer, block as u32)?;
+            write_varint(&mut writer, status as u32)?;
+            writer.write_all(&[successful as u8])?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SculkVibrationSignalResponse {}
     pub(super) fn read_sculk_vibration_signal_response(
@@ -2940,6 +4802,11 @@ pub mod play {
     ) -> Result<SculkVibrationSignalResponse> {
         let result = SculkVibrationSignalResponse {};
         Ok(result)
+    }
+    impl SculkVibrationSignalResponse {
+        pub(super) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct ClearTitlesResponse {
@@ -2952,6 +4819,12 @@ pub mod play {
 
         let result = ClearTitlesResponse { reset };
         Ok(result)
+    }
+    impl ClearTitlesResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, reset: bool) -> IoResult<()> {
+            writer.write_all(&[reset as u8])?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct InitializeWorldBorderResponse {
@@ -2988,6 +4861,29 @@ pub mod play {
         };
         Ok(result)
     }
+    impl InitializeWorldBorderResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            x: f64,
+            z: f64,
+            old_diameter: f64,
+            new_diameter: f64,
+            speed: i64,
+            portal_teleport_boundary: i32,
+            warning_blocks: i32,
+            warning_time: i32,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(z)?;
+            writer.write_f64::<BE>(old_diameter)?;
+            writer.write_f64::<BE>(new_diameter)?;
+            write_varlong(&mut writer, speed as u64)?;
+            write_varint(&mut writer, portal_teleport_boundary as u32)?;
+            write_varint(&mut writer, warning_blocks as u32)?;
+            write_varint(&mut writer, warning_time as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct ActionBarResponse {
         pub text: IndexedString,
@@ -2997,6 +4893,13 @@ pub mod play {
 
         let result = ActionBarResponse { text };
         Ok(result)
+    }
+    impl ActionBarResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, text: &str) -> IoResult<()> {
+            write_varint(&mut writer, text.len() as u32)?;
+            writer.write_all(text.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct WorldBorderCenterResponse {
@@ -3011,6 +4914,13 @@ pub mod play {
 
         let result = WorldBorderCenterResponse { x, z };
         Ok(result)
+    }
+    impl WorldBorderCenterResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, x: f64, z: f64) -> IoResult<()> {
+            writer.write_f64::<BE>(x)?;
+            writer.write_f64::<BE>(z)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct WorldBorderLerpSizeResponse {
@@ -3032,6 +4942,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl WorldBorderLerpSizeResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            old_diameter: f64,
+            new_diameter: f64,
+            speed: i64,
+        ) -> IoResult<()> {
+            writer.write_f64::<BE>(old_diameter)?;
+            writer.write_f64::<BE>(new_diameter)?;
+            write_varlong(&mut writer, speed as u64)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct WorldBorderSizeResponse {
         pub diameter: f64,
@@ -3043,6 +4966,12 @@ pub mod play {
 
         let result = WorldBorderSizeResponse { diameter };
         Ok(result)
+    }
+    impl WorldBorderSizeResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, diameter: f64) -> IoResult<()> {
+            writer.write_f64::<BE>(diameter)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct WorldBorderWarningDelayResponse {
@@ -3056,6 +4985,12 @@ pub mod play {
         let result = WorldBorderWarningDelayResponse { warning_time };
         Ok(result)
     }
+    impl WorldBorderWarningDelayResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, warning_time: i32) -> IoResult<()> {
+            write_varint(&mut writer, warning_time as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct WorldBorderWarningReachResponse {
         pub warning_blocks: i32,
@@ -3068,6 +5003,12 @@ pub mod play {
         let result = WorldBorderWarningReachResponse { warning_blocks };
         Ok(result)
     }
+    impl WorldBorderWarningReachResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, warning_blocks: i32) -> IoResult<()> {
+            write_varint(&mut writer, warning_blocks as u32)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct PlayPingResponse {
         pub id: i32,
@@ -3077,6 +5018,12 @@ pub mod play {
 
         let result = PlayPingResponse { id };
         Ok(result)
+    }
+    impl PlayPingResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, id: i32) -> IoResult<()> {
+            writer.write_i32::<BE>(id)?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SetTitleSubtitleResponse {
@@ -3090,6 +5037,13 @@ pub mod play {
         let result = SetTitleSubtitleResponse { text };
         Ok(result)
     }
+    impl SetTitleSubtitleResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, text: &str) -> IoResult<()> {
+            write_varint(&mut writer, text.len() as u32)?;
+            writer.write_all(text.as_bytes())?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SetTitleTextResponse {
         pub text: IndexedString,
@@ -3101,6 +5055,13 @@ pub mod play {
 
         let result = SetTitleTextResponse { text };
         Ok(result)
+    }
+    impl SetTitleTextResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, text: &str) -> IoResult<()> {
+            write_varint(&mut writer, text.len() as u32)?;
+            writer.write_all(text.as_bytes())?;
+            Ok(())
+        }
     }
     #[derive(Debug)]
     pub struct SetTitleTimeResponse {
@@ -3122,6 +5083,19 @@ pub mod play {
         };
         Ok(result)
     }
+    impl SetTitleTimeResponse {
+        pub(super) fn write<W: Write>(
+            mut writer: &mut W,
+            fade_in: i32,
+            stay: i32,
+            fade_out: i32,
+        ) -> IoResult<()> {
+            writer.write_i32::<BE>(fade_in)?;
+            writer.write_i32::<BE>(stay)?;
+            writer.write_i32::<BE>(fade_out)?;
+            Ok(())
+        }
+    }
     #[derive(Debug)]
     pub struct SimulationDistanceResponse {
         pub distance: i32,
@@ -3133,6 +5107,12 @@ pub mod play {
 
         let result = SimulationDistanceResponse { distance };
         Ok(result)
+    }
+    impl SimulationDistanceResponse {
+        pub(super) fn write<W: Write>(mut writer: &mut W, distance: i32) -> IoResult<()> {
+            write_varint(&mut writer, distance as u32)?;
+            Ok(())
+        }
     }
 }
 #[derive(Debug)]
