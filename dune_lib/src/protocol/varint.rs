@@ -22,12 +22,12 @@ pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usiz
     Ok((result as i32, bytes_read))
 }
 
-pub fn read_varint<R: Read>(reader: R) -> Result<i32> {
+pub(crate) fn read_varint<R: Read>(reader: R) -> Result<i32> {
     let (value, _) = read_varint_with_size(reader)?;
     Ok(value)
 }
 
-pub fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
+pub(crate) fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
@@ -63,3 +63,20 @@ pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> Result<()
 
     Ok(())
 }
+
+// pub(crate) fn write_varlong<W: Write>(mut writer: W, mut value: u64) -> Result<()> {
+//     loop {
+//         let mut temp = (value & 0b01111111) as u8;
+//         value >>= 7;
+//         if value != 0 {
+//             temp |= 0b10000000;
+//         }
+//         writer.write_all(&[temp])?;
+
+//         if value == 0 {
+//             break;
+//         }
+//     }
+
+//     Ok(())
+// }

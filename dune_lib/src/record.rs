@@ -19,19 +19,19 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 
 type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
-struct Encryption {
+pub(crate) struct Encryption {
     enc: Aes128Cfb8,
     dec: Aes128Cfb8,
 }
 
-struct Session {
-    read_buf: Vec<u8>,
-    write_buf: Vec<u8>,
-    crypt: Option<Encryption>,
+pub(crate) struct Session {
+    pub(crate) read_buf: Vec<u8>,
+    pub(crate) write_buf: Vec<u8>,
+    pub(crate) crypt: Option<Encryption>,
 }
 
 impl Session {
-    fn new() -> Session {
+    pub(crate) fn new() -> Session {
         Session {
             read_buf: vec![],
             write_buf: vec![],
@@ -41,7 +41,7 @@ impl Session {
 }
 
 impl Session {
-    fn write(&mut self, buf: &[u8]) {
+    pub(crate) fn write(&mut self, buf: &[u8]) {
         let offset = self.write_buf.len();
         self.write_buf.extend_from_slice(buf);
 
@@ -50,7 +50,7 @@ impl Session {
         }
     }
 
-    fn read(&mut self, buf: &[u8]) {
+    pub(crate) fn read(&mut self, buf: &[u8]) {
         let offset = self.read_buf.len();
         self.read_buf.extend_from_slice(buf);
 

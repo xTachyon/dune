@@ -9,6 +9,7 @@ use std::hash::Hash;
 use std::io::Write;
 
 pub mod chat;
+pub mod client;
 mod data;
 pub mod events;
 mod game;
