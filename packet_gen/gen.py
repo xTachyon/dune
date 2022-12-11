@@ -525,7 +525,7 @@ pub(super) fn read_use_entity_request(mut reader: &mut Reader) -> Result<UseEnti
 
         self.out += f'''
 impl {struct.name} {{
-    pub(super) fn write<W: Write>(mut {underscore}writer: &mut W,
+    pub(crate) fn write<W: Write>(mut {underscore}writer: &mut W,
 '''
         for i in struct.fields:
             self.out += f"{underscore}{i.name}: {get_type_for_serializer(i.ty)},"

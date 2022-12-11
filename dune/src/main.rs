@@ -18,7 +18,7 @@ use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
 use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
 use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
-use dune_lib::{nbt, Enchantment, Item};
+use dune_lib::{nbt, Enchantment, Item, client};
 use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
@@ -44,6 +44,7 @@ enum Action {
     Record { option: Option<String> },
     Replay { option: String },
     Signs { path: String },
+    Client,
 }
 struct EventHandler {
     player_name: String,
@@ -440,6 +441,12 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
     })
 }
 
+fn do_client() -> Result<()> {
+    client::run("127.0.0.1:25565".parse()?)?;
+
+    Ok(())
+}
+
 fn main_impl() -> Result<()> {
     let arguments = Args::parse();
 
@@ -455,6 +462,7 @@ fn main_impl() -> Result<()> {
             play(&option, handler)
         }
         Action::Signs { path } => print_signs(path),
+        Action::Client => do_client()
     }
 }
 

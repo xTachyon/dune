@@ -47,7 +47,8 @@ pub(crate) fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
     Ok(result as i64)
 }
 
-pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<()> {
+pub(crate) fn write_varint_with_size<W: Write>(mut writer: W, mut value: u32) -> IoResult<u32> {
+    let mut count = 0;
     loop {
         let mut temp = (value & 0b01111111) as u8;
         value >>= 7;
@@ -55,12 +56,18 @@ pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<
             temp |= 0b10000000;
         }
         writer.write_all(&[temp])?;
+        count += 1;
 
         if value == 0 {
             break;
         }
     }
 
+    Ok(count)
+}
+
+pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<()> {
+    write_varint_with_size(writer, value)?;
     Ok(())
 }
 
