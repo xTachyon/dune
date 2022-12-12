@@ -1,36 +1,41 @@
-use crate::protocol::ConnectionState;
 use crate::protocol::v1_18_2::handshaking::SetProtocolRequest;
 use crate::protocol::v1_18_2::login::LoginStartRequest;
-use crate::protocol::varint::{write_varint_with_size, write_varint};
+use crate::protocol::varint::write_varint;
+use crate::protocol::ConnectionState;
 use crate::record::Session;
 use anyhow::Result;
 use polling::{Event, Poller};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 
-struct Client {
-    
-}
-impl Client {
-    fn send_packet() -> Result<()> {
+// struct Client {
 
-        Ok(())
-    }
-}
+// }
+// impl Client {
+//     fn send_packet() -> Result<()> {
+
+//         Ok(())
+//     }
+// }
 
 fn send_start(mut writer: &mut Vec<u8>) -> Result<()> {
     let mut tmp = Vec::new();
 
-    SetProtocolRequest::write(&mut tmp, 758, "localhost", 25565, ConnectionState::Login as i32)?;
+    SetProtocolRequest::write(
+        &mut tmp,
+        758,
+        "localhost",
+        25565,
+        ConnectionState::Login as i32,
+    )?;
     write_varint(&mut writer, tmp.len() as u32)?;
     writer.extend_from_slice(&tmp);
     tmp.clear();
 
-
     LoginStartRequest::write(&mut tmp, "me")?;
     write_varint(&mut writer, tmp.len() as u32)?;
     writer.extend_from_slice(&tmp);
-    
+
     Ok(())
 }
 

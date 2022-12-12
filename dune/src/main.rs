@@ -18,7 +18,7 @@ use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
 use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
 use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
-use dune_lib::{nbt, Enchantment, Item, client};
+use dune_lib::{client, nbt, Enchantment, Item};
 use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
@@ -462,7 +462,7 @@ fn main_impl() -> Result<()> {
             play(&option, handler)
         }
         Action::Signs { path } => print_signs(path),
-        Action::Client => do_client()
+        Action::Client => do_client(),
     }
 }
 

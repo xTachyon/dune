@@ -1,6 +1,6 @@
-use byteorder::ReadBytesExt;
-use std::io::{Read, Write, Result as IoResult};
 use anyhow::Result;
+use byteorder::ReadBytesExt;
+use std::io::{Read, Result as IoResult, Write};
 
 pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
     let mut result = 0;
@@ -47,7 +47,7 @@ pub(crate) fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
     Ok(result as i64)
 }
 
-pub(crate) fn write_varint_with_size<W: Write>(mut writer: W, mut value: u32) -> IoResult<u32> {
+pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<u32> {
     let mut count = 0;
     loop {
         let mut temp = (value & 0b01111111) as u8;
@@ -64,11 +64,6 @@ pub(crate) fn write_varint_with_size<W: Write>(mut writer: W, mut value: u32) ->
     }
 
     Ok(count)
-}
-
-pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<()> {
-    write_varint_with_size(writer, value)?;
-    Ok(())
 }
 
 pub(crate) fn write_varlong<W: Write>(mut writer: W, mut value: u64) -> IoResult<()> {

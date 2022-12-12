@@ -2,12 +2,12 @@ use crate::game::GameMode;
 use crate::nbt::{self};
 use crate::protocol::varint::read_varint;
 use anyhow::{anyhow, Result};
-use byteorder::{ReadBytesExt};
-use std::convert::TryFrom;
-use std::io::{Cursor, Read, Write, Result as IoResult};
-use std::ops::Range;
-use byteorder::BE;
+use byteorder::ReadBytesExt;
 use byteorder::WriteBytesExt;
+use byteorder::BE;
+use std::convert::TryFrom;
+use std::io::{Cursor, Read, Result as IoResult, Write};
+use std::ops::Range;
 
 use super::{
     IndexedBuffer, IndexedNbt, IndexedOptionNbt, IndexedString, InventorySlot, InventorySlotData,
@@ -265,7 +265,11 @@ pub struct Position {
 }
 impl Position {
     pub(crate) fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        writer.write_u64::<BE>(((self.x as u64 & 0x3FFFFFF) << 38) | ((self.z as u64 & 0x3FFFFFF) << 12) | (self.y as u64 & 0xFFF))   
+        writer.write_u64::<BE>(
+            ((self.x as u64 & 0x3FFFFFF) << 38)
+                | ((self.z as u64 & 0x3FFFFFF) << 12)
+                | (self.y as u64 & 0xFFF),
+        )
     }
 }
 
