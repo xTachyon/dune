@@ -1,20 +1,34 @@
 use crate::game::GameMode;
 use crate::nbt::{self};
 use crate::protocol::varint::read_varint;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use byteorder::ReadBytesExt;
-use byteorder::WriteBytesExt;
-use byteorder::BE;
 use std::convert::TryFrom;
-use std::io::{Cursor, Read, Result as IoResult, Write};
-use std::ops::Range;
+use std::io::{self, Read, Result as IoResult, Write};
 
-use super::{
-    IndexedBuffer, IndexedNbt, IndexedOptionNbt, IndexedString, InventorySlot, InventorySlotData,
-};
+use super::varint::write_varint;
+use super::{IndexedNbt, IndexedOptionNbt, InventorySlot, InventorySlotData};
 
-pub(crate) trait MD {
-    fn deserialize(reader: &mut Reader) -> Result<Self>
+pub(crate) trait MemoryExt<'x> {
+    fn read_mem(&mut self, size: usize) -> IoResult<&'x [u8]>;
+}
+impl<'x> MemoryExt<'x> for &'x [u8] {
+    fn read_mem(&mut self, size: usize) -> IoResult<&'x [u8]> {
+        if size > self.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "failed to fill whole buffer",
+            ));
+        }
+        let b = &self[..size];
+        *self = &self[size..];
+        Ok(b)
+    }
+}
+
+pub(crate) trait MD<'x> {
+    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()>;
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self>
     where
         Self: Sized;
 }
@@ -22,12 +36,17 @@ pub(crate) trait MD {
 macro_rules! impl_for_numbers {
     ($($number:ident)*) => {
         $(
-            impl MD for $number {
-                fn deserialize(mut reader: &mut Reader) -> Result<Self> {
+            impl<'x> MD<'x> for $number {
+                fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
                     let mut buffer = [0u8; std::mem::size_of::<$number>()];
-                    reader.read_exact(&mut buffer)?;
+                    memory.read_exact(&mut buffer)?;
                     let value = $number::from_be_bytes(buffer.into());
                     Ok(value)
+                }
+                fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+                    let buffer = self.to_be_bytes();
+                    writer.write_all(&buffer)?;
+                    Ok(())
                 }
             }
         )*
@@ -36,78 +55,77 @@ macro_rules! impl_for_numbers {
 
 impl_for_numbers!(u16 u32 u64 u128 i16 i32 i64 f32 f64);
 
-impl MD for u8 {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let value = reader.read_u8()?;
-        Ok(value)
+impl<'x> MD<'x> for &'x str {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let slice: &[u8] = MD::deserialize(memory)?;
+        let s = std::str::from_utf8(slice)?;
+        Ok(s)
+    }
+    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+        self.as_bytes().serialize(writer)
     }
 }
 
-impl MD for i8 {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let value = reader.read_i8()?;
-        Ok(value)
+impl<'x> MD<'x> for &'x [u8] {
+    fn deserialize(mut memory: &mut &'x [u8]) -> Result<Self> {
+        let size: usize = read_varint(&mut memory)?.try_into()?;
+        let slice = memory.read_mem(size)?;
+        Ok(slice)
+    }
+    fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+        write_varint(&mut writer, self.len() as u32)?;
+        writer.write_all(self)?;
+        Ok(())
     }
 }
 
-impl MD for bool {
-    fn deserialize(reader: &mut Reader) -> Result<Self> where {
-        let value: u8 = MD::deserialize(reader)?;
+impl<'x> MD<'x> for u8 {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let value = memory.read_u8()?;
+        Ok(value)
+    }
+    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+        writer.write_all(&[*self])?;
+        Ok(())
+    }
+}
+
+impl<'x> MD<'x> for i8 {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let value = memory.read_i8()?;
+        Ok(value)
+    }
+    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+        writer.write_all(&[*self as u8])?;
+        Ok(())
+    }
+}
+
+impl<'x> MD<'x> for bool {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let value: u8 = MD::deserialize(memory)?;
         let result = value != 0;
         Ok(result)
     }
-}
-
-const MAX_DATA_SIZE: usize = 5 * 1024 * 1024;
-
-impl MD for String {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let size = read_varint(&mut reader)? as usize;
-        if size > MAX_DATA_SIZE {
-            return Err(anyhow!("string size too big"));
-        }
-        let mut buffer = vec![0; size];
-        reader.read_exact(&mut buffer)?;
-        Ok(String::from_utf8(buffer)?)
+    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+        writer.write_all(&[*self as u8])?;
+        Ok(())
     }
 }
 
-impl MD for Vec<u8> {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let size = read_varint(&mut reader)? as usize;
-        if size > MAX_DATA_SIZE {
-            return Err(anyhow!("buffer size too big"));
-        }
-        let mut buffer = vec![0; size];
-        reader.read_exact(&mut buffer)?;
-        Ok(buffer)
-    }
-}
-
-impl MD for IndexedBuffer {
-    fn deserialize(reader: &mut Reader) -> Result<Self> {
-        reader.read_indexed_buffer()
-    }
-}
-
-impl MD for IndexedString {
-    fn deserialize(reader: &mut Reader) -> Result<Self> {
-        reader.read_indexed_string()
-    }
-}
-
-impl MD for InventorySlot {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let present: bool = MD::deserialize(reader)?;
+impl<'x> MD<'x> for InventorySlot<'x> {
+    fn deserialize(mut memory: &mut &'x [u8]) -> Result<Self> {
+        let present: bool = MD::deserialize(memory)?;
 
         let data = if present {
-            let item_id = read_varint(&mut reader)?;
-            let count = MD::deserialize(reader)?;
-            let start = reader.offset() as u32;
+            let item_id = read_varint(&mut memory)?;
+            let count = MD::deserialize(&mut memory)?;
+            let original = *memory;
 
-            let nbt = if nbt::skip_option(&mut reader)? {
-                let end = reader.offset() as u32;
-                Some(IndexedBuffer { start, end })
+            let nbt = if nbt::skip_option(&mut memory)? {
+                let size = memory.as_ptr() as usize - original.as_ptr() as usize;
+                let buf = &original[..size];
+                Some(buf)
             } else {
                 None
             };
@@ -123,52 +141,73 @@ impl MD for InventorySlot {
 
         Ok(InventorySlot { data })
     }
-}
-
-impl MD for IndexedNbt {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let start = reader.offset() as u32;
-        nbt::skip(&mut reader)?;
-        let end = reader.offset() as u32;
-        let nbt = IndexedBuffer { start, end };
-        Ok(IndexedNbt { nbt })
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
     }
 }
 
-impl MD for IndexedOptionNbt {
-    fn deserialize(mut reader: &mut Reader) -> Result<Self> {
-        let start = reader.offset() as u32;
-        let nbt = if nbt::skip_option(&mut reader)? {
-            let end = reader.offset() as u32;
-            Some(IndexedBuffer { start, end })
+impl<'x> MD<'x> for IndexedNbt<'x> {
+    fn deserialize(mut memory: &mut &'x [u8]) -> Result<Self> {
+        let tmp = *memory;
+        nbt::skip(&mut memory)?;
+        let size = memory.as_ptr() as usize - tmp.as_ptr() as usize;
+        let nbt = &tmp[..size];
+        Ok(IndexedNbt { nbt })
+    }
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
+    }
+}
+
+impl<'x> MD<'x> for IndexedOptionNbt<'x> {
+    fn deserialize(mut memory: &mut &'x [u8]) -> Result<Self> {
+        let tmp = *memory;
+        let nbt = if nbt::skip_option(&mut memory)? {
+            let size = memory.as_ptr() as usize - tmp.as_ptr() as usize;
+            let nbt = &tmp[..size];
+            Some(nbt)
         } else {
             None
         };
         Ok(IndexedOptionNbt { nbt })
     }
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
+    }
 }
 
-impl<T: MD> MD for Option<T> {
-    fn deserialize(reader: &mut Reader) -> Result<Option<T>>
-    where
-        Self: Sized,
-    {
-        let b = MD::deserialize(reader)?;
+impl<'x, T: MD<'x>> MD<'x> for Option<T> {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let b = MD::deserialize(memory)?;
         let result = if b {
-            Some(MD::deserialize(reader)?)
+            Some(MD::deserialize(memory)?)
         } else {
             None
         };
         Ok(result)
     }
+    fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+        match self {
+            None => false.serialize(&mut writer)?,
+            Some(x) => {
+                true.serialize(&mut writer)?;
+                x.serialize(&mut writer)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 macro_rules! impl_with_varint {
     ($enu:ident) => {
-        impl MD for $enu {
-            fn deserialize(reader: &mut Reader) -> Result<Self> {
-                let value = read_varint(reader)?;
+        impl<'x> MD<'x> for $enu {
+            fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+                let value = read_varint(memory)?;
                 Ok($enu::try_from(value as u8)?)
+            }
+            fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+                write_varint(writer, *self as u32)?;
+                Ok(())
             }
         }
     };
@@ -176,113 +215,37 @@ macro_rules! impl_with_varint {
 
 impl_with_varint!(GameMode);
 
-pub struct Reader<'r> {
-    cursor: Cursor<&'r [u8]>,
-}
-
-impl<'r> Reader<'r> {
-    pub fn new(buffer: &[u8]) -> Reader {
-        Reader {
-            cursor: Cursor::new(buffer),
-        }
-    }
-
-    pub fn get_buf_from(&self, r: Range<usize>) -> Result<&[u8]> {
-        let bytes = &self.get()[r];
-        Ok(bytes)
-    }
-
-    pub fn read_range(&mut self) -> Result<Range<u32>> {
-        let size = read_varint(&mut self.cursor)? as usize;
-        self.read_range_size(size)
-    }
-
-    pub fn read_range_size(&mut self, size: usize) -> Result<Range<u32>> {
-        let start = self.offset();
-        let end = start + size;
-        let vec_len = self.get().len();
-
-        if end <= vec_len {
-            self.cursor.set_position(end as u64);
-            Ok(start as u32..end as u32)
-        } else {
-            Err(anyhow!("not enough bytes for str"))
-        }
-    }
-
-    pub fn read_indexed_string(&mut self) -> Result<IndexedString> {
-        let size = read_varint(&mut self.cursor)? as usize;
-        let r = self.read_range_size(size)?;
-        Ok(IndexedString {
-            start: r.start,
-            end: r.end,
-        })
-    }
-
-    pub fn read_indexed_buffer(&mut self) -> Result<IndexedBuffer> {
-        let size = read_varint(&mut self.cursor)? as usize;
-        self.read_indexed_buffer_size(size)
-    }
-
-    pub fn read_indexed_buffer_size(&mut self, size: usize) -> Result<IndexedBuffer> {
-        let r = self.read_range_size(size)?;
-        Ok(IndexedBuffer {
-            start: r.start,
-            end: r.end,
-        })
-    }
-
-    pub fn read_rest_buffer(&mut self) -> IndexedBuffer {
-        let end = self.get().len();
-        let r = self.offset() as u32..end as u32;
-        self.cursor.set_position(end as u64);
-        IndexedBuffer {
-            start: r.start,
-            end: r.end,
-        }
-    }
-
-    pub fn get(&self) -> &[u8] {
-        self.cursor.get_ref()
-    }
-
-    pub fn offset(&self) -> usize {
-        self.cursor.position() as usize
-    }
-}
-
-impl<'r> Read for &mut Reader<'r> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.cursor.read(buf)
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
     pub z: i32,
 }
-impl Position {
-    pub(crate) fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        writer.write_u64::<BE>(
-            ((self.x as u64 & 0x3FFFFFF) << 38)
-                | ((self.z as u64 & 0x3FFFFFF) << 12)
-                | (self.y as u64 & 0xFFF),
-        )
-    }
-}
+// impl Position {
+//     pub(crate) fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+//         writer.write_u64::<BE>(
+//             ((self.x as u64 & 0x3FFFFFF) << 38)
+//                 | ((self.z as u64 & 0x3FFFFFF) << 12)
+//                 | (self.y as u64 & 0xFFF),
+//         )
+//     }
+// }
 
-impl MD for Position {
-    fn deserialize(reader: &mut Reader) -> Result<Position>
-    where
-        Self: Sized,
-    {
-        let val: u64 = MD::deserialize(reader)?;
+impl<'x> MD<'x> for Position {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let val: u64 = MD::deserialize(memory)?;
         let x = (val >> 38) as i32;
         let y = (val & 0xFFF) as i32;
         let z = ((val >> 12) & 0x3FFFFFF) as i32;
 
         Ok(Position { x, y, z })
     }
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
+    }
+}
+
+pub(super) fn cautious_size(size: usize) -> usize {
+    const LIMIT: usize = 4096;
+    size.min(LIMIT)
 }

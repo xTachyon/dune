@@ -1,1 +1,0 @@
-python %0/../gen.py

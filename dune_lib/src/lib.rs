@@ -1,7 +1,8 @@
-use crate::protocol::de::{Reader, MD};
+use crate::protocol::de::MD;
 use crate::protocol::PacketDirection;
 use anyhow::bail;
 use anyhow::Result;
+use protocol::de::MemoryExt;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
@@ -41,15 +42,14 @@ impl<'p> DiskPacket<'p> {
         Ok(())
     }
 
-    fn read(reader: &'p mut Reader) -> Result<DiskPacket<'p>> {
+    fn read(mut reader: &'p mut &[u8]) -> Result<DiskPacket<'p>> {
         let size: u32 = MD::deserialize(reader)?;
-        let id: u32 = MD::deserialize(reader)?;
+        let id: u32 = MD::deserialize(&mut reader)?;
 
-        let direction: u8 = MD::deserialize(reader)?;
+        let direction: u8 = MD::deserialize(&mut reader)?;
         let direction = PacketDirection::try_from(direction)?;
 
-        let data = reader.read_range_size(size as usize - 4 - 1)?;
-        let data = reader.get_buf_from(data.start as usize..data.end as usize)?;
+        let data = reader.read_mem(size as usize - 4 - 1)?;
 
         Ok(DiskPacket {
             id,

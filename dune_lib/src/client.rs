@@ -1,3 +1,4 @@
+use crate::protocol::de::MD;
 use crate::protocol::v1_18_2::handshaking::SetProtocolRequest;
 use crate::protocol::v1_18_2::login::LoginStartRequest;
 use crate::protocol::varint::write_varint;
@@ -12,29 +13,34 @@ use std::net::{SocketAddr, TcpStream};
 
 // }
 // impl Client {
-//     fn send_packet() -> Result<()> {
-
-//         Ok(())
-//     }
 // }
+fn send_packet<'x, P: MD<'x>>(
+    mut writer: &mut Vec<u8>,
+    packet: P,
+    tmp: &mut Vec<u8>,
+) -> Result<()> {
+    tmp.clear();
+    packet.serialize(tmp)?;
 
-fn send_start(mut writer: &mut Vec<u8>) -> Result<()> {
+    write_varint(&mut writer, tmp.len() as u32)?;
+    writer.extend_from_slice(tmp);
+
+    Ok(())
+}
+
+fn send_start(writer: &mut Vec<u8>) -> Result<()> {
     let mut tmp = Vec::new();
 
-    SetProtocolRequest::write(
-        &mut tmp,
-        758,
-        "localhost",
-        25565,
-        ConnectionState::Login as i32,
-    )?;
-    write_varint(&mut writer, tmp.len() as u32)?;
-    writer.extend_from_slice(&tmp);
-    tmp.clear();
+    let p = SetProtocolRequest {
+        protocol_version: 758,
+        server_host: "localhost",
+        server_port: 25565,
+        next_state: ConnectionState::Login as i32,
+    };
+    send_packet(writer, p, &mut tmp)?;
 
-    LoginStartRequest::write(&mut tmp, "me")?;
-    write_varint(&mut writer, tmp.len() as u32)?;
-    writer.extend_from_slice(&tmp);
+    let p = LoginStartRequest { username: "TheTachyon" };
+    send_packet(writer, p, &mut tmp)?;
 
     Ok(())
 }

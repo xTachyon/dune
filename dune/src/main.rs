@@ -11,7 +11,7 @@ use bumpalo::Bump;
 use chrono::Local;
 use clap::Parser;
 use dune_lib::chat::parse_chat;
-use dune_lib::events::{EventSubscriber, Position, Trades, UseEntity, UseEntityKind};
+use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, UseEntityKind};
 use dune_lib::nbt::Tag;
 use dune_lib::play::play;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
@@ -136,7 +136,6 @@ fn deserialize_item_nbt<'b>(
 }
 fn get_item<'b>(
     bump: &'b Bump,
-    buf: &[u8],
     item: Option<InventorySlot>,
 ) -> Result<Option<InventorySlotUnpacked<'b>>> {
     let item = match get_item_opt(item) {
@@ -145,7 +144,6 @@ fn get_item<'b>(
     };
     let attrs = match item.nbt {
         Some(buffer) => {
-            let buffer = buffer.get(buf);
             let r = nbt::read(buffer, bump)?;
             let attrs = deserialize_item_nbt(bump, r.tag.compound()?)?;
             Some(attrs)
@@ -218,9 +216,7 @@ impl EventSubscriber for EventHandler {
         self.player_position = pos;
         Ok(())
     }
-    fn trades(&mut self, trades: Trades) -> Result<()> {
-        let buf = trades.buffer;
-        let trades = trades.packet;
+    fn trades(&mut self, trades: TradeListResponse) -> Result<()> {
         let bump = &mut Bump::with_capacity(4096);
 
         let last_entity = self
@@ -230,13 +226,13 @@ impl EventSubscriber for EventHandler {
         let out = &mut BString::with_capacity_in(1024, bump);
         writeln!(out, "trades at {:?}:", last_entity)?;
         for i in trades.trades {
-            let in1 = get_item(bump, buf, Some(i.input_item1))?;
+            let in1 = get_item(bump, Some(i.input_item_1))?;
             print_item(out, "in1", in1)?;
 
-            let in2 = get_item(bump, buf, i.input_item2)?;
+            let in2 = get_item(bump, i.input_item_2)?;
             print_item(out, "in2", in2)?;
 
-            let out_item = get_item(bump, buf, Some(i.output_item))?;
+            let out_item = get_item(bump, Some(i.output_item))?;
             print_item(out, "out", out_item)?;
 
             writeln!(out)?;

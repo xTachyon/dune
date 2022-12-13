@@ -1,4 +1,3 @@
-use crate::protocol::de::Reader;
 use crate::protocol::varint::write_varint;
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use crate::{protocol, DiskPacket};
@@ -139,10 +138,8 @@ impl Proxy {
             Some(x) => x,
             None => return Ok(None),
         };
-        let data = packet_data.get_data(src, &self.tmp);
-        let mut reader = Reader::new(data);
-        let packet =
-            protocol::just_deserialize(direction, self.state, packet_data.id, &mut reader)?;
+        let mut data = packet_data.get_data(src, &self.tmp);
+        let packet = protocol::just_deserialize(direction, self.state, packet_data.id, &mut data)?;
 
         println!("{:?}", packet);
         let mut skip = false;
@@ -171,9 +168,9 @@ impl Proxy {
 
                 let hash = {
                     let mut sha1 = Sha1::new();
-                    sha1.update(packet.server_id.get(data));
+                    sha1.update(packet.server_id);
                     sha1.update(aes_key);
-                    sha1.update(packet.public_key.get(data));
+                    sha1.update(packet.public_key);
                     let hash = sha1.finalize();
 
                     num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
@@ -195,6 +192,7 @@ impl Proxy {
                     serverId: hash,
                 };
                 let req = serde_json::to_string(&req)?;
+                dbg!(&req);
                 let response =
                     ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
                         .set("Content-Type", "application/json; charset=utf-8")
@@ -208,8 +206,8 @@ impl Proxy {
                 }
 
                 let buf = Proxy::serialize_enc_response(
-                    &Proxy::rsa_crypt(packet.public_key.get(data), &aes_key)?,
-                    &Proxy::rsa_crypt(packet.public_key.get(data), packet.verify_token.get(data))?,
+                    &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
+                    &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
                 )?;
                 src_session.write(&buf);
 

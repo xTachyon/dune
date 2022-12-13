@@ -7,62 +7,52 @@
 #![allow(unused_variables)]
 // fix
 
+use crate::protocol::de::cautious_size;
 use crate::protocol::de::Position;
-use crate::protocol::de::Reader;
 use crate::protocol::de::MD;
 use crate::protocol::varint::read_varint;
 use crate::protocol::varint::read_varlong;
 use crate::protocol::varint::write_varint;
 use crate::protocol::varint::write_varlong;
 use crate::protocol::ConnectionState;
-use crate::protocol::IndexedBuffer;
 use crate::protocol::IndexedNbt;
 use crate::protocol::IndexedOptionNbt;
-use crate::protocol::IndexedString;
 use crate::protocol::InventorySlot;
 use crate::protocol::PacketDirection;
 use anyhow::{anyhow, Result};
-use byteorder::WriteBytesExt;
-use byteorder::BE;
 use std::io::{Result as IoResult, Write};
 
 pub mod handshaking {
     use super::*;
 
     #[derive(Debug)]
-    pub struct SetProtocolRequest {
+    pub struct SetProtocolRequest<'p> {
         pub protocol_version: i32,
-        pub server_host: IndexedString,
+        pub server_host: &'p str,
         pub server_port: u16,
         pub next_state: i32,
     }
-    pub(super) fn read_set_protocol_request(mut reader: &mut Reader) -> Result<SetProtocolRequest> {
-        let protocol_version: i32 = read_varint(&mut reader)?;
-        let server_host: IndexedString = MD::deserialize(reader)?;
-        let server_port: u16 = MD::deserialize(reader)?;
-        let next_state: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for SetProtocolRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SetProtocolRequest<'p>> {
+            let protocol_version: i32 = read_varint(&mut reader)?;
+            let server_host: &'p str = MD::deserialize(reader)?;
+            let server_port: u16 = MD::deserialize(reader)?;
+            let next_state: i32 = read_varint(&mut reader)?;
 
-        let result = SetProtocolRequest {
-            protocol_version,
-            server_host,
-            server_port,
-            next_state,
-        };
-        Ok(result)
-    }
-    impl SetProtocolRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            protocol_version: i32,
-            server_host: &str,
-            server_port: u16,
-            next_state: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, protocol_version as u32)?;
-            write_varint(&mut writer, server_host.len() as u32)?;
-            writer.write_all(server_host.as_bytes())?;
-            writer.write_u16::<BE>(server_port)?;
-            write_varint(&mut writer, next_state as u32)?;
+            let result = SetProtocolRequest {
+                protocol_version,
+                server_host,
+                server_port,
+                next_state,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
+            write_varint(&mut writer, self.protocol_version as u32)?;
+            self.server_host.serialize(&mut writer)?;
+            self.server_port.serialize(&mut writer)?;
+            write_varint(&mut writer, self.next_state as u32)?;
             Ok(())
         }
     }
@@ -70,17 +60,16 @@ pub mod handshaking {
     pub struct LegacyServerListPingRequest {
         pub payload: u8,
     }
-    pub(super) fn read_legacy_server_list_ping_request(
-        mut reader: &mut Reader,
-    ) -> Result<LegacyServerListPingRequest> {
-        let payload: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for LegacyServerListPingRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<LegacyServerListPingRequest> {
+            let payload: u8 = MD::deserialize(reader)?;
 
-        let result = LegacyServerListPingRequest { payload };
-        Ok(result)
-    }
-    impl LegacyServerListPingRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, payload: u8) -> IoResult<()> {
-            writer.write_u8(payload)?;
+            let result = LegacyServerListPingRequest { payload };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xfe)?;
+            self.payload.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -90,12 +79,13 @@ pub mod status {
 
     #[derive(Debug)]
     pub struct PingStartRequest {}
-    pub(super) fn read_ping_start_request(mut _reader: &mut Reader) -> Result<PingStartRequest> {
-        let result = PingStartRequest {};
-        Ok(result)
-    }
-    impl PingStartRequest {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for PingStartRequest {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<PingStartRequest> {
+            let result = PingStartRequest {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
             Ok(())
         }
     }
@@ -103,32 +93,33 @@ pub mod status {
     pub struct PingRequest {
         pub time: i64,
     }
-    pub(super) fn read_ping_request(mut reader: &mut Reader) -> Result<PingRequest> {
-        let time: i64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PingRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PingRequest> {
+            let time: i64 = MD::deserialize(reader)?;
 
-        let result = PingRequest { time };
-        Ok(result)
-    }
-    impl PingRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, time: i64) -> IoResult<()> {
-            writer.write_i64::<BE>(time)?;
+            let result = PingRequest { time };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1)?;
+            self.time.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct ServerInfoResponse {
-        pub response: IndexedString,
+    pub struct ServerInfoResponse<'p> {
+        pub response: &'p str,
     }
-    pub(super) fn read_server_info_response(mut reader: &mut Reader) -> Result<ServerInfoResponse> {
-        let response: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ServerInfoResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<ServerInfoResponse<'p>> {
+            let response: &'p str = MD::deserialize(reader)?;
 
-        let result = ServerInfoResponse { response };
-        Ok(result)
-    }
-    impl ServerInfoResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, response: &str) -> IoResult<()> {
-            write_varint(&mut writer, response.len() as u32)?;
-            writer.write_all(response.as_bytes())?;
+            let result = ServerInfoResponse { response };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
+            self.response.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -136,15 +127,16 @@ pub mod status {
     pub struct PingResponse {
         pub time: i64,
     }
-    pub(super) fn read_ping_response(mut reader: &mut Reader) -> Result<PingResponse> {
-        let time: i64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PingResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PingResponse> {
+            let time: i64 = MD::deserialize(reader)?;
 
-        let result = PingResponse { time };
-        Ok(result)
-    }
-    impl PingResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, time: i64) -> IoResult<()> {
-            writer.write_i64::<BE>(time)?;
+            let result = PingResponse { time };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1)?;
+            self.time.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -153,157 +145,126 @@ pub mod login {
     use super::*;
 
     #[derive(Debug)]
-    pub struct LoginStartRequest {
-        pub username: IndexedString,
+    pub struct LoginStartRequest<'p> {
+        pub username: &'p str,
     }
-    pub(super) fn read_login_start_request(mut reader: &mut Reader) -> Result<LoginStartRequest> {
-        let username: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for LoginStartRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<LoginStartRequest<'p>> {
+            let username: &'p str = MD::deserialize(reader)?;
 
-        let result = LoginStartRequest { username };
-        Ok(result)
-    }
-    impl LoginStartRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, username: &str) -> IoResult<()> {
-            write_varint(&mut writer, username.len() as u32)?;
-            writer.write_all(username.as_bytes())?;
+            let result = LoginStartRequest { username };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
+            self.username.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct EncryptionBeginRequest {
-        pub shared_secret: IndexedBuffer,
-        pub verify_token: IndexedBuffer,
+    pub struct EncryptionBeginRequest<'p> {
+        pub shared_secret: &'p [u8],
+        pub verify_token: &'p [u8],
     }
-    pub(super) fn read_encryption_begin_request(
-        mut reader: &mut Reader,
-    ) -> Result<EncryptionBeginRequest> {
-        let shared_secret: IndexedBuffer = MD::deserialize(reader)?;
-        let verify_token: IndexedBuffer = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EncryptionBeginRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<EncryptionBeginRequest<'p>> {
+            let shared_secret: &'p [u8] = MD::deserialize(reader)?;
+            let verify_token: &'p [u8] = MD::deserialize(reader)?;
 
-        let result = EncryptionBeginRequest {
-            shared_secret,
-            verify_token,
-        };
-        Ok(result)
-    }
-    impl EncryptionBeginRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            shared_secret: &[u8],
-            verify_token: &[u8],
-        ) -> IoResult<()> {
-            write_varint(&mut writer, shared_secret.len() as u32)?;
-            writer.write_all(shared_secret)?;
-            write_varint(&mut writer, verify_token.len() as u32)?;
-            writer.write_all(verify_token)?;
+            let result = EncryptionBeginRequest {
+                shared_secret,
+                verify_token,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1)?;
+            self.shared_secret.serialize(&mut writer)?;
+            self.verify_token.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct LoginPluginResponse {
+    pub struct LoginPluginResponse<'p> {
         pub message_id: i32,
-        pub data: Option<IndexedBuffer>,
+        pub data: Option<&'p [u8]>,
     }
-    pub(super) fn read_login_plugin_response(
-        mut reader: &mut Reader,
-    ) -> Result<LoginPluginResponse> {
-        let message_id: i32 = read_varint(&mut reader)?;
-        let data: Option<IndexedBuffer> = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for LoginPluginResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<LoginPluginResponse<'p>> {
+            let message_id: i32 = read_varint(&mut reader)?;
+            let data: Option<&'p [u8]> = MD::deserialize(reader)?;
 
-        let result = LoginPluginResponse { message_id, data };
-        Ok(result)
-    }
-    impl LoginPluginResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            message_id: i32,
-            data: Option<&[u8]>,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, message_id as u32)?;
-            match data {
-                Some(data_1) => {
-                    writer.write_all(&[1])?;
-                    writer.write_all(data_1)?;
-                }
-                None => writer.write_all(&[0])?,
-            }
+            let result = LoginPluginResponse { message_id, data };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2)?;
+            write_varint(&mut writer, self.message_id as u32)?;
+            self.data.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct DisconnectResponse {
-        pub reason: IndexedString,
+    pub struct DisconnectResponse<'p> {
+        pub reason: &'p str,
     }
-    pub(super) fn read_disconnect_response(mut reader: &mut Reader) -> Result<DisconnectResponse> {
-        let reason: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for DisconnectResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<DisconnectResponse<'p>> {
+            let reason: &'p str = MD::deserialize(reader)?;
 
-        let result = DisconnectResponse { reason };
-        Ok(result)
-    }
-    impl DisconnectResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, reason: &str) -> IoResult<()> {
-            write_varint(&mut writer, reason.len() as u32)?;
-            writer.write_all(reason.as_bytes())?;
+            let result = DisconnectResponse { reason };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
+            self.reason.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct EncryptionBeginResponse {
-        pub server_id: IndexedString,
-        pub public_key: IndexedBuffer,
-        pub verify_token: IndexedBuffer,
+    pub struct EncryptionBeginResponse<'p> {
+        pub server_id: &'p str,
+        pub public_key: &'p [u8],
+        pub verify_token: &'p [u8],
     }
-    pub(super) fn read_encryption_begin_response(
-        mut reader: &mut Reader,
-    ) -> Result<EncryptionBeginResponse> {
-        let server_id: IndexedString = MD::deserialize(reader)?;
-        let public_key: IndexedBuffer = MD::deserialize(reader)?;
-        let verify_token: IndexedBuffer = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EncryptionBeginResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<EncryptionBeginResponse<'p>> {
+            let server_id: &'p str = MD::deserialize(reader)?;
+            let public_key: &'p [u8] = MD::deserialize(reader)?;
+            let verify_token: &'p [u8] = MD::deserialize(reader)?;
 
-        let result = EncryptionBeginResponse {
-            server_id,
-            public_key,
-            verify_token,
-        };
-        Ok(result)
-    }
-    impl EncryptionBeginResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            server_id: &str,
-            public_key: &[u8],
-            verify_token: &[u8],
-        ) -> IoResult<()> {
-            write_varint(&mut writer, server_id.len() as u32)?;
-            writer.write_all(server_id.as_bytes())?;
-            write_varint(&mut writer, public_key.len() as u32)?;
-            writer.write_all(public_key)?;
-            write_varint(&mut writer, verify_token.len() as u32)?;
-            writer.write_all(verify_token)?;
+            let result = EncryptionBeginResponse {
+                server_id,
+                public_key,
+                verify_token,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1)?;
+            self.server_id.serialize(&mut writer)?;
+            self.public_key.serialize(&mut writer)?;
+            self.verify_token.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SuccessResponse {
+    pub struct SuccessResponse<'p> {
         pub uuid: u128,
-        pub username: IndexedString,
+        pub username: &'p str,
     }
-    pub(super) fn read_success_response(mut reader: &mut Reader) -> Result<SuccessResponse> {
-        let uuid: u128 = MD::deserialize(reader)?;
-        let username: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SuccessResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SuccessResponse<'p>> {
+            let uuid: u128 = MD::deserialize(reader)?;
+            let username: &'p str = MD::deserialize(reader)?;
 
-        let result = SuccessResponse { uuid, username };
-        Ok(result)
-    }
-    impl SuccessResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            uuid: u128,
-            username: &str,
-        ) -> IoResult<()> {
-            writer.write_u128::<BE>(uuid)?;
-            write_varint(&mut writer, username.len() as u32)?;
-            writer.write_all(username.as_bytes())?;
+            let result = SuccessResponse { uuid, username };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2)?;
+            self.uuid.serialize(&mut writer)?;
+            self.username.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -311,47 +272,44 @@ pub mod login {
     pub struct CompressResponse {
         pub threshold: i32,
     }
-    pub(super) fn read_compress_response(mut reader: &mut Reader) -> Result<CompressResponse> {
-        let threshold: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for CompressResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<CompressResponse> {
+            let threshold: i32 = read_varint(&mut reader)?;
 
-        let result = CompressResponse { threshold };
-        Ok(result)
-    }
-    impl CompressResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, threshold: i32) -> IoResult<()> {
-            write_varint(&mut writer, threshold as u32)?;
+            let result = CompressResponse { threshold };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3)?;
+            write_varint(&mut writer, self.threshold as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct LoginPluginRequest {
+    pub struct LoginPluginRequest<'p> {
         pub message_id: i32,
-        pub channel: IndexedString,
-        pub data: IndexedBuffer,
+        pub channel: &'p str,
+        pub data: &'p [u8],
     }
-    pub(super) fn read_login_plugin_request(mut reader: &mut Reader) -> Result<LoginPluginRequest> {
-        let message_id: i32 = read_varint(&mut reader)?;
-        let channel: IndexedString = MD::deserialize(reader)?;
-        let data: IndexedBuffer = reader.read_rest_buffer();
+    impl<'p> MD<'p> for LoginPluginRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<LoginPluginRequest<'p>> {
+            let message_id: i32 = read_varint(&mut reader)?;
+            let channel: &'p str = MD::deserialize(reader)?;
+            let data: &'p [u8] = &reader[..];
+            *reader = &[];
 
-        let result = LoginPluginRequest {
-            message_id,
-            channel,
-            data,
-        };
-        Ok(result)
-    }
-    impl LoginPluginRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            message_id: i32,
-            channel: &str,
-            data: &[u8],
-        ) -> IoResult<()> {
-            write_varint(&mut writer, message_id as u32)?;
-            write_varint(&mut writer, channel.len() as u32)?;
-            writer.write_all(channel.as_bytes())?;
-            writer.write_all(data)?;
+            let result = LoginPluginRequest {
+                message_id,
+                channel,
+                data,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4)?;
+            write_varint(&mut writer, self.message_id as u32)?;
+            self.channel.serialize(&mut writer)?;
+            writer.write_all(self.data)?;
             Ok(())
         }
     }
@@ -363,17 +321,16 @@ pub mod play {
     pub struct TeleportConfirmRequest {
         pub teleport_id: i32,
     }
-    pub(super) fn read_teleport_confirm_request(
-        mut reader: &mut Reader,
-    ) -> Result<TeleportConfirmRequest> {
-        let teleport_id: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for TeleportConfirmRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<TeleportConfirmRequest> {
+            let teleport_id: i32 = read_varint(&mut reader)?;
 
-        let result = TeleportConfirmRequest { teleport_id };
-        Ok(result)
-    }
-    impl TeleportConfirmRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, teleport_id: i32) -> IoResult<()> {
-            write_varint(&mut writer, teleport_id as u32)?;
+            let result = TeleportConfirmRequest { teleport_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
+            write_varint(&mut writer, self.teleport_id as u32)?;
             Ok(())
         }
     }
@@ -382,26 +339,21 @@ pub mod play {
         pub transaction_id: i32,
         pub location: Position,
     }
-    pub(super) fn read_query_block_nbt_request(
-        mut reader: &mut Reader,
-    ) -> Result<QueryBlockNbtRequest> {
-        let transaction_id: i32 = read_varint(&mut reader)?;
-        let location: Position = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for QueryBlockNbtRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<QueryBlockNbtRequest> {
+            let transaction_id: i32 = read_varint(&mut reader)?;
+            let location: Position = MD::deserialize(reader)?;
 
-        let result = QueryBlockNbtRequest {
-            transaction_id,
-            location,
-        };
-        Ok(result)
-    }
-    impl QueryBlockNbtRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            transaction_id: i32,
-            location: Position,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, transaction_id as u32)?;
-            location.write(&mut writer)?;
+            let result = QueryBlockNbtRequest {
+                transaction_id,
+                location,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1)?;
+            write_varint(&mut writer, self.transaction_id as u32)?;
+            self.location.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -409,46 +361,40 @@ pub mod play {
     pub struct SetDifficultyRequest {
         pub new_difficulty: u8,
     }
-    pub(super) fn read_set_difficulty_request(
-        mut reader: &mut Reader,
-    ) -> Result<SetDifficultyRequest> {
-        let new_difficulty: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SetDifficultyRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SetDifficultyRequest> {
+            let new_difficulty: u8 = MD::deserialize(reader)?;
 
-        let result = SetDifficultyRequest { new_difficulty };
-        Ok(result)
-    }
-    impl SetDifficultyRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, new_difficulty: u8) -> IoResult<()> {
-            writer.write_u8(new_difficulty)?;
+            let result = SetDifficultyRequest { new_difficulty };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2)?;
+            self.new_difficulty.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct EditBookRequest {
+    pub struct EditBookRequest<'p> {
         pub hand: i32,
-        pub pages: Vec<IndexedString>,
-        pub title: Option<IndexedString>,
+        pub pages: Vec<&'p str>,
+        pub title: Option<&'p str>,
     }
-    pub(super) fn read_edit_book_request(mut reader: &mut Reader) -> Result<EditBookRequest> {
-        let hand: i32 = read_varint(&mut reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut pages = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: IndexedString = MD::deserialize(reader)?;
-            pages.push(x);
-        }
-        let title: Option<IndexedString> = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EditBookRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<EditBookRequest<'p>> {
+            let hand: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut pages = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: &'p str = MD::deserialize(reader)?;
+                pages.push(x);
+            }
+            let title: Option<&'p str> = MD::deserialize(reader)?;
 
-        let result = EditBookRequest { hand, pages, title };
-        Ok(result)
-    }
-    impl EditBookRequest {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _hand: i32,
-            _pages: &[&str],
-            _title: Option<&str>,
-        ) -> IoResult<()> {
+            let result = EditBookRequest { hand, pages, title };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -457,26 +403,21 @@ pub mod play {
         pub transaction_id: i32,
         pub entity_id: i32,
     }
-    pub(super) fn read_query_entity_nbt_request(
-        mut reader: &mut Reader,
-    ) -> Result<QueryEntityNbtRequest> {
-        let transaction_id: i32 = read_varint(&mut reader)?;
-        let entity_id: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for QueryEntityNbtRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<QueryEntityNbtRequest> {
+            let transaction_id: i32 = read_varint(&mut reader)?;
+            let entity_id: i32 = read_varint(&mut reader)?;
 
-        let result = QueryEntityNbtRequest {
-            transaction_id,
-            entity_id,
-        };
-        Ok(result)
-    }
-    impl QueryEntityNbtRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            transaction_id: i32,
-            entity_id: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, transaction_id as u32)?;
-            write_varint(&mut writer, entity_id as u32)?;
+            let result = QueryEntityNbtRequest {
+                transaction_id,
+                entity_id,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xc)?;
+            write_varint(&mut writer, self.transaction_id as u32)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
             Ok(())
         }
     }
@@ -484,32 +425,33 @@ pub mod play {
     pub struct PickItemRequest {
         pub slot: i32,
     }
-    pub(super) fn read_pick_item_request(mut reader: &mut Reader) -> Result<PickItemRequest> {
-        let slot: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for PickItemRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PickItemRequest> {
+            let slot: i32 = read_varint(&mut reader)?;
 
-        let result = PickItemRequest { slot };
-        Ok(result)
-    }
-    impl PickItemRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, slot: i32) -> IoResult<()> {
-            write_varint(&mut writer, slot as u32)?;
+            let result = PickItemRequest { slot };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x17)?;
+            write_varint(&mut writer, self.slot as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct NameItemRequest {
-        pub name: IndexedString,
+    pub struct NameItemRequest<'p> {
+        pub name: &'p str,
     }
-    pub(super) fn read_name_item_request(mut reader: &mut Reader) -> Result<NameItemRequest> {
-        let name: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for NameItemRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<NameItemRequest<'p>> {
+            let name: &'p str = MD::deserialize(reader)?;
 
-        let result = NameItemRequest { name };
-        Ok(result)
-    }
-    impl NameItemRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, name: &str) -> IoResult<()> {
-            write_varint(&mut writer, name.len() as u32)?;
-            writer.write_all(name.as_bytes())?;
+            let result = NameItemRequest { name };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x20)?;
+            self.name.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -517,15 +459,16 @@ pub mod play {
     pub struct SelectTradeRequest {
         pub slot: i32,
     }
-    pub(super) fn read_select_trade_request(mut reader: &mut Reader) -> Result<SelectTradeRequest> {
-        let slot: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for SelectTradeRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SelectTradeRequest> {
+            let slot: i32 = read_varint(&mut reader)?;
 
-        let result = SelectTradeRequest { slot };
-        Ok(result)
-    }
-    impl SelectTradeRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, slot: i32) -> IoResult<()> {
-            write_varint(&mut writer, slot as u32)?;
+            let result = SelectTradeRequest { slot };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x23)?;
+            write_varint(&mut writer, self.slot as u32)?;
             Ok(())
         }
     }
@@ -534,108 +477,88 @@ pub mod play {
         pub primary_effect: i32,
         pub secondary_effect: i32,
     }
-    pub(super) fn read_set_beacon_effect_request(
-        mut reader: &mut Reader,
-    ) -> Result<SetBeaconEffectRequest> {
-        let primary_effect: i32 = read_varint(&mut reader)?;
-        let secondary_effect: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for SetBeaconEffectRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SetBeaconEffectRequest> {
+            let primary_effect: i32 = read_varint(&mut reader)?;
+            let secondary_effect: i32 = read_varint(&mut reader)?;
 
-        let result = SetBeaconEffectRequest {
-            primary_effect,
-            secondary_effect,
-        };
-        Ok(result)
-    }
-    impl SetBeaconEffectRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            primary_effect: i32,
-            secondary_effect: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, primary_effect as u32)?;
-            write_varint(&mut writer, secondary_effect as u32)?;
+            let result = SetBeaconEffectRequest {
+                primary_effect,
+                secondary_effect,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x24)?;
+            write_varint(&mut writer, self.primary_effect as u32)?;
+            write_varint(&mut writer, self.secondary_effect as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct UpdateCommandBlockRequest {
+    pub struct UpdateCommandBlockRequest<'p> {
         pub location: Position,
-        pub command: IndexedString,
+        pub command: &'p str,
         pub mode: i32,
         pub flags: u8,
     }
-    pub(super) fn read_update_command_block_request(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateCommandBlockRequest> {
-        let location: Position = MD::deserialize(reader)?;
-        let command: IndexedString = MD::deserialize(reader)?;
-        let mode: i32 = read_varint(&mut reader)?;
-        let flags: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateCommandBlockRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<UpdateCommandBlockRequest<'p>> {
+            let location: Position = MD::deserialize(reader)?;
+            let command: &'p str = MD::deserialize(reader)?;
+            let mode: i32 = read_varint(&mut reader)?;
+            let flags: u8 = MD::deserialize(reader)?;
 
-        let result = UpdateCommandBlockRequest {
-            location,
-            command,
-            mode,
-            flags,
-        };
-        Ok(result)
-    }
-    impl UpdateCommandBlockRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            command: &str,
-            mode: i32,
-            flags: u8,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, command.len() as u32)?;
-            writer.write_all(command.as_bytes())?;
-            write_varint(&mut writer, mode as u32)?;
-            writer.write_u8(flags)?;
+            let result = UpdateCommandBlockRequest {
+                location,
+                command,
+                mode,
+                flags,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x26)?;
+            self.location.serialize(&mut writer)?;
+            self.command.serialize(&mut writer)?;
+            write_varint(&mut writer, self.mode as u32)?;
+            self.flags.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct UpdateCommandBlockMinecartRequest {
+    pub struct UpdateCommandBlockMinecartRequest<'p> {
         pub entity_id: i32,
-        pub command: IndexedString,
+        pub command: &'p str,
         pub track_output: bool,
     }
-    pub(super) fn read_update_command_block_minecart_request(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateCommandBlockMinecartRequest> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let command: IndexedString = MD::deserialize(reader)?;
-        let track_output: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateCommandBlockMinecartRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<UpdateCommandBlockMinecartRequest<'p>> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let command: &'p str = MD::deserialize(reader)?;
+            let track_output: bool = MD::deserialize(reader)?;
 
-        let result = UpdateCommandBlockMinecartRequest {
-            entity_id,
-            command,
-            track_output,
-        };
-        Ok(result)
-    }
-    impl UpdateCommandBlockMinecartRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            command: &str,
-            track_output: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            write_varint(&mut writer, command.len() as u32)?;
-            writer.write_all(command.as_bytes())?;
-            writer.write_all(&[track_output as u8])?;
+            let result = UpdateCommandBlockMinecartRequest {
+                entity_id,
+                command,
+                track_output,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x27)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.command.serialize(&mut writer)?;
+            self.track_output.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct UpdateStructureBlockRequest {
+    pub struct UpdateStructureBlockRequest<'p> {
         pub location: Position,
         pub action: i32,
         pub mode: i32,
-        pub name: IndexedString,
+        pub name: &'p str,
         pub offset_x: i8,
         pub offset_y: i8,
         pub offset_z: i8,
@@ -644,133 +567,108 @@ pub mod play {
         pub size_z: i8,
         pub mirror: i32,
         pub rotation: i32,
-        pub metadata: IndexedString,
+        pub metadata: &'p str,
         pub integrity: f32,
         pub seed: i64,
         pub flags: u8,
     }
-    pub(super) fn read_update_structure_block_request(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateStructureBlockRequest> {
-        let location: Position = MD::deserialize(reader)?;
-        let action: i32 = read_varint(&mut reader)?;
-        let mode: i32 = read_varint(&mut reader)?;
-        let name: IndexedString = MD::deserialize(reader)?;
-        let offset_x: i8 = MD::deserialize(reader)?;
-        let offset_y: i8 = MD::deserialize(reader)?;
-        let offset_z: i8 = MD::deserialize(reader)?;
-        let size_x: i8 = MD::deserialize(reader)?;
-        let size_y: i8 = MD::deserialize(reader)?;
-        let size_z: i8 = MD::deserialize(reader)?;
-        let mirror: i32 = read_varint(&mut reader)?;
-        let rotation: i32 = read_varint(&mut reader)?;
-        let metadata: IndexedString = MD::deserialize(reader)?;
-        let integrity: f32 = MD::deserialize(reader)?;
-        let seed: i64 = read_varlong(&mut reader)?;
-        let flags: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateStructureBlockRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<UpdateStructureBlockRequest<'p>> {
+            let location: Position = MD::deserialize(reader)?;
+            let action: i32 = read_varint(&mut reader)?;
+            let mode: i32 = read_varint(&mut reader)?;
+            let name: &'p str = MD::deserialize(reader)?;
+            let offset_x: i8 = MD::deserialize(reader)?;
+            let offset_y: i8 = MD::deserialize(reader)?;
+            let offset_z: i8 = MD::deserialize(reader)?;
+            let size_x: i8 = MD::deserialize(reader)?;
+            let size_y: i8 = MD::deserialize(reader)?;
+            let size_z: i8 = MD::deserialize(reader)?;
+            let mirror: i32 = read_varint(&mut reader)?;
+            let rotation: i32 = read_varint(&mut reader)?;
+            let metadata: &'p str = MD::deserialize(reader)?;
+            let integrity: f32 = MD::deserialize(reader)?;
+            let seed: i64 = read_varlong(&mut reader)?;
+            let flags: u8 = MD::deserialize(reader)?;
 
-        let result = UpdateStructureBlockRequest {
-            location,
-            action,
-            mode,
-            name,
-            offset_x,
-            offset_y,
-            offset_z,
-            size_x,
-            size_y,
-            size_z,
-            mirror,
-            rotation,
-            metadata,
-            integrity,
-            seed,
-            flags,
-        };
-        Ok(result)
-    }
-    impl UpdateStructureBlockRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            action: i32,
-            mode: i32,
-            name: &str,
-            offset_x: i8,
-            offset_y: i8,
-            offset_z: i8,
-            size_x: i8,
-            size_y: i8,
-            size_z: i8,
-            mirror: i32,
-            rotation: i32,
-            metadata: &str,
-            integrity: f32,
-            seed: i64,
-            flags: u8,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, action as u32)?;
-            write_varint(&mut writer, mode as u32)?;
-            write_varint(&mut writer, name.len() as u32)?;
-            writer.write_all(name.as_bytes())?;
-            writer.write_i8(offset_x)?;
-            writer.write_i8(offset_y)?;
-            writer.write_i8(offset_z)?;
-            writer.write_i8(size_x)?;
-            writer.write_i8(size_y)?;
-            writer.write_i8(size_z)?;
-            write_varint(&mut writer, mirror as u32)?;
-            write_varint(&mut writer, rotation as u32)?;
-            write_varint(&mut writer, metadata.len() as u32)?;
-            writer.write_all(metadata.as_bytes())?;
-            writer.write_f32::<BE>(integrity)?;
-            write_varlong(&mut writer, seed as u64)?;
-            writer.write_u8(flags)?;
+            let result = UpdateStructureBlockRequest {
+                location,
+                action,
+                mode,
+                name,
+                offset_x,
+                offset_y,
+                offset_z,
+                size_x,
+                size_y,
+                size_z,
+                mirror,
+                rotation,
+                metadata,
+                integrity,
+                seed,
+                flags,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2a)?;
+            self.location.serialize(&mut writer)?;
+            write_varint(&mut writer, self.action as u32)?;
+            write_varint(&mut writer, self.mode as u32)?;
+            self.name.serialize(&mut writer)?;
+            self.offset_x.serialize(&mut writer)?;
+            self.offset_y.serialize(&mut writer)?;
+            self.offset_z.serialize(&mut writer)?;
+            self.size_x.serialize(&mut writer)?;
+            self.size_y.serialize(&mut writer)?;
+            self.size_z.serialize(&mut writer)?;
+            write_varint(&mut writer, self.mirror as u32)?;
+            write_varint(&mut writer, self.rotation as u32)?;
+            self.metadata.serialize(&mut writer)?;
+            self.integrity.serialize(&mut writer)?;
+            write_varlong(&mut writer, self.seed as u64)?;
+            self.flags.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct TabCompleteRequest {
+    pub struct TabCompleteRequest<'p> {
         pub transaction_id: i32,
-        pub text: IndexedString,
+        pub text: &'p str,
     }
-    pub(super) fn read_tab_complete_request(mut reader: &mut Reader) -> Result<TabCompleteRequest> {
-        let transaction_id: i32 = read_varint(&mut reader)?;
-        let text: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for TabCompleteRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<TabCompleteRequest<'p>> {
+            let transaction_id: i32 = read_varint(&mut reader)?;
+            let text: &'p str = MD::deserialize(reader)?;
 
-        let result = TabCompleteRequest {
-            transaction_id,
-            text,
-        };
-        Ok(result)
-    }
-    impl TabCompleteRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            transaction_id: i32,
-            text: &str,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, transaction_id as u32)?;
-            write_varint(&mut writer, text.len() as u32)?;
-            writer.write_all(text.as_bytes())?;
+            let result = TabCompleteRequest {
+                transaction_id,
+                text,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x6)?;
+            write_varint(&mut writer, self.transaction_id as u32)?;
+            self.text.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct ChatRequest {
-        pub message: IndexedString,
+    pub struct ChatRequest<'p> {
+        pub message: &'p str,
     }
-    pub(super) fn read_chat_request(mut reader: &mut Reader) -> Result<ChatRequest> {
-        let message: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ChatRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<ChatRequest<'p>> {
+            let message: &'p str = MD::deserialize(reader)?;
 
-        let result = ChatRequest { message };
-        Ok(result)
-    }
-    impl ChatRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, message: &str) -> IoResult<()> {
-            write_varint(&mut writer, message.len() as u32)?;
-            writer.write_all(message.as_bytes())?;
+            let result = ChatRequest { message };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3)?;
+            self.message.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -778,23 +676,22 @@ pub mod play {
     pub struct ClientCommandRequest {
         pub action_id: i32,
     }
-    pub(super) fn read_client_command_request(
-        mut reader: &mut Reader,
-    ) -> Result<ClientCommandRequest> {
-        let action_id: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for ClientCommandRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ClientCommandRequest> {
+            let action_id: i32 = read_varint(&mut reader)?;
 
-        let result = ClientCommandRequest { action_id };
-        Ok(result)
-    }
-    impl ClientCommandRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, action_id: i32) -> IoResult<()> {
-            write_varint(&mut writer, action_id as u32)?;
+            let result = ClientCommandRequest { action_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4)?;
+            write_varint(&mut writer, self.action_id as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SettingsRequest {
-        pub locale: IndexedString,
+    pub struct SettingsRequest<'p> {
+        pub locale: &'p str,
         pub view_distance: i8,
         pub chat_flags: i32,
         pub chat_colors: bool,
@@ -803,49 +700,39 @@ pub mod play {
         pub enable_text_filtering: bool,
         pub enable_server_listing: bool,
     }
-    pub(super) fn read_settings_request(mut reader: &mut Reader) -> Result<SettingsRequest> {
-        let locale: IndexedString = MD::deserialize(reader)?;
-        let view_distance: i8 = MD::deserialize(reader)?;
-        let chat_flags: i32 = read_varint(&mut reader)?;
-        let chat_colors: bool = MD::deserialize(reader)?;
-        let skin_parts: u8 = MD::deserialize(reader)?;
-        let main_hand: i32 = read_varint(&mut reader)?;
-        let enable_text_filtering: bool = MD::deserialize(reader)?;
-        let enable_server_listing: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SettingsRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SettingsRequest<'p>> {
+            let locale: &'p str = MD::deserialize(reader)?;
+            let view_distance: i8 = MD::deserialize(reader)?;
+            let chat_flags: i32 = read_varint(&mut reader)?;
+            let chat_colors: bool = MD::deserialize(reader)?;
+            let skin_parts: u8 = MD::deserialize(reader)?;
+            let main_hand: i32 = read_varint(&mut reader)?;
+            let enable_text_filtering: bool = MD::deserialize(reader)?;
+            let enable_server_listing: bool = MD::deserialize(reader)?;
 
-        let result = SettingsRequest {
-            locale,
-            view_distance,
-            chat_flags,
-            chat_colors,
-            skin_parts,
-            main_hand,
-            enable_text_filtering,
-            enable_server_listing,
-        };
-        Ok(result)
-    }
-    impl SettingsRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            locale: &str,
-            view_distance: i8,
-            chat_flags: i32,
-            chat_colors: bool,
-            skin_parts: u8,
-            main_hand: i32,
-            enable_text_filtering: bool,
-            enable_server_listing: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, locale.len() as u32)?;
-            writer.write_all(locale.as_bytes())?;
-            writer.write_i8(view_distance)?;
-            write_varint(&mut writer, chat_flags as u32)?;
-            writer.write_all(&[chat_colors as u8])?;
-            writer.write_u8(skin_parts)?;
-            write_varint(&mut writer, main_hand as u32)?;
-            writer.write_all(&[enable_text_filtering as u8])?;
-            writer.write_all(&[enable_server_listing as u8])?;
+            let result = SettingsRequest {
+                locale,
+                view_distance,
+                chat_flags,
+                chat_colors,
+                skin_parts,
+                main_hand,
+                enable_text_filtering,
+                enable_server_listing,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5)?;
+            self.locale.serialize(&mut writer)?;
+            self.view_distance.serialize(&mut writer)?;
+            write_varint(&mut writer, self.chat_flags as u32)?;
+            self.chat_colors.serialize(&mut writer)?;
+            self.skin_parts.serialize(&mut writer)?;
+            write_varint(&mut writer, self.main_hand as u32)?;
+            self.enable_text_filtering.serialize(&mut writer)?;
+            self.enable_server_listing.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -854,99 +741,81 @@ pub mod play {
         pub window_id: i8,
         pub enchantment: i8,
     }
-    pub(super) fn read_enchant_item_request(mut reader: &mut Reader) -> Result<EnchantItemRequest> {
-        let window_id: i8 = MD::deserialize(reader)?;
-        let enchantment: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EnchantItemRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EnchantItemRequest> {
+            let window_id: i8 = MD::deserialize(reader)?;
+            let enchantment: i8 = MD::deserialize(reader)?;
 
-        let result = EnchantItemRequest {
-            window_id,
-            enchantment,
-        };
-        Ok(result)
-    }
-    impl EnchantItemRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: i8,
-            enchantment: i8,
-        ) -> IoResult<()> {
-            writer.write_i8(window_id)?;
-            writer.write_i8(enchantment)?;
+            let result = EnchantItemRequest {
+                window_id,
+                enchantment,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x7)?;
+            self.window_id.serialize(&mut writer)?;
+            self.enchantment.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct WindowClickRequest_ChangedSlots {
+    pub struct WindowClickRequest_ChangedSlots<'p> {
         pub location: i16,
-        pub item: InventorySlot,
+        pub item: InventorySlot<'p>,
     }
-    pub(super) fn read_window_click_request_changed_slots(
-        mut reader: &mut Reader,
-    ) -> Result<WindowClickRequest_ChangedSlots> {
-        let location: i16 = MD::deserialize(reader)?;
-        let item: InventorySlot = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for WindowClickRequest_ChangedSlots<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<WindowClickRequest_ChangedSlots<'p>> {
+            let location: i16 = MD::deserialize(reader)?;
+            let item: InventorySlot<'p> = MD::deserialize(reader)?;
 
-        let result = WindowClickRequest_ChangedSlots { location, item };
-        Ok(result)
-    }
-    impl WindowClickRequest_ChangedSlots {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: i16,
-            item: InventorySlot,
-        ) -> IoResult<()> {
-            writer.write_i16::<BE>(location)?;
-            unimplemented!();
+            let result = WindowClickRequest_ChangedSlots { location, item };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            self.location.serialize(&mut writer)?;
+            self.item.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct WindowClickRequest {
+    pub struct WindowClickRequest<'p> {
         pub window_id: u8,
         pub state_id: i32,
         pub slot: i16,
         pub mouse_button: i8,
         pub mode: i32,
-        pub changed_slots: Vec<WindowClickRequest_ChangedSlots>,
-        pub cursor_item: InventorySlot,
+        pub changed_slots: Vec<WindowClickRequest_ChangedSlots<'p>>,
+        pub cursor_item: InventorySlot<'p>,
     }
-    pub(super) fn read_window_click_request(mut reader: &mut Reader) -> Result<WindowClickRequest> {
-        let window_id: u8 = MD::deserialize(reader)?;
-        let state_id: i32 = read_varint(&mut reader)?;
-        let slot: i16 = MD::deserialize(reader)?;
-        let mouse_button: i8 = MD::deserialize(reader)?;
-        let mode: i32 = read_varint(&mut reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut changed_slots = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: WindowClickRequest_ChangedSlots =
-                read_window_click_request_changed_slots(reader)?;
-            changed_slots.push(x);
-        }
-        let cursor_item: InventorySlot = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for WindowClickRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<WindowClickRequest<'p>> {
+            let window_id: u8 = MD::deserialize(reader)?;
+            let state_id: i32 = read_varint(&mut reader)?;
+            let slot: i16 = MD::deserialize(reader)?;
+            let mouse_button: i8 = MD::deserialize(reader)?;
+            let mode: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut changed_slots = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: WindowClickRequest_ChangedSlots =
+                    WindowClickRequest_ChangedSlots::deserialize(reader)?;
+                changed_slots.push(x);
+            }
+            let cursor_item: InventorySlot<'p> = MD::deserialize(reader)?;
 
-        let result = WindowClickRequest {
-            window_id,
-            state_id,
-            slot,
-            mouse_button,
-            mode,
-            changed_slots,
-            cursor_item,
-        };
-        Ok(result)
-    }
-    impl WindowClickRequest {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _window_id: u8,
-            _state_id: i32,
-            _slot: i16,
-            _mouse_button: i8,
-            _mode: i32,
-            _changed_slots: &[WindowClickRequest_ChangedSlots],
-            _cursor_item: InventorySlot,
-        ) -> IoResult<()> {
+            let result = WindowClickRequest {
+                window_id,
+                state_id,
+                slot,
+                mouse_button,
+                mode,
+                changed_slots,
+                cursor_item,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -954,41 +823,37 @@ pub mod play {
     pub struct CloseWindowRequest {
         pub window_id: u8,
     }
-    pub(super) fn read_close_window_request(mut reader: &mut Reader) -> Result<CloseWindowRequest> {
-        let window_id: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for CloseWindowRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<CloseWindowRequest> {
+            let window_id: u8 = MD::deserialize(reader)?;
 
-        let result = CloseWindowRequest { window_id };
-        Ok(result)
-    }
-    impl CloseWindowRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, window_id: u8) -> IoResult<()> {
-            writer.write_u8(window_id)?;
+            let result = CloseWindowRequest { window_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x9)?;
+            self.window_id.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct CustomPayloadRequest {
-        pub channel: IndexedString,
-        pub data: IndexedBuffer,
+    pub struct CustomPayloadRequest<'p> {
+        pub channel: &'p str,
+        pub data: &'p [u8],
     }
-    pub(super) fn read_custom_payload_request(
-        mut reader: &mut Reader,
-    ) -> Result<CustomPayloadRequest> {
-        let channel: IndexedString = MD::deserialize(reader)?;
-        let data: IndexedBuffer = reader.read_rest_buffer();
+    impl<'p> MD<'p> for CustomPayloadRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<CustomPayloadRequest<'p>> {
+            let channel: &'p str = MD::deserialize(reader)?;
+            let data: &'p [u8] = &reader[..];
+            *reader = &[];
 
-        let result = CustomPayloadRequest { channel, data };
-        Ok(result)
-    }
-    impl CustomPayloadRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            channel: &str,
-            data: &[u8],
-        ) -> IoResult<()> {
-            write_varint(&mut writer, channel.len() as u32)?;
-            writer.write_all(channel.as_bytes())?;
-            writer.write_all(data)?;
+            let result = CustomPayloadRequest { channel, data };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xa)?;
+            self.channel.serialize(&mut writer)?;
+            writer.write_all(self.data)?;
             Ok(())
         }
     }
@@ -1012,32 +877,37 @@ pub mod play {
         pub sneaking: bool,
     }
 
-    pub(super) fn read_use_entity_request(mut reader: &mut Reader) -> Result<UseEntityRequest> {
-        let entity_id = read_varint(&mut reader)?;
-        let kind = read_varint(&mut reader)?;
-        let kind = match kind {
-            0 => {
-                let _ = read_varint(&mut reader)?;
-                UseEntityKind::Interact
-            }
-            1 => UseEntityKind::Attack,
-            2 => {
-                let x = MD::deserialize(&mut reader)?;
-                let y = MD::deserialize(&mut reader)?;
-                let z = MD::deserialize(&mut reader)?;
-                let _ = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for UseEntityRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UseEntityRequest> {
+            let entity_id = read_varint(&mut reader)?;
+            let kind = read_varint(&mut reader)?;
+            let kind = match kind {
+                0 => {
+                    let _ = read_varint(&mut reader)?;
+                    UseEntityKind::Interact
+                }
+                1 => UseEntityKind::Attack,
+                2 => {
+                    let x = MD::deserialize(&mut reader)?;
+                    let y = MD::deserialize(&mut reader)?;
+                    let z = MD::deserialize(&mut reader)?;
+                    let _ = read_varint(&mut reader)?;
 
-                UseEntityKind::InteractAt(Coords { x, y, z })
-            }
-            _ => anyhow::bail!("unknown use entity kind {}", kind),
-        };
-        let sneaking = MD::deserialize(&mut reader)?;
+                    UseEntityKind::InteractAt(Coords { x, y, z })
+                }
+                _ => anyhow::bail!("unknown use entity kind {}", kind),
+            };
+            let sneaking = MD::deserialize(&mut reader)?;
 
-        Ok(UseEntityRequest {
-            entity_id,
-            kind,
-            sneaking,
-        })
+            Ok(UseEntityRequest {
+                entity_id,
+                kind,
+                sneaking,
+            })
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            unimplemented!()
+        }
     }
     #[derive(Debug)]
     pub struct GenerateStructureRequest {
@@ -1045,30 +915,24 @@ pub mod play {
         pub levels: i32,
         pub keep_jigsaws: bool,
     }
-    pub(super) fn read_generate_structure_request(
-        mut reader: &mut Reader,
-    ) -> Result<GenerateStructureRequest> {
-        let location: Position = MD::deserialize(reader)?;
-        let levels: i32 = read_varint(&mut reader)?;
-        let keep_jigsaws: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for GenerateStructureRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<GenerateStructureRequest> {
+            let location: Position = MD::deserialize(reader)?;
+            let levels: i32 = read_varint(&mut reader)?;
+            let keep_jigsaws: bool = MD::deserialize(reader)?;
 
-        let result = GenerateStructureRequest {
-            location,
-            levels,
-            keep_jigsaws,
-        };
-        Ok(result)
-    }
-    impl GenerateStructureRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            levels: i32,
-            keep_jigsaws: bool,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, levels as u32)?;
-            writer.write_all(&[keep_jigsaws as u8])?;
+            let result = GenerateStructureRequest {
+                location,
+                levels,
+                keep_jigsaws,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xe)?;
+            self.location.serialize(&mut writer)?;
+            write_varint(&mut writer, self.levels as u32)?;
+            self.keep_jigsaws.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1076,15 +940,16 @@ pub mod play {
     pub struct KeepAliveRequest {
         pub keep_alive_id: i64,
     }
-    pub(super) fn read_keep_alive_request(mut reader: &mut Reader) -> Result<KeepAliveRequest> {
-        let keep_alive_id: i64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for KeepAliveRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<KeepAliveRequest> {
+            let keep_alive_id: i64 = MD::deserialize(reader)?;
 
-        let result = KeepAliveRequest { keep_alive_id };
-        Ok(result)
-    }
-    impl KeepAliveRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, keep_alive_id: i64) -> IoResult<()> {
-            writer.write_i64::<BE>(keep_alive_id)?;
+            let result = KeepAliveRequest { keep_alive_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xf)?;
+            self.keep_alive_id.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1092,17 +957,16 @@ pub mod play {
     pub struct LockDifficultyRequest {
         pub locked: bool,
     }
-    pub(super) fn read_lock_difficulty_request(
-        mut reader: &mut Reader,
-    ) -> Result<LockDifficultyRequest> {
-        let locked: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for LockDifficultyRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<LockDifficultyRequest> {
+            let locked: bool = MD::deserialize(reader)?;
 
-        let result = LockDifficultyRequest { locked };
-        Ok(result)
-    }
-    impl LockDifficultyRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, locked: bool) -> IoResult<()> {
-            writer.write_all(&[locked as u8])?;
+            let result = LockDifficultyRequest { locked };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x10)?;
+            self.locked.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1113,27 +977,22 @@ pub mod play {
         pub z: f64,
         pub on_ground: bool,
     }
-    pub(super) fn read_position_request(mut reader: &mut Reader) -> Result<PositionRequest> {
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PositionRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PositionRequest> {
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = PositionRequest { x, y, z, on_ground };
-        Ok(result)
-    }
-    impl PositionRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            x: f64,
-            y: f64,
-            z: f64,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = PositionRequest { x, y, z, on_ground };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x11)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1146,42 +1005,33 @@ pub mod play {
         pub pitch: f32,
         pub on_ground: bool,
     }
-    pub(super) fn read_position_look_request(
-        mut reader: &mut Reader,
-    ) -> Result<PositionLookRequest> {
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PositionLookRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PositionLookRequest> {
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = PositionLookRequest {
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-            on_ground,
-        };
-        Ok(result)
-    }
-    impl PositionLookRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: f32,
-            pitch: f32,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_f32::<BE>(yaw)?;
-            writer.write_f32::<BE>(pitch)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = PositionLookRequest {
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+                on_ground,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x12)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1191,28 +1041,24 @@ pub mod play {
         pub pitch: f32,
         pub on_ground: bool,
     }
-    pub(super) fn read_look_request(mut reader: &mut Reader) -> Result<LookRequest> {
-        let yaw: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for LookRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<LookRequest> {
+            let yaw: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = LookRequest {
-            yaw,
-            pitch,
-            on_ground,
-        };
-        Ok(result)
-    }
-    impl LookRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            yaw: f32,
-            pitch: f32,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            writer.write_f32::<BE>(yaw)?;
-            writer.write_f32::<BE>(pitch)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = LookRequest {
+                yaw,
+                pitch,
+                on_ground,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x13)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1220,15 +1066,16 @@ pub mod play {
     pub struct FlyingRequest {
         pub on_ground: bool,
     }
-    pub(super) fn read_flying_request(mut reader: &mut Reader) -> Result<FlyingRequest> {
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for FlyingRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<FlyingRequest> {
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = FlyingRequest { on_ground };
-        Ok(result)
-    }
-    impl FlyingRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, on_ground: bool) -> IoResult<()> {
-            writer.write_all(&[on_ground as u8])?;
+            let result = FlyingRequest { on_ground };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x14)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1240,36 +1087,30 @@ pub mod play {
         pub yaw: f32,
         pub pitch: f32,
     }
-    pub(super) fn read_vehicle_move_request(mut reader: &mut Reader) -> Result<VehicleMoveRequest> {
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for VehicleMoveRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<VehicleMoveRequest> {
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
 
-        let result = VehicleMoveRequest {
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-        };
-        Ok(result)
-    }
-    impl VehicleMoveRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: f32,
-            pitch: f32,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_f32::<BE>(yaw)?;
-            writer.write_f32::<BE>(pitch)?;
+            let result = VehicleMoveRequest {
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x15)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1278,56 +1119,48 @@ pub mod play {
         pub left_paddle: bool,
         pub right_paddle: bool,
     }
-    pub(super) fn read_steer_boat_request(mut reader: &mut Reader) -> Result<SteerBoatRequest> {
-        let left_paddle: bool = MD::deserialize(reader)?;
-        let right_paddle: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SteerBoatRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SteerBoatRequest> {
+            let left_paddle: bool = MD::deserialize(reader)?;
+            let right_paddle: bool = MD::deserialize(reader)?;
 
-        let result = SteerBoatRequest {
-            left_paddle,
-            right_paddle,
-        };
-        Ok(result)
-    }
-    impl SteerBoatRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            left_paddle: bool,
-            right_paddle: bool,
-        ) -> IoResult<()> {
-            writer.write_all(&[left_paddle as u8])?;
-            writer.write_all(&[right_paddle as u8])?;
+            let result = SteerBoatRequest {
+                left_paddle,
+                right_paddle,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x16)?;
+            self.left_paddle.serialize(&mut writer)?;
+            self.right_paddle.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct CraftRecipeRequest {
+    pub struct CraftRecipeRequest<'p> {
         pub window_id: i8,
-        pub recipe: IndexedString,
+        pub recipe: &'p str,
         pub make_all: bool,
     }
-    pub(super) fn read_craft_recipe_request(mut reader: &mut Reader) -> Result<CraftRecipeRequest> {
-        let window_id: i8 = MD::deserialize(reader)?;
-        let recipe: IndexedString = MD::deserialize(reader)?;
-        let make_all: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for CraftRecipeRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<CraftRecipeRequest<'p>> {
+            let window_id: i8 = MD::deserialize(reader)?;
+            let recipe: &'p str = MD::deserialize(reader)?;
+            let make_all: bool = MD::deserialize(reader)?;
 
-        let result = CraftRecipeRequest {
-            window_id,
-            recipe,
-            make_all,
-        };
-        Ok(result)
-    }
-    impl CraftRecipeRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: i8,
-            recipe: &str,
-            make_all: bool,
-        ) -> IoResult<()> {
-            writer.write_i8(window_id)?;
-            write_varint(&mut writer, recipe.len() as u32)?;
-            writer.write_all(recipe.as_bytes())?;
-            writer.write_all(&[make_all as u8])?;
+            let result = CraftRecipeRequest {
+                window_id,
+                recipe,
+                make_all,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x18)?;
+            self.window_id.serialize(&mut writer)?;
+            self.recipe.serialize(&mut writer)?;
+            self.make_all.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1335,15 +1168,16 @@ pub mod play {
     pub struct AbilitiesRequest {
         pub flags: i8,
     }
-    pub(super) fn read_abilities_request(mut reader: &mut Reader) -> Result<AbilitiesRequest> {
-        let flags: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for AbilitiesRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<AbilitiesRequest> {
+            let flags: i8 = MD::deserialize(reader)?;
 
-        let result = AbilitiesRequest { flags };
-        Ok(result)
-    }
-    impl AbilitiesRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, flags: i8) -> IoResult<()> {
-            writer.write_i8(flags)?;
+            let result = AbilitiesRequest { flags };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x19)?;
+            self.flags.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1353,28 +1187,24 @@ pub mod play {
         pub location: Position,
         pub face: i8,
     }
-    pub(super) fn read_block_dig_request(mut reader: &mut Reader) -> Result<BlockDigRequest> {
-        let status: i32 = read_varint(&mut reader)?;
-        let location: Position = MD::deserialize(reader)?;
-        let face: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for BlockDigRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<BlockDigRequest> {
+            let status: i32 = read_varint(&mut reader)?;
+            let location: Position = MD::deserialize(reader)?;
+            let face: i8 = MD::deserialize(reader)?;
 
-        let result = BlockDigRequest {
-            status,
-            location,
-            face,
-        };
-        Ok(result)
-    }
-    impl BlockDigRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            status: i32,
-            location: Position,
-            face: i8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, status as u32)?;
-            location.write(&mut writer)?;
-            writer.write_i8(face)?;
+            let result = BlockDigRequest {
+                status,
+                location,
+                face,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1a)?;
+            write_varint(&mut writer, self.status as u32)?;
+            self.location.serialize(&mut writer)?;
+            self.face.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1384,30 +1214,24 @@ pub mod play {
         pub action_id: i32,
         pub jump_boost: i32,
     }
-    pub(super) fn read_entity_action_request(
-        mut reader: &mut Reader,
-    ) -> Result<EntityActionRequest> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let action_id: i32 = read_varint(&mut reader)?;
-        let jump_boost: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for EntityActionRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityActionRequest> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let action_id: i32 = read_varint(&mut reader)?;
+            let jump_boost: i32 = read_varint(&mut reader)?;
 
-        let result = EntityActionRequest {
-            entity_id,
-            action_id,
-            jump_boost,
-        };
-        Ok(result)
-    }
-    impl EntityActionRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            action_id: i32,
-            jump_boost: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            write_varint(&mut writer, action_id as u32)?;
-            write_varint(&mut writer, jump_boost as u32)?;
+            let result = EntityActionRequest {
+                entity_id,
+                action_id,
+                jump_boost,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1b)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            write_varint(&mut writer, self.action_id as u32)?;
+            write_varint(&mut writer, self.jump_boost as u32)?;
             Ok(())
         }
     }
@@ -1417,49 +1241,41 @@ pub mod play {
         pub forward: f32,
         pub jump: u8,
     }
-    pub(super) fn read_steer_vehicle_request(
-        mut reader: &mut Reader,
-    ) -> Result<SteerVehicleRequest> {
-        let sideways: f32 = MD::deserialize(reader)?;
-        let forward: f32 = MD::deserialize(reader)?;
-        let jump: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SteerVehicleRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SteerVehicleRequest> {
+            let sideways: f32 = MD::deserialize(reader)?;
+            let forward: f32 = MD::deserialize(reader)?;
+            let jump: u8 = MD::deserialize(reader)?;
 
-        let result = SteerVehicleRequest {
-            sideways,
-            forward,
-            jump,
-        };
-        Ok(result)
-    }
-    impl SteerVehicleRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            sideways: f32,
-            forward: f32,
-            jump: u8,
-        ) -> IoResult<()> {
-            writer.write_f32::<BE>(sideways)?;
-            writer.write_f32::<BE>(forward)?;
-            writer.write_u8(jump)?;
+            let result = SteerVehicleRequest {
+                sideways,
+                forward,
+                jump,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1c)?;
+            self.sideways.serialize(&mut writer)?;
+            self.forward.serialize(&mut writer)?;
+            self.jump.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct DisplayedRecipeRequest {
-        pub recipe_id: IndexedString,
+    pub struct DisplayedRecipeRequest<'p> {
+        pub recipe_id: &'p str,
     }
-    pub(super) fn read_displayed_recipe_request(
-        mut reader: &mut Reader,
-    ) -> Result<DisplayedRecipeRequest> {
-        let recipe_id: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for DisplayedRecipeRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<DisplayedRecipeRequest<'p>> {
+            let recipe_id: &'p str = MD::deserialize(reader)?;
 
-        let result = DisplayedRecipeRequest { recipe_id };
-        Ok(result)
-    }
-    impl DisplayedRecipeRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, recipe_id: &str) -> IoResult<()> {
-            write_varint(&mut writer, recipe_id.len() as u32)?;
-            writer.write_all(recipe_id.as_bytes())?;
+            let result = DisplayedRecipeRequest { recipe_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1f)?;
+            self.recipe_id.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1469,28 +1285,24 @@ pub mod play {
         pub book_open: bool,
         pub filter_active: bool,
     }
-    pub(super) fn read_recipe_book_request(mut reader: &mut Reader) -> Result<RecipeBookRequest> {
-        let book_id: i32 = read_varint(&mut reader)?;
-        let book_open: bool = MD::deserialize(reader)?;
-        let filter_active: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for RecipeBookRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<RecipeBookRequest> {
+            let book_id: i32 = read_varint(&mut reader)?;
+            let book_open: bool = MD::deserialize(reader)?;
+            let filter_active: bool = MD::deserialize(reader)?;
 
-        let result = RecipeBookRequest {
-            book_id,
-            book_open,
-            filter_active,
-        };
-        Ok(result)
-    }
-    impl RecipeBookRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            book_id: i32,
-            book_open: bool,
-            filter_active: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, book_id as u32)?;
-            writer.write_all(&[book_open as u8])?;
-            writer.write_all(&[filter_active as u8])?;
+            let result = RecipeBookRequest {
+                book_id,
+                book_open,
+                filter_active,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1e)?;
+            write_varint(&mut writer, self.book_id as u32)?;
+            self.book_open.serialize(&mut writer)?;
+            self.filter_active.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1498,17 +1310,16 @@ pub mod play {
     pub struct ResourcePackReceiveRequest {
         pub result: i32,
     }
-    pub(super) fn read_resource_pack_receive_request(
-        mut reader: &mut Reader,
-    ) -> Result<ResourcePackReceiveRequest> {
-        let result: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for ResourcePackReceiveRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ResourcePackReceiveRequest> {
+            let result: i32 = read_varint(&mut reader)?;
 
-        let result = ResourcePackReceiveRequest { result };
-        Ok(result)
-    }
-    impl ResourcePackReceiveRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, result: i32) -> IoResult<()> {
-            write_varint(&mut writer, result as u32)?;
+            let result = ResourcePackReceiveRequest { result };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x21)?;
+            write_varint(&mut writer, self.result as u32)?;
             Ok(())
         }
     }
@@ -1516,140 +1327,110 @@ pub mod play {
     pub struct HeldItemSlotRequest {
         pub slot_id: i16,
     }
-    pub(super) fn read_held_item_slot_request(
-        mut reader: &mut Reader,
-    ) -> Result<HeldItemSlotRequest> {
-        let slot_id: i16 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for HeldItemSlotRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<HeldItemSlotRequest> {
+            let slot_id: i16 = MD::deserialize(reader)?;
 
-        let result = HeldItemSlotRequest { slot_id };
-        Ok(result)
-    }
-    impl HeldItemSlotRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, slot_id: i16) -> IoResult<()> {
-            writer.write_i16::<BE>(slot_id)?;
+            let result = HeldItemSlotRequest { slot_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x25)?;
+            self.slot_id.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SetCreativeSlotRequest {
+    pub struct SetCreativeSlotRequest<'p> {
         pub slot: i16,
-        pub item: InventorySlot,
+        pub item: InventorySlot<'p>,
     }
-    pub(super) fn read_set_creative_slot_request(
-        mut reader: &mut Reader,
-    ) -> Result<SetCreativeSlotRequest> {
-        let slot: i16 = MD::deserialize(reader)?;
-        let item: InventorySlot = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SetCreativeSlotRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SetCreativeSlotRequest<'p>> {
+            let slot: i16 = MD::deserialize(reader)?;
+            let item: InventorySlot<'p> = MD::deserialize(reader)?;
 
-        let result = SetCreativeSlotRequest { slot, item };
-        Ok(result)
-    }
-    impl SetCreativeSlotRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            slot: i16,
-            item: InventorySlot,
-        ) -> IoResult<()> {
-            writer.write_i16::<BE>(slot)?;
-            unimplemented!();
+            let result = SetCreativeSlotRequest { slot, item };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x28)?;
+            self.slot.serialize(&mut writer)?;
+            self.item.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct UpdateJigsawBlockRequest {
+    pub struct UpdateJigsawBlockRequest<'p> {
         pub location: Position,
-        pub name: IndexedString,
-        pub target: IndexedString,
-        pub pool: IndexedString,
-        pub final_state: IndexedString,
-        pub joint_type: IndexedString,
+        pub name: &'p str,
+        pub target: &'p str,
+        pub pool: &'p str,
+        pub final_state: &'p str,
+        pub joint_type: &'p str,
     }
-    pub(super) fn read_update_jigsaw_block_request(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateJigsawBlockRequest> {
-        let location: Position = MD::deserialize(reader)?;
-        let name: IndexedString = MD::deserialize(reader)?;
-        let target: IndexedString = MD::deserialize(reader)?;
-        let pool: IndexedString = MD::deserialize(reader)?;
-        let final_state: IndexedString = MD::deserialize(reader)?;
-        let joint_type: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateJigsawBlockRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<UpdateJigsawBlockRequest<'p>> {
+            let location: Position = MD::deserialize(reader)?;
+            let name: &'p str = MD::deserialize(reader)?;
+            let target: &'p str = MD::deserialize(reader)?;
+            let pool: &'p str = MD::deserialize(reader)?;
+            let final_state: &'p str = MD::deserialize(reader)?;
+            let joint_type: &'p str = MD::deserialize(reader)?;
 
-        let result = UpdateJigsawBlockRequest {
-            location,
-            name,
-            target,
-            pool,
-            final_state,
-            joint_type,
-        };
-        Ok(result)
-    }
-    impl UpdateJigsawBlockRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            name: &str,
-            target: &str,
-            pool: &str,
-            final_state: &str,
-            joint_type: &str,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, name.len() as u32)?;
-            writer.write_all(name.as_bytes())?;
-            write_varint(&mut writer, target.len() as u32)?;
-            writer.write_all(target.as_bytes())?;
-            write_varint(&mut writer, pool.len() as u32)?;
-            writer.write_all(pool.as_bytes())?;
-            write_varint(&mut writer, final_state.len() as u32)?;
-            writer.write_all(final_state.as_bytes())?;
-            write_varint(&mut writer, joint_type.len() as u32)?;
-            writer.write_all(joint_type.as_bytes())?;
+            let result = UpdateJigsawBlockRequest {
+                location,
+                name,
+                target,
+                pool,
+                final_state,
+                joint_type,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x29)?;
+            self.location.serialize(&mut writer)?;
+            self.name.serialize(&mut writer)?;
+            self.target.serialize(&mut writer)?;
+            self.pool.serialize(&mut writer)?;
+            self.final_state.serialize(&mut writer)?;
+            self.joint_type.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct UpdateSignRequest {
+    pub struct UpdateSignRequest<'p> {
         pub location: Position,
-        pub text1: IndexedString,
-        pub text2: IndexedString,
-        pub text3: IndexedString,
-        pub text4: IndexedString,
+        pub text_1: &'p str,
+        pub text_2: &'p str,
+        pub text_3: &'p str,
+        pub text_4: &'p str,
     }
-    pub(super) fn read_update_sign_request(mut reader: &mut Reader) -> Result<UpdateSignRequest> {
-        let location: Position = MD::deserialize(reader)?;
-        let text1: IndexedString = MD::deserialize(reader)?;
-        let text2: IndexedString = MD::deserialize(reader)?;
-        let text3: IndexedString = MD::deserialize(reader)?;
-        let text4: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateSignRequest<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<UpdateSignRequest<'p>> {
+            let location: Position = MD::deserialize(reader)?;
+            let text_1: &'p str = MD::deserialize(reader)?;
+            let text_2: &'p str = MD::deserialize(reader)?;
+            let text_3: &'p str = MD::deserialize(reader)?;
+            let text_4: &'p str = MD::deserialize(reader)?;
 
-        let result = UpdateSignRequest {
-            location,
-            text1,
-            text2,
-            text3,
-            text4,
-        };
-        Ok(result)
-    }
-    impl UpdateSignRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            text1: &str,
-            text2: &str,
-            text3: &str,
-            text4: &str,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, text1.len() as u32)?;
-            writer.write_all(text1.as_bytes())?;
-            write_varint(&mut writer, text2.len() as u32)?;
-            writer.write_all(text2.as_bytes())?;
-            write_varint(&mut writer, text3.len() as u32)?;
-            writer.write_all(text3.as_bytes())?;
-            write_varint(&mut writer, text4.len() as u32)?;
-            writer.write_all(text4.as_bytes())?;
+            let result = UpdateSignRequest {
+                location,
+                text_1,
+                text_2,
+                text_3,
+                text_4,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2b)?;
+            self.location.serialize(&mut writer)?;
+            self.text_1.serialize(&mut writer)?;
+            self.text_2.serialize(&mut writer)?;
+            self.text_3.serialize(&mut writer)?;
+            self.text_4.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1657,17 +1438,16 @@ pub mod play {
     pub struct ArmAnimationRequest {
         pub hand: i32,
     }
-    pub(super) fn read_arm_animation_request(
-        mut reader: &mut Reader,
-    ) -> Result<ArmAnimationRequest> {
-        let hand: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for ArmAnimationRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ArmAnimationRequest> {
+            let hand: i32 = read_varint(&mut reader)?;
 
-        let result = ArmAnimationRequest { hand };
-        Ok(result)
-    }
-    impl ArmAnimationRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, hand: i32) -> IoResult<()> {
-            write_varint(&mut writer, hand as u32)?;
+            let result = ArmAnimationRequest { hand };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2c)?;
+            write_varint(&mut writer, self.hand as u32)?;
             Ok(())
         }
     }
@@ -1675,15 +1455,16 @@ pub mod play {
     pub struct SpectateRequest {
         pub target: u128,
     }
-    pub(super) fn read_spectate_request(mut reader: &mut Reader) -> Result<SpectateRequest> {
-        let target: u128 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SpectateRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SpectateRequest> {
+            let target: u128 = MD::deserialize(reader)?;
 
-        let result = SpectateRequest { target };
-        Ok(result)
-    }
-    impl SpectateRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, target: u128) -> IoResult<()> {
-            writer.write_u128::<BE>(target)?;
+            let result = SpectateRequest { target };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2d)?;
+            self.target.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1697,44 +1478,36 @@ pub mod play {
         pub cursor_z: f32,
         pub inside_block: bool,
     }
-    pub(super) fn read_block_place_request(mut reader: &mut Reader) -> Result<BlockPlaceRequest> {
-        let hand: i32 = read_varint(&mut reader)?;
-        let location: Position = MD::deserialize(reader)?;
-        let direction: i32 = read_varint(&mut reader)?;
-        let cursor_x: f32 = MD::deserialize(reader)?;
-        let cursor_y: f32 = MD::deserialize(reader)?;
-        let cursor_z: f32 = MD::deserialize(reader)?;
-        let inside_block: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for BlockPlaceRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<BlockPlaceRequest> {
+            let hand: i32 = read_varint(&mut reader)?;
+            let location: Position = MD::deserialize(reader)?;
+            let direction: i32 = read_varint(&mut reader)?;
+            let cursor_x: f32 = MD::deserialize(reader)?;
+            let cursor_y: f32 = MD::deserialize(reader)?;
+            let cursor_z: f32 = MD::deserialize(reader)?;
+            let inside_block: bool = MD::deserialize(reader)?;
 
-        let result = BlockPlaceRequest {
-            hand,
-            location,
-            direction,
-            cursor_x,
-            cursor_y,
-            cursor_z,
-            inside_block,
-        };
-        Ok(result)
-    }
-    impl BlockPlaceRequest {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            hand: i32,
-            location: Position,
-            direction: i32,
-            cursor_x: f32,
-            cursor_y: f32,
-            cursor_z: f32,
-            inside_block: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, hand as u32)?;
-            location.write(&mut writer)?;
-            write_varint(&mut writer, direction as u32)?;
-            writer.write_f32::<BE>(cursor_x)?;
-            writer.write_f32::<BE>(cursor_y)?;
-            writer.write_f32::<BE>(cursor_z)?;
-            writer.write_all(&[inside_block as u8])?;
+            let result = BlockPlaceRequest {
+                hand,
+                location,
+                direction,
+                cursor_x,
+                cursor_y,
+                cursor_z,
+                inside_block,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2e)?;
+            write_varint(&mut writer, self.hand as u32)?;
+            self.location.serialize(&mut writer)?;
+            write_varint(&mut writer, self.direction as u32)?;
+            self.cursor_x.serialize(&mut writer)?;
+            self.cursor_y.serialize(&mut writer)?;
+            self.cursor_z.serialize(&mut writer)?;
+            self.inside_block.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1742,28 +1515,28 @@ pub mod play {
     pub struct UseItemRequest {
         pub hand: i32,
     }
-    pub(super) fn read_use_item_request(mut reader: &mut Reader) -> Result<UseItemRequest> {
-        let hand: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for UseItemRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UseItemRequest> {
+            let hand: i32 = read_varint(&mut reader)?;
 
-        let result = UseItemRequest { hand };
-        Ok(result)
-    }
-    impl UseItemRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, hand: i32) -> IoResult<()> {
-            write_varint(&mut writer, hand as u32)?;
+            let result = UseItemRequest { hand };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2f)?;
+            write_varint(&mut writer, self.hand as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct AdvancementTabRequest {}
-    pub(super) fn read_advancement_tab_request(
-        mut _reader: &mut Reader,
-    ) -> Result<AdvancementTabRequest> {
-        let result = AdvancementTabRequest {};
-        Ok(result)
-    }
-    impl AdvancementTabRequest {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for AdvancementTabRequest {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<AdvancementTabRequest> {
+            let result = AdvancementTabRequest {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x22)?;
             Ok(())
         }
     }
@@ -1771,15 +1544,16 @@ pub mod play {
     pub struct PongRequest {
         pub id: i32,
     }
-    pub(super) fn read_pong_request(mut reader: &mut Reader) -> Result<PongRequest> {
-        let id: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PongRequest {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PongRequest> {
+            let id: i32 = MD::deserialize(reader)?;
 
-        let result = PongRequest { id };
-        Ok(result)
-    }
-    impl PongRequest {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, id: i32) -> IoResult<()> {
-            writer.write_i32::<BE>(id)?;
+            let result = PongRequest { id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1d)?;
+            self.id.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1798,66 +1572,51 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn read_spawn_entity_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let object_uuid: u128 = MD::deserialize(reader)?;
-        let type_: i32 = read_varint(&mut reader)?;
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let pitch: i8 = MD::deserialize(reader)?;
-        let yaw: i8 = MD::deserialize(reader)?;
-        let object_data: i32 = MD::deserialize(reader)?;
-        let velocity_x: i16 = MD::deserialize(reader)?;
-        let velocity_y: i16 = MD::deserialize(reader)?;
-        let velocity_z: i16 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SpawnEntityResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SpawnEntityResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let object_uuid: u128 = MD::deserialize(reader)?;
+            let type_: i32 = read_varint(&mut reader)?;
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let pitch: i8 = MD::deserialize(reader)?;
+            let yaw: i8 = MD::deserialize(reader)?;
+            let object_data: i32 = MD::deserialize(reader)?;
+            let velocity_x: i16 = MD::deserialize(reader)?;
+            let velocity_y: i16 = MD::deserialize(reader)?;
+            let velocity_z: i16 = MD::deserialize(reader)?;
 
-        let result = SpawnEntityResponse {
-            entity_id,
-            object_uuid,
-            type_,
-            x,
-            y,
-            z,
-            pitch,
-            yaw,
-            object_data,
-            velocity_x,
-            velocity_y,
-            velocity_z,
-        };
-        Ok(result)
-    }
-    impl SpawnEntityResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            object_uuid: u128,
-            type_: i32,
-            x: f64,
-            y: f64,
-            z: f64,
-            pitch: i8,
-            yaw: i8,
-            object_data: i32,
-            velocity_x: i16,
-            velocity_y: i16,
-            velocity_z: i16,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_u128::<BE>(object_uuid)?;
-            write_varint(&mut writer, type_ as u32)?;
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_i8(pitch)?;
-            writer.write_i8(yaw)?;
-            writer.write_i32::<BE>(object_data)?;
-            writer.write_i16::<BE>(velocity_x)?;
-            writer.write_i16::<BE>(velocity_y)?;
-            writer.write_i16::<BE>(velocity_z)?;
+            let result = SpawnEntityResponse {
+                entity_id,
+                object_uuid,
+                type_,
+                x,
+                y,
+                z,
+                pitch,
+                yaw,
+                object_data,
+                velocity_x,
+                velocity_y,
+                velocity_z,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x0)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.object_uuid.serialize(&mut writer)?;
+            write_varint(&mut writer, self.type_ as u32)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.object_data.serialize(&mut writer)?;
+            self.velocity_x.serialize(&mut writer)?;
+            self.velocity_y.serialize(&mut writer)?;
+            self.velocity_z.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1869,38 +1628,30 @@ pub mod play {
         pub z: f64,
         pub count: i16,
     }
-    pub(super) fn read_spawn_entity_experience_orb_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityExperienceOrbResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let count: i16 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SpawnEntityExperienceOrbResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SpawnEntityExperienceOrbResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let count: i16 = MD::deserialize(reader)?;
 
-        let result = SpawnEntityExperienceOrbResponse {
-            entity_id,
-            x,
-            y,
-            z,
-            count,
-        };
-        Ok(result)
-    }
-    impl SpawnEntityExperienceOrbResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            x: f64,
-            y: f64,
-            z: f64,
-            count: i16,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_i16::<BE>(count)?;
+            let result = SpawnEntityExperienceOrbResponse {
+                entity_id,
+                x,
+                y,
+                z,
+                count,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.count.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1919,66 +1670,51 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn read_spawn_entity_living_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityLivingResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let entity_uuid: u128 = MD::deserialize(reader)?;
-        let type_: i32 = read_varint(&mut reader)?;
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: i8 = MD::deserialize(reader)?;
-        let pitch: i8 = MD::deserialize(reader)?;
-        let head_pitch: i8 = MD::deserialize(reader)?;
-        let velocity_x: i16 = MD::deserialize(reader)?;
-        let velocity_y: i16 = MD::deserialize(reader)?;
-        let velocity_z: i16 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SpawnEntityLivingResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SpawnEntityLivingResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let entity_uuid: u128 = MD::deserialize(reader)?;
+            let type_: i32 = read_varint(&mut reader)?;
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: i8 = MD::deserialize(reader)?;
+            let pitch: i8 = MD::deserialize(reader)?;
+            let head_pitch: i8 = MD::deserialize(reader)?;
+            let velocity_x: i16 = MD::deserialize(reader)?;
+            let velocity_y: i16 = MD::deserialize(reader)?;
+            let velocity_z: i16 = MD::deserialize(reader)?;
 
-        let result = SpawnEntityLivingResponse {
-            entity_id,
-            entity_uuid,
-            type_,
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-            head_pitch,
-            velocity_x,
-            velocity_y,
-            velocity_z,
-        };
-        Ok(result)
-    }
-    impl SpawnEntityLivingResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            entity_uuid: u128,
-            type_: i32,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: i8,
-            pitch: i8,
-            head_pitch: i8,
-            velocity_x: i16,
-            velocity_y: i16,
-            velocity_z: i16,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_u128::<BE>(entity_uuid)?;
-            write_varint(&mut writer, type_ as u32)?;
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_i8(yaw)?;
-            writer.write_i8(pitch)?;
-            writer.write_i8(head_pitch)?;
-            writer.write_i16::<BE>(velocity_x)?;
-            writer.write_i16::<BE>(velocity_y)?;
-            writer.write_i16::<BE>(velocity_z)?;
+            let result = SpawnEntityLivingResponse {
+                entity_id,
+                entity_uuid,
+                type_,
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+                head_pitch,
+                velocity_x,
+                velocity_y,
+                velocity_z,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.entity_uuid.serialize(&mut writer)?;
+            write_varint(&mut writer, self.type_ as u32)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.head_pitch.serialize(&mut writer)?;
+            self.velocity_x.serialize(&mut writer)?;
+            self.velocity_y.serialize(&mut writer)?;
+            self.velocity_z.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -1990,38 +1726,30 @@ pub mod play {
         pub location: Position,
         pub direction: u8,
     }
-    pub(super) fn read_spawn_entity_painting_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnEntityPaintingResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let entity_uuid: u128 = MD::deserialize(reader)?;
-        let title: i32 = read_varint(&mut reader)?;
-        let location: Position = MD::deserialize(reader)?;
-        let direction: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SpawnEntityPaintingResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SpawnEntityPaintingResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let entity_uuid: u128 = MD::deserialize(reader)?;
+            let title: i32 = read_varint(&mut reader)?;
+            let location: Position = MD::deserialize(reader)?;
+            let direction: u8 = MD::deserialize(reader)?;
 
-        let result = SpawnEntityPaintingResponse {
-            entity_id,
-            entity_uuid,
-            title,
-            location,
-            direction,
-        };
-        Ok(result)
-    }
-    impl SpawnEntityPaintingResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            entity_uuid: u128,
-            title: i32,
-            location: Position,
-            direction: u8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_u128::<BE>(entity_uuid)?;
-            write_varint(&mut writer, title as u32)?;
-            location.write(&mut writer)?;
-            writer.write_u8(direction)?;
+            let result = SpawnEntityPaintingResponse {
+                entity_id,
+                entity_uuid,
+                title,
+                location,
+                direction,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.entity_uuid.serialize(&mut writer)?;
+            write_varint(&mut writer, self.title as u32)?;
+            self.location.serialize(&mut writer)?;
+            self.direction.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2035,46 +1763,36 @@ pub mod play {
         pub yaw: i8,
         pub pitch: i8,
     }
-    pub(super) fn read_named_entity_spawn_response(
-        mut reader: &mut Reader,
-    ) -> Result<NamedEntitySpawnResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let player_uuid: u128 = MD::deserialize(reader)?;
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: i8 = MD::deserialize(reader)?;
-        let pitch: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for NamedEntitySpawnResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<NamedEntitySpawnResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let player_uuid: u128 = MD::deserialize(reader)?;
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: i8 = MD::deserialize(reader)?;
+            let pitch: i8 = MD::deserialize(reader)?;
 
-        let result = NamedEntitySpawnResponse {
-            entity_id,
-            player_uuid,
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-        };
-        Ok(result)
-    }
-    impl NamedEntitySpawnResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            player_uuid: u128,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: i8,
-            pitch: i8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_u128::<BE>(player_uuid)?;
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_i8(yaw)?;
-            writer.write_i8(pitch)?;
+            let result = NamedEntitySpawnResponse {
+                entity_id,
+                player_uuid,
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.player_uuid.serialize(&mut writer)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2083,24 +1801,21 @@ pub mod play {
         pub entity_id: i32,
         pub animation: u8,
     }
-    pub(super) fn read_animation_response(mut reader: &mut Reader) -> Result<AnimationResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let animation: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for AnimationResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<AnimationResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let animation: u8 = MD::deserialize(reader)?;
 
-        let result = AnimationResponse {
-            entity_id,
-            animation,
-        };
-        Ok(result)
-    }
-    impl AnimationResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            animation: u8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_u8(animation)?;
+            let result = AnimationResponse {
+                entity_id,
+                animation,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x6)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.animation.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2110,30 +1825,23 @@ pub mod play {
         pub statistic_id: i32,
         pub value: i32,
     }
-    pub(super) fn read_statistics_response_entries(
-        mut reader: &mut Reader,
-    ) -> Result<StatisticsResponse_Entries> {
-        let category_id: i32 = read_varint(&mut reader)?;
-        let statistic_id: i32 = read_varint(&mut reader)?;
-        let value: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for StatisticsResponse_Entries {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<StatisticsResponse_Entries> {
+            let category_id: i32 = read_varint(&mut reader)?;
+            let statistic_id: i32 = read_varint(&mut reader)?;
+            let value: i32 = read_varint(&mut reader)?;
 
-        let result = StatisticsResponse_Entries {
-            category_id,
-            statistic_id,
-            value,
-        };
-        Ok(result)
-    }
-    impl StatisticsResponse_Entries {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            category_id: i32,
-            statistic_id: i32,
-            value: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, category_id as u32)?;
-            write_varint(&mut writer, statistic_id as u32)?;
-            write_varint(&mut writer, value as u32)?;
+            let result = StatisticsResponse_Entries {
+                category_id,
+                statistic_id,
+                value,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, self.category_id as u32)?;
+            write_varint(&mut writer, self.statistic_id as u32)?;
+            write_varint(&mut writer, self.value as u32)?;
             Ok(())
         }
     }
@@ -2141,35 +1849,32 @@ pub mod play {
     pub struct StatisticsResponse {
         pub entries: Vec<StatisticsResponse_Entries>,
     }
-    pub(super) fn read_statistics_response(mut reader: &mut Reader) -> Result<StatisticsResponse> {
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut entries = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: StatisticsResponse_Entries = read_statistics_response_entries(reader)?;
-            entries.push(x);
-        }
+    impl<'p> MD<'p> for StatisticsResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<StatisticsResponse> {
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut entries = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: StatisticsResponse_Entries =
+                    StatisticsResponse_Entries::deserialize(reader)?;
+                entries.push(x);
+            }
 
-        let result = StatisticsResponse { entries };
-        Ok(result)
-    }
-    impl StatisticsResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _entries: &[StatisticsResponse_Entries],
-        ) -> IoResult<()> {
+            let result = StatisticsResponse { entries };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
     #[derive(Debug)]
     pub struct AdvancementsResponse {}
-    pub(super) fn read_advancements_response(
-        mut _reader: &mut Reader,
-    ) -> Result<AdvancementsResponse> {
-        let result = AdvancementsResponse {};
-        Ok(result)
-    }
-    impl AdvancementsResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for AdvancementsResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<AdvancementsResponse> {
+            let result = AdvancementsResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x63)?;
             Ok(())
         }
     }
@@ -2179,101 +1884,82 @@ pub mod play {
         pub location: Position,
         pub destroy_stage: i8,
     }
-    pub(super) fn read_block_break_animation_response(
-        mut reader: &mut Reader,
-    ) -> Result<BlockBreakAnimationResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let location: Position = MD::deserialize(reader)?;
-        let destroy_stage: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for BlockBreakAnimationResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<BlockBreakAnimationResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let location: Position = MD::deserialize(reader)?;
+            let destroy_stage: i8 = MD::deserialize(reader)?;
 
-        let result = BlockBreakAnimationResponse {
-            entity_id,
-            location,
-            destroy_stage,
-        };
-        Ok(result)
-    }
-    impl BlockBreakAnimationResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            location: Position,
-            destroy_stage: i8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            location.write(&mut writer)?;
-            writer.write_i8(destroy_stage)?;
+            let result = BlockBreakAnimationResponse {
+                entity_id,
+                location,
+                destroy_stage,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x9)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.location.serialize(&mut writer)?;
+            self.destroy_stage.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct TileEntityDataResponse {
+    pub struct TileEntityDataResponse<'p> {
         pub location: Position,
         pub action: i32,
-        pub nbt_data: IndexedOptionNbt,
+        pub nbt_data: IndexedOptionNbt<'p>,
     }
-    pub(super) fn read_tile_entity_data_response(
-        mut reader: &mut Reader,
-    ) -> Result<TileEntityDataResponse> {
-        let location: Position = MD::deserialize(reader)?;
-        let action: i32 = read_varint(&mut reader)?;
-        let nbt_data: IndexedOptionNbt = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for TileEntityDataResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<TileEntityDataResponse<'p>> {
+            let location: Position = MD::deserialize(reader)?;
+            let action: i32 = read_varint(&mut reader)?;
+            let nbt_data: IndexedOptionNbt<'p> = MD::deserialize(reader)?;
 
-        let result = TileEntityDataResponse {
-            location,
-            action,
-            nbt_data,
-        };
-        Ok(result)
-    }
-    impl TileEntityDataResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            action: i32,
-            nbt_data: IndexedOptionNbt,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, action as u32)?;
-            unimplemented!();
+            let result = TileEntityDataResponse {
+                location,
+                action,
+                nbt_data,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xa)?;
+            self.location.serialize(&mut writer)?;
+            write_varint(&mut writer, self.action as u32)?;
+            self.nbt_data.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct BlockActionResponse {
         pub location: Position,
-        pub byte1: u8,
-        pub byte2: u8,
+        pub byte_1: u8,
+        pub byte_2: u8,
         pub block_id: i32,
     }
-    pub(super) fn read_block_action_response(
-        mut reader: &mut Reader,
-    ) -> Result<BlockActionResponse> {
-        let location: Position = MD::deserialize(reader)?;
-        let byte1: u8 = MD::deserialize(reader)?;
-        let byte2: u8 = MD::deserialize(reader)?;
-        let block_id: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for BlockActionResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<BlockActionResponse> {
+            let location: Position = MD::deserialize(reader)?;
+            let byte_1: u8 = MD::deserialize(reader)?;
+            let byte_2: u8 = MD::deserialize(reader)?;
+            let block_id: i32 = read_varint(&mut reader)?;
 
-        let result = BlockActionResponse {
-            location,
-            byte1,
-            byte2,
-            block_id,
-        };
-        Ok(result)
-    }
-    impl BlockActionResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            byte1: u8,
-            byte2: u8,
-            block_id: i32,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            writer.write_u8(byte1)?;
-            writer.write_u8(byte2)?;
-            write_varint(&mut writer, block_id as u32)?;
+            let result = BlockActionResponse {
+                location,
+                byte_1,
+                byte_2,
+                block_id,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xb)?;
+            self.location.serialize(&mut writer)?;
+            self.byte_1.serialize(&mut writer)?;
+            self.byte_2.serialize(&mut writer)?;
+            write_varint(&mut writer, self.block_id as u32)?;
             Ok(())
         }
     }
@@ -2282,34 +1968,30 @@ pub mod play {
         pub location: Position,
         pub type_: i32,
     }
-    pub(super) fn read_block_change_response(
-        mut reader: &mut Reader,
-    ) -> Result<BlockChangeResponse> {
-        let location: Position = MD::deserialize(reader)?;
-        let type_: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for BlockChangeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<BlockChangeResponse> {
+            let location: Position = MD::deserialize(reader)?;
+            let type_: i32 = read_varint(&mut reader)?;
 
-        let result = BlockChangeResponse { location, type_ };
-        Ok(result)
-    }
-    impl BlockChangeResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            type_: i32,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, type_ as u32)?;
+            let result = BlockChangeResponse { location, type_ };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xc)?;
+            self.location.serialize(&mut writer)?;
+            write_varint(&mut writer, self.type_ as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct BossBarResponse {}
-    pub(super) fn read_boss_bar_response(mut _reader: &mut Reader) -> Result<BossBarResponse> {
-        let result = BossBarResponse {};
-        Ok(result)
-    }
-    impl BossBarResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for BossBarResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<BossBarResponse> {
+            let result = BossBarResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xd)?;
             Ok(())
         }
     }
@@ -2318,194 +2000,158 @@ pub mod play {
         pub difficulty: u8,
         pub difficulty_locked: bool,
     }
-    pub(super) fn read_difficulty_response(mut reader: &mut Reader) -> Result<DifficultyResponse> {
-        let difficulty: u8 = MD::deserialize(reader)?;
-        let difficulty_locked: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for DifficultyResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<DifficultyResponse> {
+            let difficulty: u8 = MD::deserialize(reader)?;
+            let difficulty_locked: bool = MD::deserialize(reader)?;
 
-        let result = DifficultyResponse {
-            difficulty,
-            difficulty_locked,
-        };
-        Ok(result)
-    }
-    impl DifficultyResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            difficulty: u8,
-            difficulty_locked: bool,
-        ) -> IoResult<()> {
-            writer.write_u8(difficulty)?;
-            writer.write_all(&[difficulty_locked as u8])?;
+            let result = DifficultyResponse {
+                difficulty,
+                difficulty_locked,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xe)?;
+            self.difficulty.serialize(&mut writer)?;
+            self.difficulty_locked.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct TabCompleteResponse_Matches {
-        pub match_: IndexedString,
-        pub tooltip: Option<IndexedString>,
+    pub struct TabCompleteResponse_Matches<'p> {
+        pub match_: &'p str,
+        pub tooltip: Option<&'p str>,
     }
-    pub(super) fn read_tab_complete_response_matches(
-        mut reader: &mut Reader,
-    ) -> Result<TabCompleteResponse_Matches> {
-        let match_: IndexedString = MD::deserialize(reader)?;
-        let tooltip: Option<IndexedString> = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for TabCompleteResponse_Matches<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<TabCompleteResponse_Matches<'p>> {
+            let match_: &'p str = MD::deserialize(reader)?;
+            let tooltip: Option<&'p str> = MD::deserialize(reader)?;
 
-        let result = TabCompleteResponse_Matches { match_, tooltip };
-        Ok(result)
-    }
-    impl TabCompleteResponse_Matches {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            match_: &str,
-            tooltip: Option<&str>,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, match_.len() as u32)?;
-            writer.write_all(match_.as_bytes())?;
-            match tooltip {
-                Some(tooltip_1) => {
-                    writer.write_all(&[1])?;
-
-                    write_varint(&mut writer, tooltip_1.len() as u32)?;
-                    writer.write_all(tooltip_1.as_bytes())?;
-                }
-                None => writer.write_all(&[0])?,
-            }
+            let result = TabCompleteResponse_Matches { match_, tooltip };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            self.match_.serialize(&mut writer)?;
+            self.tooltip.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct TabCompleteResponse {
+    pub struct TabCompleteResponse<'p> {
         pub transaction_id: i32,
         pub start: i32,
         pub length: i32,
-        pub matches: Vec<TabCompleteResponse_Matches>,
+        pub matches: Vec<TabCompleteResponse_Matches<'p>>,
     }
-    pub(super) fn read_tab_complete_response(
-        mut reader: &mut Reader,
-    ) -> Result<TabCompleteResponse> {
-        let transaction_id: i32 = read_varint(&mut reader)?;
-        let start: i32 = read_varint(&mut reader)?;
-        let length: i32 = read_varint(&mut reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut matches = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: TabCompleteResponse_Matches = read_tab_complete_response_matches(reader)?;
-            matches.push(x);
-        }
+    impl<'p> MD<'p> for TabCompleteResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<TabCompleteResponse<'p>> {
+            let transaction_id: i32 = read_varint(&mut reader)?;
+            let start: i32 = read_varint(&mut reader)?;
+            let length: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut matches = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: TabCompleteResponse_Matches =
+                    TabCompleteResponse_Matches::deserialize(reader)?;
+                matches.push(x);
+            }
 
-        let result = TabCompleteResponse {
-            transaction_id,
-            start,
-            length,
-            matches,
-        };
-        Ok(result)
-    }
-    impl TabCompleteResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _transaction_id: i32,
-            _start: i32,
-            _length: i32,
-            _matches: &[TabCompleteResponse_Matches],
-        ) -> IoResult<()> {
+            let result = TabCompleteResponse {
+                transaction_id,
+                start,
+                length,
+                matches,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
     #[derive(Debug)]
     pub struct DeclareCommandsResponse {}
-    pub(super) fn read_declare_commands_response(
-        mut _reader: &mut Reader,
-    ) -> Result<DeclareCommandsResponse> {
-        let result = DeclareCommandsResponse {};
-        Ok(result)
-    }
-    impl DeclareCommandsResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for DeclareCommandsResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<DeclareCommandsResponse> {
+            let result = DeclareCommandsResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x12)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct FacePlayerResponse {}
-    pub(super) fn read_face_player_response(
-        mut _reader: &mut Reader,
-    ) -> Result<FacePlayerResponse> {
-        let result = FacePlayerResponse {};
-        Ok(result)
-    }
-    impl FacePlayerResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for FacePlayerResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<FacePlayerResponse> {
+            let result = FacePlayerResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x37)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct NbtQueryResponse {
+    pub struct NbtQueryResponse<'p> {
         pub transaction_id: i32,
-        pub nbt: IndexedOptionNbt,
+        pub nbt: IndexedOptionNbt<'p>,
     }
-    pub(super) fn read_nbt_query_response(mut reader: &mut Reader) -> Result<NbtQueryResponse> {
-        let transaction_id: i32 = read_varint(&mut reader)?;
-        let nbt: IndexedOptionNbt = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for NbtQueryResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<NbtQueryResponse<'p>> {
+            let transaction_id: i32 = read_varint(&mut reader)?;
+            let nbt: IndexedOptionNbt<'p> = MD::deserialize(reader)?;
 
-        let result = NbtQueryResponse {
-            transaction_id,
-            nbt,
-        };
-        Ok(result)
-    }
-    impl NbtQueryResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            transaction_id: i32,
-            nbt: IndexedOptionNbt,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, transaction_id as u32)?;
-            unimplemented!();
+            let result = NbtQueryResponse {
+                transaction_id,
+                nbt,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x60)?;
+            write_varint(&mut writer, self.transaction_id as u32)?;
+            self.nbt.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct ChatResponse {
-        pub message: IndexedString,
+    pub struct ChatResponse<'p> {
+        pub message: &'p str,
         pub position: i8,
         pub sender: u128,
     }
-    pub(super) fn read_chat_response(mut reader: &mut Reader) -> Result<ChatResponse> {
-        let message: IndexedString = MD::deserialize(reader)?;
-        let position: i8 = MD::deserialize(reader)?;
-        let sender: u128 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ChatResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<ChatResponse<'p>> {
+            let message: &'p str = MD::deserialize(reader)?;
+            let position: i8 = MD::deserialize(reader)?;
+            let sender: u128 = MD::deserialize(reader)?;
 
-        let result = ChatResponse {
-            message,
-            position,
-            sender,
-        };
-        Ok(result)
-    }
-    impl ChatResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            message: &str,
-            position: i8,
-            sender: u128,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, message.len() as u32)?;
-            writer.write_all(message.as_bytes())?;
-            writer.write_i8(position)?;
-            writer.write_u128::<BE>(sender)?;
+            let result = ChatResponse {
+                message,
+                position,
+                sender,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0xf)?;
+            self.message.serialize(&mut writer)?;
+            self.position.serialize(&mut writer)?;
+            self.sender.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct MultiBlockChangeResponse {}
-    pub(super) fn read_multi_block_change_response(
-        mut _reader: &mut Reader,
-    ) -> Result<MultiBlockChangeResponse> {
-        let result = MultiBlockChangeResponse {};
-        Ok(result)
-    }
-    impl MultiBlockChangeResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for MultiBlockChangeResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<MultiBlockChangeResponse> {
+            let result = MultiBlockChangeResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3f)?;
             Ok(())
         }
     }
@@ -2513,88 +2159,74 @@ pub mod play {
     pub struct CloseWindowResponse {
         pub window_id: u8,
     }
-    pub(super) fn read_close_window_response(
-        mut reader: &mut Reader,
-    ) -> Result<CloseWindowResponse> {
-        let window_id: u8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for CloseWindowResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<CloseWindowResponse> {
+            let window_id: u8 = MD::deserialize(reader)?;
 
-        let result = CloseWindowResponse { window_id };
-        Ok(result)
-    }
-    impl CloseWindowResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, window_id: u8) -> IoResult<()> {
-            writer.write_u8(window_id)?;
+            let result = CloseWindowResponse { window_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x13)?;
+            self.window_id.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct OpenWindowResponse {
+    pub struct OpenWindowResponse<'p> {
         pub window_id: i32,
         pub inventory_type: i32,
-        pub window_title: IndexedString,
+        pub window_title: &'p str,
     }
-    pub(super) fn read_open_window_response(mut reader: &mut Reader) -> Result<OpenWindowResponse> {
-        let window_id: i32 = read_varint(&mut reader)?;
-        let inventory_type: i32 = read_varint(&mut reader)?;
-        let window_title: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for OpenWindowResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<OpenWindowResponse<'p>> {
+            let window_id: i32 = read_varint(&mut reader)?;
+            let inventory_type: i32 = read_varint(&mut reader)?;
+            let window_title: &'p str = MD::deserialize(reader)?;
 
-        let result = OpenWindowResponse {
-            window_id,
-            inventory_type,
-            window_title,
-        };
-        Ok(result)
-    }
-    impl OpenWindowResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: i32,
-            inventory_type: i32,
-            window_title: &str,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, window_id as u32)?;
-            write_varint(&mut writer, inventory_type as u32)?;
-            write_varint(&mut writer, window_title.len() as u32)?;
-            writer.write_all(window_title.as_bytes())?;
+            let result = OpenWindowResponse {
+                window_id,
+                inventory_type,
+                window_title,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2e)?;
+            write_varint(&mut writer, self.window_id as u32)?;
+            write_varint(&mut writer, self.inventory_type as u32)?;
+            self.window_title.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct WindowItemsResponse {
+    pub struct WindowItemsResponse<'p> {
         pub window_id: u8,
         pub state_id: i32,
-        pub items: Vec<InventorySlot>,
-        pub carried_item: InventorySlot,
+        pub items: Vec<InventorySlot<'p>>,
+        pub carried_item: InventorySlot<'p>,
     }
-    pub(super) fn read_window_items_response(
-        mut reader: &mut Reader,
-    ) -> Result<WindowItemsResponse> {
-        let window_id: u8 = MD::deserialize(reader)?;
-        let state_id: i32 = read_varint(&mut reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut items = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: InventorySlot = MD::deserialize(reader)?;
-            items.push(x);
-        }
-        let carried_item: InventorySlot = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for WindowItemsResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<WindowItemsResponse<'p>> {
+            let window_id: u8 = MD::deserialize(reader)?;
+            let state_id: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut items = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: InventorySlot<'p> = MD::deserialize(reader)?;
+                items.push(x);
+            }
+            let carried_item: InventorySlot<'p> = MD::deserialize(reader)?;
 
-        let result = WindowItemsResponse {
-            window_id,
-            state_id,
-            items,
-            carried_item,
-        };
-        Ok(result)
-    }
-    impl WindowItemsResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _window_id: u8,
-            _state_id: i32,
-            _items: &[InventorySlot],
-            _carried_item: InventorySlot,
-        ) -> IoResult<()> {
+            let result = WindowItemsResponse {
+                window_id,
+                state_id,
+                items,
+                carried_item,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -2604,66 +2236,55 @@ pub mod play {
         pub property: i16,
         pub value: i16,
     }
-    pub(super) fn read_craft_progress_bar_response(
-        mut reader: &mut Reader,
-    ) -> Result<CraftProgressBarResponse> {
-        let window_id: u8 = MD::deserialize(reader)?;
-        let property: i16 = MD::deserialize(reader)?;
-        let value: i16 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for CraftProgressBarResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<CraftProgressBarResponse> {
+            let window_id: u8 = MD::deserialize(reader)?;
+            let property: i16 = MD::deserialize(reader)?;
+            let value: i16 = MD::deserialize(reader)?;
 
-        let result = CraftProgressBarResponse {
-            window_id,
-            property,
-            value,
-        };
-        Ok(result)
-    }
-    impl CraftProgressBarResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: u8,
-            property: i16,
-            value: i16,
-        ) -> IoResult<()> {
-            writer.write_u8(window_id)?;
-            writer.write_i16::<BE>(property)?;
-            writer.write_i16::<BE>(value)?;
+            let result = CraftProgressBarResponse {
+                window_id,
+                property,
+                value,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x15)?;
+            self.window_id.serialize(&mut writer)?;
+            self.property.serialize(&mut writer)?;
+            self.value.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SetSlotResponse {
+    pub struct SetSlotResponse<'p> {
         pub window_id: i8,
         pub state_id: i32,
         pub slot: i16,
-        pub item: InventorySlot,
+        pub item: InventorySlot<'p>,
     }
-    pub(super) fn read_set_slot_response(mut reader: &mut Reader) -> Result<SetSlotResponse> {
-        let window_id: i8 = MD::deserialize(reader)?;
-        let state_id: i32 = read_varint(&mut reader)?;
-        let slot: i16 = MD::deserialize(reader)?;
-        let item: InventorySlot = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SetSlotResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SetSlotResponse<'p>> {
+            let window_id: i8 = MD::deserialize(reader)?;
+            let state_id: i32 = read_varint(&mut reader)?;
+            let slot: i16 = MD::deserialize(reader)?;
+            let item: InventorySlot<'p> = MD::deserialize(reader)?;
 
-        let result = SetSlotResponse {
-            window_id,
-            state_id,
-            slot,
-            item,
-        };
-        Ok(result)
-    }
-    impl SetSlotResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: i8,
-            state_id: i32,
-            slot: i16,
-            item: InventorySlot,
-        ) -> IoResult<()> {
-            writer.write_i8(window_id)?;
-            write_varint(&mut writer, state_id as u32)?;
-            writer.write_i16::<BE>(slot)?;
-            unimplemented!();
+            let result = SetSlotResponse {
+                window_id,
+                state_id,
+                slot,
+                item,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x16)?;
+            self.window_id.serialize(&mut writer)?;
+            write_varint(&mut writer, self.state_id as u32)?;
+            self.slot.serialize(&mut writer)?;
+            self.item.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2672,58 +2293,48 @@ pub mod play {
         pub item_id: i32,
         pub cooldown_ticks: i32,
     }
-    pub(super) fn read_set_cooldown_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetCooldownResponse> {
-        let item_id: i32 = read_varint(&mut reader)?;
-        let cooldown_ticks: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for SetCooldownResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SetCooldownResponse> {
+            let item_id: i32 = read_varint(&mut reader)?;
+            let cooldown_ticks: i32 = read_varint(&mut reader)?;
 
-        let result = SetCooldownResponse {
-            item_id,
-            cooldown_ticks,
-        };
-        Ok(result)
-    }
-    impl SetCooldownResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            item_id: i32,
-            cooldown_ticks: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, item_id as u32)?;
-            write_varint(&mut writer, cooldown_ticks as u32)?;
+            let result = SetCooldownResponse {
+                item_id,
+                cooldown_ticks,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x17)?;
+            write_varint(&mut writer, self.item_id as u32)?;
+            write_varint(&mut writer, self.cooldown_ticks as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct CustomPayloadResponse {
-        pub channel: IndexedString,
-        pub data: IndexedBuffer,
+    pub struct CustomPayloadResponse<'p> {
+        pub channel: &'p str,
+        pub data: &'p [u8],
     }
-    pub(super) fn read_custom_payload_response(
-        mut reader: &mut Reader,
-    ) -> Result<CustomPayloadResponse> {
-        let channel: IndexedString = MD::deserialize(reader)?;
-        let data: IndexedBuffer = reader.read_rest_buffer();
+    impl<'p> MD<'p> for CustomPayloadResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<CustomPayloadResponse<'p>> {
+            let channel: &'p str = MD::deserialize(reader)?;
+            let data: &'p [u8] = &reader[..];
+            *reader = &[];
 
-        let result = CustomPayloadResponse { channel, data };
-        Ok(result)
-    }
-    impl CustomPayloadResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            channel: &str,
-            data: &[u8],
-        ) -> IoResult<()> {
-            write_varint(&mut writer, channel.len() as u32)?;
-            writer.write_all(channel.as_bytes())?;
-            writer.write_all(data)?;
+            let result = CustomPayloadResponse { channel, data };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x18)?;
+            self.channel.serialize(&mut writer)?;
+            writer.write_all(self.data)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct NamedSoundEffectResponse {
-        pub sound_name: IndexedString,
+    pub struct NamedSoundEffectResponse<'p> {
+        pub sound_name: &'p str,
         pub sound_category: i32,
         pub x: i32,
         pub y: i32,
@@ -2731,66 +2342,53 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn read_named_sound_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<NamedSoundEffectResponse> {
-        let sound_name: IndexedString = MD::deserialize(reader)?;
-        let sound_category: i32 = read_varint(&mut reader)?;
-        let x: i32 = MD::deserialize(reader)?;
-        let y: i32 = MD::deserialize(reader)?;
-        let z: i32 = MD::deserialize(reader)?;
-        let volume: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for NamedSoundEffectResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<NamedSoundEffectResponse<'p>> {
+            let sound_name: &'p str = MD::deserialize(reader)?;
+            let sound_category: i32 = read_varint(&mut reader)?;
+            let x: i32 = MD::deserialize(reader)?;
+            let y: i32 = MD::deserialize(reader)?;
+            let z: i32 = MD::deserialize(reader)?;
+            let volume: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
 
-        let result = NamedSoundEffectResponse {
-            sound_name,
-            sound_category,
-            x,
-            y,
-            z,
-            volume,
-            pitch,
-        };
-        Ok(result)
-    }
-    impl NamedSoundEffectResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            sound_name: &str,
-            sound_category: i32,
-            x: i32,
-            y: i32,
-            z: i32,
-            volume: f32,
-            pitch: f32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, sound_name.len() as u32)?;
-            writer.write_all(sound_name.as_bytes())?;
-            write_varint(&mut writer, sound_category as u32)?;
-            writer.write_i32::<BE>(x)?;
-            writer.write_i32::<BE>(y)?;
-            writer.write_i32::<BE>(z)?;
-            writer.write_f32::<BE>(volume)?;
-            writer.write_f32::<BE>(pitch)?;
+            let result = NamedSoundEffectResponse {
+                sound_name,
+                sound_category,
+                x,
+                y,
+                z,
+                volume,
+                pitch,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x19)?;
+            self.sound_name.serialize(&mut writer)?;
+            write_varint(&mut writer, self.sound_category as u32)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.volume.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct KickDisconnectResponse {
-        pub reason: IndexedString,
+    pub struct KickDisconnectResponse<'p> {
+        pub reason: &'p str,
     }
-    pub(super) fn read_kick_disconnect_response(
-        mut reader: &mut Reader,
-    ) -> Result<KickDisconnectResponse> {
-        let reason: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for KickDisconnectResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<KickDisconnectResponse<'p>> {
+            let reason: &'p str = MD::deserialize(reader)?;
 
-        let result = KickDisconnectResponse { reason };
-        Ok(result)
-    }
-    impl KickDisconnectResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, reason: &str) -> IoResult<()> {
-            write_varint(&mut writer, reason.len() as u32)?;
-            writer.write_all(reason.as_bytes())?;
+            let result = KickDisconnectResponse { reason };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1a)?;
+            self.reason.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2799,26 +2397,21 @@ pub mod play {
         pub entity_id: i32,
         pub entity_status: i8,
     }
-    pub(super) fn read_entity_status_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityStatusResponse> {
-        let entity_id: i32 = MD::deserialize(reader)?;
-        let entity_status: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityStatusResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityStatusResponse> {
+            let entity_id: i32 = MD::deserialize(reader)?;
+            let entity_status: i8 = MD::deserialize(reader)?;
 
-        let result = EntityStatusResponse {
-            entity_id,
-            entity_status,
-        };
-        Ok(result)
-    }
-    impl EntityStatusResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            entity_status: i8,
-        ) -> IoResult<()> {
-            writer.write_i32::<BE>(entity_id)?;
-            writer.write_i8(entity_status)?;
+            let result = EntityStatusResponse {
+                entity_id,
+                entity_status,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1b)?;
+            self.entity_id.serialize(&mut writer)?;
+            self.entity_status.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2828,21 +2421,19 @@ pub mod play {
         pub y: i8,
         pub z: i8,
     }
-    pub(super) fn read_explosion_response_affected_block_offsets(
-        mut reader: &mut Reader,
-    ) -> Result<ExplosionResponse_AffectedBlockOffsets> {
-        let x: i8 = MD::deserialize(reader)?;
-        let y: i8 = MD::deserialize(reader)?;
-        let z: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ExplosionResponse_AffectedBlockOffsets {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ExplosionResponse_AffectedBlockOffsets> {
+            let x: i8 = MD::deserialize(reader)?;
+            let y: i8 = MD::deserialize(reader)?;
+            let z: i8 = MD::deserialize(reader)?;
 
-        let result = ExplosionResponse_AffectedBlockOffsets { x, y, z };
-        Ok(result)
-    }
-    impl ExplosionResponse_AffectedBlockOffsets {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, x: i8, y: i8, z: i8) -> IoResult<()> {
-            writer.write_i8(x)?;
-            writer.write_i8(y)?;
-            writer.write_i8(z)?;
+            let result = ExplosionResponse_AffectedBlockOffsets { x, y, z };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2857,46 +2448,37 @@ pub mod play {
         pub player_motion_y: f32,
         pub player_motion_z: f32,
     }
-    pub(super) fn read_explosion_response(mut reader: &mut Reader) -> Result<ExplosionResponse> {
-        let x: f32 = MD::deserialize(reader)?;
-        let y: f32 = MD::deserialize(reader)?;
-        let z: f32 = MD::deserialize(reader)?;
-        let radius: f32 = MD::deserialize(reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut affected_block_offsets = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: ExplosionResponse_AffectedBlockOffsets =
-                read_explosion_response_affected_block_offsets(reader)?;
-            affected_block_offsets.push(x);
-        }
-        let player_motion_x: f32 = MD::deserialize(reader)?;
-        let player_motion_y: f32 = MD::deserialize(reader)?;
-        let player_motion_z: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ExplosionResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ExplosionResponse> {
+            let x: f32 = MD::deserialize(reader)?;
+            let y: f32 = MD::deserialize(reader)?;
+            let z: f32 = MD::deserialize(reader)?;
+            let radius: f32 = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut affected_block_offsets =
+                Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: ExplosionResponse_AffectedBlockOffsets =
+                    ExplosionResponse_AffectedBlockOffsets::deserialize(reader)?;
+                affected_block_offsets.push(x);
+            }
+            let player_motion_x: f32 = MD::deserialize(reader)?;
+            let player_motion_y: f32 = MD::deserialize(reader)?;
+            let player_motion_z: f32 = MD::deserialize(reader)?;
 
-        let result = ExplosionResponse {
-            x,
-            y,
-            z,
-            radius,
-            affected_block_offsets,
-            player_motion_x,
-            player_motion_y,
-            player_motion_z,
-        };
-        Ok(result)
-    }
-    impl ExplosionResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _x: f32,
-            _y: f32,
-            _z: f32,
-            _radius: f32,
-            _affected_block_offsets: &[ExplosionResponse_AffectedBlockOffsets],
-            _player_motion_x: f32,
-            _player_motion_y: f32,
-            _player_motion_z: f32,
-        ) -> IoResult<()> {
+            let result = ExplosionResponse {
+                x,
+                y,
+                z,
+                radius,
+                affected_block_offsets,
+                player_motion_x,
+                player_motion_y,
+                player_motion_z,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -2905,23 +2487,18 @@ pub mod play {
         pub chunk_x: i32,
         pub chunk_z: i32,
     }
-    pub(super) fn read_unload_chunk_response(
-        mut reader: &mut Reader,
-    ) -> Result<UnloadChunkResponse> {
-        let chunk_x: i32 = MD::deserialize(reader)?;
-        let chunk_z: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UnloadChunkResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UnloadChunkResponse> {
+            let chunk_x: i32 = MD::deserialize(reader)?;
+            let chunk_z: i32 = MD::deserialize(reader)?;
 
-        let result = UnloadChunkResponse { chunk_x, chunk_z };
-        Ok(result)
-    }
-    impl UnloadChunkResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            chunk_x: i32,
-            chunk_z: i32,
-        ) -> IoResult<()> {
-            writer.write_i32::<BE>(chunk_x)?;
-            writer.write_i32::<BE>(chunk_z)?;
+            let result = UnloadChunkResponse { chunk_x, chunk_z };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1d)?;
+            self.chunk_x.serialize(&mut writer)?;
+            self.chunk_z.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2930,23 +2507,18 @@ pub mod play {
         pub reason: u8,
         pub game_mode: f32,
     }
-    pub(super) fn read_game_state_change_response(
-        mut reader: &mut Reader,
-    ) -> Result<GameStateChangeResponse> {
-        let reason: u8 = MD::deserialize(reader)?;
-        let game_mode: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for GameStateChangeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<GameStateChangeResponse> {
+            let reason: u8 = MD::deserialize(reader)?;
+            let game_mode: f32 = MD::deserialize(reader)?;
 
-        let result = GameStateChangeResponse { reason, game_mode };
-        Ok(result)
-    }
-    impl GameStateChangeResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            reason: u8,
-            game_mode: f32,
-        ) -> IoResult<()> {
-            writer.write_u8(reason)?;
-            writer.write_f32::<BE>(game_mode)?;
+            let result = GameStateChangeResponse { reason, game_mode };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1e)?;
+            self.reason.serialize(&mut writer)?;
+            self.game_mode.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2956,30 +2528,24 @@ pub mod play {
         pub nb_slots: i32,
         pub entity_id: i32,
     }
-    pub(super) fn read_open_horse_window_response(
-        mut reader: &mut Reader,
-    ) -> Result<OpenHorseWindowResponse> {
-        let window_id: u8 = MD::deserialize(reader)?;
-        let nb_slots: i32 = read_varint(&mut reader)?;
-        let entity_id: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for OpenHorseWindowResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<OpenHorseWindowResponse> {
+            let window_id: u8 = MD::deserialize(reader)?;
+            let nb_slots: i32 = read_varint(&mut reader)?;
+            let entity_id: i32 = MD::deserialize(reader)?;
 
-        let result = OpenHorseWindowResponse {
-            window_id,
-            nb_slots,
-            entity_id,
-        };
-        Ok(result)
-    }
-    impl OpenHorseWindowResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: u8,
-            nb_slots: i32,
-            entity_id: i32,
-        ) -> IoResult<()> {
-            writer.write_u8(window_id)?;
-            write_varint(&mut writer, nb_slots as u32)?;
-            writer.write_i32::<BE>(entity_id)?;
+            let result = OpenHorseWindowResponse {
+                window_id,
+                nb_slots,
+                entity_id,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x1f)?;
+            self.window_id.serialize(&mut writer)?;
+            write_varint(&mut writer, self.nb_slots as u32)?;
+            self.entity_id.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -2987,26 +2553,28 @@ pub mod play {
     pub struct KeepAliveResponse {
         pub keep_alive_id: i64,
     }
-    pub(super) fn read_keep_alive_response(mut reader: &mut Reader) -> Result<KeepAliveResponse> {
-        let keep_alive_id: i64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for KeepAliveResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<KeepAliveResponse> {
+            let keep_alive_id: i64 = MD::deserialize(reader)?;
 
-        let result = KeepAliveResponse { keep_alive_id };
-        Ok(result)
-    }
-    impl KeepAliveResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, keep_alive_id: i64) -> IoResult<()> {
-            writer.write_i64::<BE>(keep_alive_id)?;
+            let result = KeepAliveResponse { keep_alive_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x21)?;
+            self.keep_alive_id.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct MapChunkResponse {}
-    pub(super) fn read_map_chunk_response(mut _reader: &mut Reader) -> Result<MapChunkResponse> {
-        let result = MapChunkResponse {};
-        Ok(result)
-    }
-    impl MapChunkResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for MapChunkResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<MapChunkResponse> {
+            let result = MapChunkResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x22)?;
             Ok(())
         }
     }
@@ -3017,45 +2585,39 @@ pub mod play {
         pub data: i32,
         pub global: bool,
     }
-    pub(super) fn read_world_event_response(mut reader: &mut Reader) -> Result<WorldEventResponse> {
-        let effect_id: i32 = MD::deserialize(reader)?;
-        let location: Position = MD::deserialize(reader)?;
-        let data: i32 = MD::deserialize(reader)?;
-        let global: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for WorldEventResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<WorldEventResponse> {
+            let effect_id: i32 = MD::deserialize(reader)?;
+            let location: Position = MD::deserialize(reader)?;
+            let data: i32 = MD::deserialize(reader)?;
+            let global: bool = MD::deserialize(reader)?;
 
-        let result = WorldEventResponse {
-            effect_id,
-            location,
-            data,
-            global,
-        };
-        Ok(result)
-    }
-    impl WorldEventResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            effect_id: i32,
-            location: Position,
-            data: i32,
-            global: bool,
-        ) -> IoResult<()> {
-            writer.write_i32::<BE>(effect_id)?;
-            location.write(&mut writer)?;
-            writer.write_i32::<BE>(data)?;
-            writer.write_all(&[global as u8])?;
+            let result = WorldEventResponse {
+                effect_id,
+                location,
+                data,
+                global,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x23)?;
+            self.effect_id.serialize(&mut writer)?;
+            self.location.serialize(&mut writer)?;
+            self.data.serialize(&mut writer)?;
+            self.global.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct WorldParticlesResponse {}
-    pub(super) fn read_world_particles_response(
-        mut _reader: &mut Reader,
-    ) -> Result<WorldParticlesResponse> {
-        let result = WorldParticlesResponse {};
-        Ok(result)
-    }
-    impl WorldParticlesResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for WorldParticlesResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<WorldParticlesResponse> {
+            let result = WorldParticlesResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x24)?;
             Ok(())
         }
     }
@@ -3071,98 +2633,86 @@ pub mod play {
         pub sky_light: Vec<Vec<u8>>,
         pub block_light: Vec<Vec<u8>>,
     }
-    pub(super) fn read_update_light_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateLightResponse> {
-        let chunk_x: i32 = read_varint(&mut reader)?;
-        let chunk_z: i32 = read_varint(&mut reader)?;
-        let trust_edges: bool = MD::deserialize(reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut sky_light_mask = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: i64 = MD::deserialize(reader)?;
-            sky_light_mask.push(x);
-        }
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut block_light_mask = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: i64 = MD::deserialize(reader)?;
-            block_light_mask.push(x);
-        }
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut empty_sky_light_mask = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: i64 = MD::deserialize(reader)?;
-            empty_sky_light_mask.push(x);
-        }
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut empty_block_light_mask = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: i64 = MD::deserialize(reader)?;
-            empty_block_light_mask.push(x);
-        }
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut sky_light = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let count_array: i32 = read_varint(&mut reader)?;
-            let mut x = Vec::with_capacity(count_array as usize);
-            for _ in 0..count_array {
-                let x_2: u8 = MD::deserialize(reader)?;
-                x.push(x_2);
+    impl<'p> MD<'p> for UpdateLightResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UpdateLightResponse> {
+            let chunk_x: i32 = read_varint(&mut reader)?;
+            let chunk_z: i32 = read_varint(&mut reader)?;
+            let trust_edges: bool = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                sky_light_mask.push(x);
             }
-            sky_light.push(x);
-        }
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut block_light = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let count_array: i32 = read_varint(&mut reader)?;
-            let mut x = Vec::with_capacity(count_array as usize);
-            for _ in 0..count_array {
-                let x_2: u8 = MD::deserialize(reader)?;
-                x.push(x_2);
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut block_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                block_light_mask.push(x);
             }
-            block_light.push(x);
-        }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut empty_sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                empty_sky_light_mask.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut empty_block_light_mask =
+                Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                empty_block_light_mask.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut sky_light = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let array_count: i32 = read_varint(&mut reader)?;
+                let mut x = Vec::with_capacity(cautious_size(array_count as usize));
+                for _ in 0..array_count {
+                    let x_2: u8 = MD::deserialize(reader)?;
+                    x.push(x_2);
+                }
+                sky_light.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut block_light = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let array_count: i32 = read_varint(&mut reader)?;
+                let mut x = Vec::with_capacity(cautious_size(array_count as usize));
+                for _ in 0..array_count {
+                    let x_2: u8 = MD::deserialize(reader)?;
+                    x.push(x_2);
+                }
+                block_light.push(x);
+            }
 
-        let result = UpdateLightResponse {
-            chunk_x,
-            chunk_z,
-            trust_edges,
-            sky_light_mask,
-            block_light_mask,
-            empty_sky_light_mask,
-            empty_block_light_mask,
-            sky_light,
-            block_light,
-        };
-        Ok(result)
-    }
-    impl UpdateLightResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _chunk_x: i32,
-            _chunk_z: i32,
-            _trust_edges: bool,
-            _sky_light_mask: &[i64],
-            _block_light_mask: &[i64],
-            _empty_sky_light_mask: &[i64],
-            _empty_block_light_mask: &[i64],
-            _sky_light: &[&[u8]],
-            _block_light: &[&[u8]],
-        ) -> IoResult<()> {
+            let result = UpdateLightResponse {
+                chunk_x,
+                chunk_z,
+                trust_edges,
+                sky_light_mask,
+                block_light_mask,
+                empty_sky_light_mask,
+                empty_block_light_mask,
+                sky_light,
+                block_light,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
     #[derive(Debug)]
-    pub struct LoginResponse {
+    pub struct LoginResponse<'p> {
         pub entity_id: i32,
         pub is_hardcore: bool,
         pub game_mode: u8,
         pub previous_game_mode: i8,
-        pub world_names: Vec<IndexedString>,
-        pub dimension_codec: IndexedNbt,
-        pub dimension: IndexedNbt,
-        pub world_name: IndexedString,
+        pub world_names: Vec<&'p str>,
+        pub dimension_codec: IndexedNbt<'p>,
+        pub dimension: IndexedNbt<'p>,
+        pub world_name: &'p str,
         pub hashed_seed: i64,
         pub max_players: i32,
         pub view_distance: i32,
@@ -3172,88 +2722,71 @@ pub mod play {
         pub is_debug: bool,
         pub is_flat: bool,
     }
-    pub(super) fn read_login_response(mut reader: &mut Reader) -> Result<LoginResponse> {
-        let entity_id: i32 = MD::deserialize(reader)?;
-        let is_hardcore: bool = MD::deserialize(reader)?;
-        let game_mode: u8 = MD::deserialize(reader)?;
-        let previous_game_mode: i8 = MD::deserialize(reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut world_names = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: IndexedString = MD::deserialize(reader)?;
-            world_names.push(x);
-        }
-        let dimension_codec: IndexedNbt = MD::deserialize(reader)?;
-        let dimension: IndexedNbt = MD::deserialize(reader)?;
-        let world_name: IndexedString = MD::deserialize(reader)?;
-        let hashed_seed: i64 = MD::deserialize(reader)?;
-        let max_players: i32 = read_varint(&mut reader)?;
-        let view_distance: i32 = read_varint(&mut reader)?;
-        let simulation_distance: i32 = read_varint(&mut reader)?;
-        let reduced_debug_info: bool = MD::deserialize(reader)?;
-        let enable_respawn_screen: bool = MD::deserialize(reader)?;
-        let is_debug: bool = MD::deserialize(reader)?;
-        let is_flat: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for LoginResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<LoginResponse<'p>> {
+            let entity_id: i32 = MD::deserialize(reader)?;
+            let is_hardcore: bool = MD::deserialize(reader)?;
+            let game_mode: u8 = MD::deserialize(reader)?;
+            let previous_game_mode: i8 = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut world_names = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: &'p str = MD::deserialize(reader)?;
+                world_names.push(x);
+            }
+            let dimension_codec: IndexedNbt<'p> = MD::deserialize(reader)?;
+            let dimension: IndexedNbt<'p> = MD::deserialize(reader)?;
+            let world_name: &'p str = MD::deserialize(reader)?;
+            let hashed_seed: i64 = MD::deserialize(reader)?;
+            let max_players: i32 = read_varint(&mut reader)?;
+            let view_distance: i32 = read_varint(&mut reader)?;
+            let simulation_distance: i32 = read_varint(&mut reader)?;
+            let reduced_debug_info: bool = MD::deserialize(reader)?;
+            let enable_respawn_screen: bool = MD::deserialize(reader)?;
+            let is_debug: bool = MD::deserialize(reader)?;
+            let is_flat: bool = MD::deserialize(reader)?;
 
-        let result = LoginResponse {
-            entity_id,
-            is_hardcore,
-            game_mode,
-            previous_game_mode,
-            world_names,
-            dimension_codec,
-            dimension,
-            world_name,
-            hashed_seed,
-            max_players,
-            view_distance,
-            simulation_distance,
-            reduced_debug_info,
-            enable_respawn_screen,
-            is_debug,
-            is_flat,
-        };
-        Ok(result)
-    }
-    impl LoginResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _entity_id: i32,
-            _is_hardcore: bool,
-            _game_mode: u8,
-            _previous_game_mode: i8,
-            _world_names: &[&str],
-            _dimension_codec: IndexedNbt,
-            _dimension: IndexedNbt,
-            _world_name: &str,
-            _hashed_seed: i64,
-            _max_players: i32,
-            _view_distance: i32,
-            _simulation_distance: i32,
-            _reduced_debug_info: bool,
-            _enable_respawn_screen: bool,
-            _is_debug: bool,
-            _is_flat: bool,
-        ) -> IoResult<()> {
+            let result = LoginResponse {
+                entity_id,
+                is_hardcore,
+                game_mode,
+                previous_game_mode,
+                world_names,
+                dimension_codec,
+                dimension,
+                world_name,
+                hashed_seed,
+                max_players,
+                view_distance,
+                simulation_distance,
+                reduced_debug_info,
+                enable_respawn_screen,
+                is_debug,
+                is_flat,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
     #[derive(Debug)]
     pub struct MapResponse {}
-    pub(super) fn read_map_response(mut _reader: &mut Reader) -> Result<MapResponse> {
-        let result = MapResponse {};
-        Ok(result)
-    }
-    impl MapResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for MapResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<MapResponse> {
+            let result = MapResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x27)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct TradeListResponse_Trades {
-        pub input_item1: InventorySlot,
-        pub output_item: InventorySlot,
-        pub input_item2: Option<InventorySlot>,
+    pub struct TradeListResponse_Trades<'p> {
+        pub input_item_1: InventorySlot<'p>,
+        pub output_item: InventorySlot<'p>,
+        pub input_item_2: Option<InventorySlot<'p>>,
         pub trade_disabled: bool,
         pub nb_trade_uses: i32,
         pub maximum_nb_trade_uses: i32,
@@ -3262,109 +2795,81 @@ pub mod play {
         pub price_multiplier: f32,
         pub demand: i32,
     }
-    pub(super) fn read_trade_list_response_trades(
-        mut reader: &mut Reader,
-    ) -> Result<TradeListResponse_Trades> {
-        let input_item1: InventorySlot = MD::deserialize(reader)?;
-        let output_item: InventorySlot = MD::deserialize(reader)?;
-        let input_item2: Option<InventorySlot> = MD::deserialize(reader)?;
-        let trade_disabled: bool = MD::deserialize(reader)?;
-        let nb_trade_uses: i32 = MD::deserialize(reader)?;
-        let maximum_nb_trade_uses: i32 = MD::deserialize(reader)?;
-        let xp: i32 = MD::deserialize(reader)?;
-        let special_price: i32 = MD::deserialize(reader)?;
-        let price_multiplier: f32 = MD::deserialize(reader)?;
-        let demand: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for TradeListResponse_Trades<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<TradeListResponse_Trades<'p>> {
+            let input_item_1: InventorySlot<'p> = MD::deserialize(reader)?;
+            let output_item: InventorySlot<'p> = MD::deserialize(reader)?;
+            let input_item_2: Option<InventorySlot<'p>> = MD::deserialize(reader)?;
+            let trade_disabled: bool = MD::deserialize(reader)?;
+            let nb_trade_uses: i32 = MD::deserialize(reader)?;
+            let maximum_nb_trade_uses: i32 = MD::deserialize(reader)?;
+            let xp: i32 = MD::deserialize(reader)?;
+            let special_price: i32 = MD::deserialize(reader)?;
+            let price_multiplier: f32 = MD::deserialize(reader)?;
+            let demand: i32 = MD::deserialize(reader)?;
 
-        let result = TradeListResponse_Trades {
-            input_item1,
-            output_item,
-            input_item2,
-            trade_disabled,
-            nb_trade_uses,
-            maximum_nb_trade_uses,
-            xp,
-            special_price,
-            price_multiplier,
-            demand,
-        };
-        Ok(result)
-    }
-    impl TradeListResponse_Trades {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            input_item1: InventorySlot,
-            output_item: InventorySlot,
-            input_item2: Option<InventorySlot>,
-            trade_disabled: bool,
-            nb_trade_uses: i32,
-            maximum_nb_trade_uses: i32,
-            xp: i32,
-            special_price: i32,
-            price_multiplier: f32,
-            demand: i32,
-        ) -> IoResult<()> {
-            unimplemented!();
-            unimplemented!();
-            match input_item2 {
-                Some(input_item2_1) => {
-                    writer.write_all(&[1])?;
-                    unimplemented!();
-                }
-                None => writer.write_all(&[0])?,
-            }
-            writer.write_all(&[trade_disabled as u8])?;
-            writer.write_i32::<BE>(nb_trade_uses)?;
-            writer.write_i32::<BE>(maximum_nb_trade_uses)?;
-            writer.write_i32::<BE>(xp)?;
-            writer.write_i32::<BE>(special_price)?;
-            writer.write_f32::<BE>(price_multiplier)?;
-            writer.write_i32::<BE>(demand)?;
+            let result = TradeListResponse_Trades {
+                input_item_1,
+                output_item,
+                input_item_2,
+                trade_disabled,
+                nb_trade_uses,
+                maximum_nb_trade_uses,
+                xp,
+                special_price,
+                price_multiplier,
+                demand,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            self.input_item_1.serialize(&mut writer)?;
+            self.output_item.serialize(&mut writer)?;
+            self.input_item_2.serialize(&mut writer)?;
+            self.trade_disabled.serialize(&mut writer)?;
+            self.nb_trade_uses.serialize(&mut writer)?;
+            self.maximum_nb_trade_uses.serialize(&mut writer)?;
+            self.xp.serialize(&mut writer)?;
+            self.special_price.serialize(&mut writer)?;
+            self.price_multiplier.serialize(&mut writer)?;
+            self.demand.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct TradeListResponse {
+    pub struct TradeListResponse<'p> {
         pub window_id: i32,
-        pub trades: Vec<TradeListResponse_Trades>,
+        pub trades: Vec<TradeListResponse_Trades<'p>>,
         pub villager_level: i32,
         pub experience: i32,
         pub is_regular_villager: bool,
         pub can_restock: bool,
     }
-    pub(super) fn read_trade_list_response(mut reader: &mut Reader) -> Result<TradeListResponse> {
-        let window_id: i32 = read_varint(&mut reader)?;
-        let count_array: u8 = MD::deserialize(reader)?;
-        let mut trades = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: TradeListResponse_Trades = read_trade_list_response_trades(reader)?;
-            trades.push(x);
-        }
-        let villager_level: i32 = read_varint(&mut reader)?;
-        let experience: i32 = read_varint(&mut reader)?;
-        let is_regular_villager: bool = MD::deserialize(reader)?;
-        let can_restock: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for TradeListResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<TradeListResponse<'p>> {
+            let window_id: i32 = read_varint(&mut reader)?;
+            let array_count: u8 = MD::deserialize(reader)?;
+            let mut trades = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: TradeListResponse_Trades = TradeListResponse_Trades::deserialize(reader)?;
+                trades.push(x);
+            }
+            let villager_level: i32 = read_varint(&mut reader)?;
+            let experience: i32 = read_varint(&mut reader)?;
+            let is_regular_villager: bool = MD::deserialize(reader)?;
+            let can_restock: bool = MD::deserialize(reader)?;
 
-        let result = TradeListResponse {
-            window_id,
-            trades,
-            villager_level,
-            experience,
-            is_regular_villager,
-            can_restock,
-        };
-        Ok(result)
-    }
-    impl TradeListResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _window_id: i32,
-            _trades: &[TradeListResponse_Trades],
-            _villager_level: i32,
-            _experience: i32,
-            _is_regular_villager: bool,
-            _can_restock: bool,
-        ) -> IoResult<()> {
+            let result = TradeListResponse {
+                window_id,
+                trades,
+                villager_level,
+                experience,
+                is_regular_villager,
+                can_restock,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -3376,38 +2881,30 @@ pub mod play {
         pub d_z: i16,
         pub on_ground: bool,
     }
-    pub(super) fn read_rel_entity_move_response(
-        mut reader: &mut Reader,
-    ) -> Result<RelEntityMoveResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let d_x: i16 = MD::deserialize(reader)?;
-        let d_y: i16 = MD::deserialize(reader)?;
-        let d_z: i16 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for RelEntityMoveResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<RelEntityMoveResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let d_x: i16 = MD::deserialize(reader)?;
+            let d_y: i16 = MD::deserialize(reader)?;
+            let d_z: i16 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = RelEntityMoveResponse {
-            entity_id,
-            d_x,
-            d_y,
-            d_z,
-            on_ground,
-        };
-        Ok(result)
-    }
-    impl RelEntityMoveResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            d_x: i16,
-            d_y: i16,
-            d_z: i16,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_i16::<BE>(d_x)?;
-            writer.write_i16::<BE>(d_y)?;
-            writer.write_i16::<BE>(d_z)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = RelEntityMoveResponse {
+                entity_id,
+                d_x,
+                d_y,
+                d_z,
+                on_ground,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x29)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.d_x.serialize(&mut writer)?;
+            self.d_y.serialize(&mut writer)?;
+            self.d_z.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3421,46 +2918,36 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn read_entity_move_look_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityMoveLookResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let d_x: i16 = MD::deserialize(reader)?;
-        let d_y: i16 = MD::deserialize(reader)?;
-        let d_z: i16 = MD::deserialize(reader)?;
-        let yaw: i8 = MD::deserialize(reader)?;
-        let pitch: i8 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityMoveLookResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityMoveLookResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let d_x: i16 = MD::deserialize(reader)?;
+            let d_y: i16 = MD::deserialize(reader)?;
+            let d_z: i16 = MD::deserialize(reader)?;
+            let yaw: i8 = MD::deserialize(reader)?;
+            let pitch: i8 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = EntityMoveLookResponse {
-            entity_id,
-            d_x,
-            d_y,
-            d_z,
-            yaw,
-            pitch,
-            on_ground,
-        };
-        Ok(result)
-    }
-    impl EntityMoveLookResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            d_x: i16,
-            d_y: i16,
-            d_z: i16,
-            yaw: i8,
-            pitch: i8,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_i16::<BE>(d_x)?;
-            writer.write_i16::<BE>(d_y)?;
-            writer.write_i16::<BE>(d_z)?;
-            writer.write_i8(yaw)?;
-            writer.write_i8(pitch)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = EntityMoveLookResponse {
+                entity_id,
+                d_x,
+                d_y,
+                d_z,
+                yaw,
+                pitch,
+                on_ground,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2a)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.d_x.serialize(&mut writer)?;
+            self.d_y.serialize(&mut writer)?;
+            self.d_z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3471,32 +2958,27 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn read_entity_look_response(mut reader: &mut Reader) -> Result<EntityLookResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let yaw: i8 = MD::deserialize(reader)?;
-        let pitch: i8 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityLookResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityLookResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let yaw: i8 = MD::deserialize(reader)?;
+            let pitch: i8 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = EntityLookResponse {
-            entity_id,
-            yaw,
-            pitch,
-            on_ground,
-        };
-        Ok(result)
-    }
-    impl EntityLookResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            yaw: i8,
-            pitch: i8,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_i8(yaw)?;
-            writer.write_i8(pitch)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = EntityLookResponse {
+                entity_id,
+                yaw,
+                pitch,
+                on_ground,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2b)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3508,38 +2990,30 @@ pub mod play {
         pub yaw: f32,
         pub pitch: f32,
     }
-    pub(super) fn read_vehicle_move_response(
-        mut reader: &mut Reader,
-    ) -> Result<VehicleMoveResponse> {
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for VehicleMoveResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<VehicleMoveResponse> {
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
 
-        let result = VehicleMoveResponse {
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-        };
-        Ok(result)
-    }
-    impl VehicleMoveResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: f32,
-            pitch: f32,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_f32::<BE>(yaw)?;
-            writer.write_f32::<BE>(pitch)?;
+            let result = VehicleMoveResponse {
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2c)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3547,15 +3021,16 @@ pub mod play {
     pub struct OpenBookResponse {
         pub hand: i32,
     }
-    pub(super) fn read_open_book_response(mut reader: &mut Reader) -> Result<OpenBookResponse> {
-        let hand: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for OpenBookResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<OpenBookResponse> {
+            let hand: i32 = read_varint(&mut reader)?;
 
-        let result = OpenBookResponse { hand };
-        Ok(result)
-    }
-    impl OpenBookResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, hand: i32) -> IoResult<()> {
-            write_varint(&mut writer, hand as u32)?;
+            let result = OpenBookResponse { hand };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2d)?;
+            write_varint(&mut writer, self.hand as u32)?;
             Ok(())
         }
     }
@@ -3563,43 +3038,36 @@ pub mod play {
     pub struct OpenSignEntityResponse {
         pub location: Position,
     }
-    pub(super) fn read_open_sign_entity_response(
-        mut reader: &mut Reader,
-    ) -> Result<OpenSignEntityResponse> {
-        let location: Position = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for OpenSignEntityResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<OpenSignEntityResponse> {
+            let location: Position = MD::deserialize(reader)?;
 
-        let result = OpenSignEntityResponse { location };
-        Ok(result)
-    }
-    impl OpenSignEntityResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, location: Position) -> IoResult<()> {
-            location.write(&mut writer)?;
+            let result = OpenSignEntityResponse { location };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x2f)?;
+            self.location.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct CraftRecipeResponse {
+    pub struct CraftRecipeResponse<'p> {
         pub window_id: i8,
-        pub recipe: IndexedString,
+        pub recipe: &'p str,
     }
-    pub(super) fn read_craft_recipe_response(
-        mut reader: &mut Reader,
-    ) -> Result<CraftRecipeResponse> {
-        let window_id: i8 = MD::deserialize(reader)?;
-        let recipe: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for CraftRecipeResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<CraftRecipeResponse<'p>> {
+            let window_id: i8 = MD::deserialize(reader)?;
+            let recipe: &'p str = MD::deserialize(reader)?;
 
-        let result = CraftRecipeResponse { window_id, recipe };
-        Ok(result)
-    }
-    impl CraftRecipeResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            window_id: i8,
-            recipe: &str,
-        ) -> IoResult<()> {
-            writer.write_i8(window_id)?;
-            write_varint(&mut writer, recipe.len() as u32)?;
-            writer.write_all(recipe.as_bytes())?;
+            let result = CraftRecipeResponse { window_id, recipe };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x31)?;
+            self.window_id.serialize(&mut writer)?;
+            self.recipe.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3609,28 +3077,24 @@ pub mod play {
         pub flying_speed: f32,
         pub walking_speed: f32,
     }
-    pub(super) fn read_abilities_response(mut reader: &mut Reader) -> Result<AbilitiesResponse> {
-        let flags: i8 = MD::deserialize(reader)?;
-        let flying_speed: f32 = MD::deserialize(reader)?;
-        let walking_speed: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for AbilitiesResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<AbilitiesResponse> {
+            let flags: i8 = MD::deserialize(reader)?;
+            let flying_speed: f32 = MD::deserialize(reader)?;
+            let walking_speed: f32 = MD::deserialize(reader)?;
 
-        let result = AbilitiesResponse {
-            flags,
-            flying_speed,
-            walking_speed,
-        };
-        Ok(result)
-    }
-    impl AbilitiesResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            flags: i8,
-            flying_speed: f32,
-            walking_speed: f32,
-        ) -> IoResult<()> {
-            writer.write_i8(flags)?;
-            writer.write_f32::<BE>(flying_speed)?;
-            writer.write_f32::<BE>(walking_speed)?;
+            let result = AbilitiesResponse {
+                flags,
+                flying_speed,
+                walking_speed,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x32)?;
+            self.flags.serialize(&mut writer)?;
+            self.flying_speed.serialize(&mut writer)?;
+            self.walking_speed.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3639,87 +3103,94 @@ pub mod play {
         pub duration: i32,
         pub entity_id: i32,
     }
-    pub(super) fn read_end_combat_event_response(
-        mut reader: &mut Reader,
-    ) -> Result<EndCombatEventResponse> {
-        let duration: i32 = read_varint(&mut reader)?;
-        let entity_id: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EndCombatEventResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EndCombatEventResponse> {
+            let duration: i32 = read_varint(&mut reader)?;
+            let entity_id: i32 = MD::deserialize(reader)?;
 
-        let result = EndCombatEventResponse {
-            duration,
-            entity_id,
-        };
-        Ok(result)
-    }
-    impl EndCombatEventResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            duration: i32,
-            entity_id: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, duration as u32)?;
-            writer.write_i32::<BE>(entity_id)?;
+            let result = EndCombatEventResponse {
+                duration,
+                entity_id,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x33)?;
+            write_varint(&mut writer, self.duration as u32)?;
+            self.entity_id.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct EnterCombatEventResponse {}
-    pub(super) fn read_enter_combat_event_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EnterCombatEventResponse> {
-        let result = EnterCombatEventResponse {};
-        Ok(result)
-    }
-    impl EnterCombatEventResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for EnterCombatEventResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<EnterCombatEventResponse> {
+            let result = EnterCombatEventResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x34)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct DeathCombatEventResponse {
+    pub struct DeathCombatEventResponse<'p> {
         pub player_id: i32,
         pub entity_id: i32,
-        pub message: IndexedString,
+        pub message: &'p str,
     }
-    pub(super) fn read_death_combat_event_response(
-        mut reader: &mut Reader,
-    ) -> Result<DeathCombatEventResponse> {
-        let player_id: i32 = read_varint(&mut reader)?;
-        let entity_id: i32 = MD::deserialize(reader)?;
-        let message: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for DeathCombatEventResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<DeathCombatEventResponse<'p>> {
+            let player_id: i32 = read_varint(&mut reader)?;
+            let entity_id: i32 = MD::deserialize(reader)?;
+            let message: &'p str = MD::deserialize(reader)?;
 
-        let result = DeathCombatEventResponse {
-            player_id,
-            entity_id,
-            message,
-        };
-        Ok(result)
-    }
-    impl DeathCombatEventResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            player_id: i32,
-            entity_id: i32,
-            message: &str,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, player_id as u32)?;
-            writer.write_i32::<BE>(entity_id)?;
-            write_varint(&mut writer, message.len() as u32)?;
-            writer.write_all(message.as_bytes())?;
+            let result = DeathCombatEventResponse {
+                player_id,
+                entity_id,
+                message,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x35)?;
+            write_varint(&mut writer, self.player_id as u32)?;
+            self.entity_id.serialize(&mut writer)?;
+            self.message.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct PlayerInfoResponse {}
-    pub(super) fn read_player_info_response(
-        mut _reader: &mut Reader,
-    ) -> Result<PlayerInfoResponse> {
-        let result = PlayerInfoResponse {};
-        Ok(result)
-    }
-    impl PlayerInfoResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    pub struct PlayerInfoResponse_Data {}
+    impl<'p> MD<'p> for PlayerInfoResponse_Data {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<PlayerInfoResponse_Data> {
+            let result = PlayerInfoResponse_Data {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
             Ok(())
+        }
+    }
+    #[derive(Debug)]
+    pub struct PlayerInfoResponse {
+        pub action: i32,
+        pub data: Vec<PlayerInfoResponse_Data>,
+    }
+    impl<'p> MD<'p> for PlayerInfoResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PlayerInfoResponse> {
+            let action: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut data = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: PlayerInfoResponse_Data = PlayerInfoResponse_Data::deserialize(reader)?;
+                data.push(x);
+            }
+
+            let result = PlayerInfoResponse { action, data };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
+            unimplemented!();
         }
     }
     #[derive(Debug)]
@@ -3733,61 +3204,51 @@ pub mod play {
         pub teleport_id: i32,
         pub dismount_vehicle: bool,
     }
-    pub(super) fn read_position_response(mut reader: &mut Reader) -> Result<PositionResponse> {
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
-        let flags: i8 = MD::deserialize(reader)?;
-        let teleport_id: i32 = read_varint(&mut reader)?;
-        let dismount_vehicle: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PositionResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PositionResponse> {
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
+            let flags: i8 = MD::deserialize(reader)?;
+            let teleport_id: i32 = read_varint(&mut reader)?;
+            let dismount_vehicle: bool = MD::deserialize(reader)?;
 
-        let result = PositionResponse {
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-            flags,
-            teleport_id,
-            dismount_vehicle,
-        };
-        Ok(result)
-    }
-    impl PositionResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: f32,
-            pitch: f32,
-            flags: i8,
-            teleport_id: i32,
-            dismount_vehicle: bool,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_f32::<BE>(yaw)?;
-            writer.write_f32::<BE>(pitch)?;
-            writer.write_i8(flags)?;
-            write_varint(&mut writer, teleport_id as u32)?;
-            writer.write_all(&[dismount_vehicle as u8])?;
+            let result = PositionResponse {
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+                flags,
+                teleport_id,
+                dismount_vehicle,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x38)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.flags.serialize(&mut writer)?;
+            write_varint(&mut writer, self.teleport_id as u32)?;
+            self.dismount_vehicle.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct UnlockRecipesResponse {}
-    pub(super) fn read_unlock_recipes_response(
-        mut _reader: &mut Reader,
-    ) -> Result<UnlockRecipesResponse> {
-        let result = UnlockRecipesResponse {};
-        Ok(result)
-    }
-    impl UnlockRecipesResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for UnlockRecipesResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<UnlockRecipesResponse> {
+            let result = UnlockRecipesResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x39)?;
             Ok(())
         }
     }
@@ -3795,21 +3256,19 @@ pub mod play {
     pub struct EntityDestroyResponse {
         pub entity_ids: Vec<i32>,
     }
-    pub(super) fn read_entity_destroy_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityDestroyResponse> {
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut entity_ids = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: i32 = read_varint(&mut reader)?;
-            entity_ids.push(x);
-        }
+    impl<'p> MD<'p> for EntityDestroyResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityDestroyResponse> {
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut entity_ids = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i32 = read_varint(&mut reader)?;
+                entity_ids.push(x);
+            }
 
-        let result = EntityDestroyResponse { entity_ids };
-        Ok(result)
-    }
-    impl EntityDestroyResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W, _entity_ids: &[i32]) -> IoResult<()> {
+            let result = EntityDestroyResponse { entity_ids };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -3818,81 +3277,59 @@ pub mod play {
         pub entity_id: i32,
         pub effect_id: i32,
     }
-    pub(super) fn read_remove_entity_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<RemoveEntityEffectResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let effect_id: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for RemoveEntityEffectResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<RemoveEntityEffectResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let effect_id: i32 = read_varint(&mut reader)?;
 
-        let result = RemoveEntityEffectResponse {
-            entity_id,
-            effect_id,
-        };
-        Ok(result)
-    }
-    impl RemoveEntityEffectResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            effect_id: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            write_varint(&mut writer, effect_id as u32)?;
+            let result = RemoveEntityEffectResponse {
+                entity_id,
+                effect_id,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3b)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            write_varint(&mut writer, self.effect_id as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct ResourcePackSendResponse {
-        pub url: IndexedString,
-        pub hash: IndexedString,
+    pub struct ResourcePackSendResponse<'p> {
+        pub url: &'p str,
+        pub hash: &'p str,
         pub forced: bool,
-        pub prompt_message: Option<IndexedString>,
+        pub prompt_message: Option<&'p str>,
     }
-    pub(super) fn read_resource_pack_send_response(
-        mut reader: &mut Reader,
-    ) -> Result<ResourcePackSendResponse> {
-        let url: IndexedString = MD::deserialize(reader)?;
-        let hash: IndexedString = MD::deserialize(reader)?;
-        let forced: bool = MD::deserialize(reader)?;
-        let prompt_message: Option<IndexedString> = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ResourcePackSendResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<ResourcePackSendResponse<'p>> {
+            let url: &'p str = MD::deserialize(reader)?;
+            let hash: &'p str = MD::deserialize(reader)?;
+            let forced: bool = MD::deserialize(reader)?;
+            let prompt_message: Option<&'p str> = MD::deserialize(reader)?;
 
-        let result = ResourcePackSendResponse {
-            url,
-            hash,
-            forced,
-            prompt_message,
-        };
-        Ok(result)
-    }
-    impl ResourcePackSendResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            url: &str,
-            hash: &str,
-            forced: bool,
-            prompt_message: Option<&str>,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, url.len() as u32)?;
-            writer.write_all(url.as_bytes())?;
-            write_varint(&mut writer, hash.len() as u32)?;
-            writer.write_all(hash.as_bytes())?;
-            writer.write_all(&[forced as u8])?;
-            match prompt_message {
-                Some(prompt_message_1) => {
-                    writer.write_all(&[1])?;
-
-                    write_varint(&mut writer, prompt_message_1.len() as u32)?;
-                    writer.write_all(prompt_message_1.as_bytes())?;
-                }
-                None => writer.write_all(&[0])?,
-            }
+            let result = ResourcePackSendResponse {
+                url,
+                hash,
+                forced,
+                prompt_message,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3c)?;
+            self.url.serialize(&mut writer)?;
+            self.hash.serialize(&mut writer)?;
+            self.forced.serialize(&mut writer)?;
+            self.prompt_message.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct RespawnResponse {
-        pub dimension: IndexedNbt,
-        pub world_name: IndexedString,
+    pub struct RespawnResponse<'p> {
+        pub dimension: IndexedNbt<'p>,
+        pub world_name: &'p str,
         pub hashed_seed: i64,
         pub gamemode: u8,
         pub previous_gamemode: u8,
@@ -3900,49 +3337,39 @@ pub mod play {
         pub is_flat: bool,
         pub copy_metadata: bool,
     }
-    pub(super) fn read_respawn_response(mut reader: &mut Reader) -> Result<RespawnResponse> {
-        let dimension: IndexedNbt = MD::deserialize(reader)?;
-        let world_name: IndexedString = MD::deserialize(reader)?;
-        let hashed_seed: i64 = MD::deserialize(reader)?;
-        let gamemode: u8 = MD::deserialize(reader)?;
-        let previous_gamemode: u8 = MD::deserialize(reader)?;
-        let is_debug: bool = MD::deserialize(reader)?;
-        let is_flat: bool = MD::deserialize(reader)?;
-        let copy_metadata: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for RespawnResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<RespawnResponse<'p>> {
+            let dimension: IndexedNbt<'p> = MD::deserialize(reader)?;
+            let world_name: &'p str = MD::deserialize(reader)?;
+            let hashed_seed: i64 = MD::deserialize(reader)?;
+            let gamemode: u8 = MD::deserialize(reader)?;
+            let previous_gamemode: u8 = MD::deserialize(reader)?;
+            let is_debug: bool = MD::deserialize(reader)?;
+            let is_flat: bool = MD::deserialize(reader)?;
+            let copy_metadata: bool = MD::deserialize(reader)?;
 
-        let result = RespawnResponse {
-            dimension,
-            world_name,
-            hashed_seed,
-            gamemode,
-            previous_gamemode,
-            is_debug,
-            is_flat,
-            copy_metadata,
-        };
-        Ok(result)
-    }
-    impl RespawnResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            dimension: IndexedNbt,
-            world_name: &str,
-            hashed_seed: i64,
-            gamemode: u8,
-            previous_gamemode: u8,
-            is_debug: bool,
-            is_flat: bool,
-            copy_metadata: bool,
-        ) -> IoResult<()> {
-            unimplemented!();
-            write_varint(&mut writer, world_name.len() as u32)?;
-            writer.write_all(world_name.as_bytes())?;
-            writer.write_i64::<BE>(hashed_seed)?;
-            writer.write_u8(gamemode)?;
-            writer.write_u8(previous_gamemode)?;
-            writer.write_all(&[is_debug as u8])?;
-            writer.write_all(&[is_flat as u8])?;
-            writer.write_all(&[copy_metadata as u8])?;
+            let result = RespawnResponse {
+                dimension,
+                world_name,
+                hashed_seed,
+                gamemode,
+                previous_gamemode,
+                is_debug,
+                is_flat,
+                copy_metadata,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3d)?;
+            self.dimension.serialize(&mut writer)?;
+            self.world_name.serialize(&mut writer)?;
+            self.hashed_seed.serialize(&mut writer)?;
+            self.gamemode.serialize(&mut writer)?;
+            self.previous_gamemode.serialize(&mut writer)?;
+            self.is_debug.serialize(&mut writer)?;
+            self.is_flat.serialize(&mut writer)?;
+            self.copy_metadata.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3951,26 +3378,21 @@ pub mod play {
         pub entity_id: i32,
         pub head_yaw: i8,
     }
-    pub(super) fn read_entity_head_rotation_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityHeadRotationResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let head_yaw: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityHeadRotationResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityHeadRotationResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let head_yaw: i8 = MD::deserialize(reader)?;
 
-        let result = EntityHeadRotationResponse {
-            entity_id,
-            head_yaw,
-        };
-        Ok(result)
-    }
-    impl EntityHeadRotationResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            head_yaw: i8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_i8(head_yaw)?;
+            let result = EntityHeadRotationResponse {
+                entity_id,
+                head_yaw,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x3e)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.head_yaw.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -3978,15 +3400,16 @@ pub mod play {
     pub struct CameraResponse {
         pub camera_id: i32,
     }
-    pub(super) fn read_camera_response(mut reader: &mut Reader) -> Result<CameraResponse> {
-        let camera_id: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for CameraResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<CameraResponse> {
+            let camera_id: i32 = read_varint(&mut reader)?;
 
-        let result = CameraResponse { camera_id };
-        Ok(result)
-    }
-    impl CameraResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, camera_id: i32) -> IoResult<()> {
-            write_varint(&mut writer, camera_id as u32)?;
+            let result = CameraResponse { camera_id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x47)?;
+            write_varint(&mut writer, self.camera_id as u32)?;
             Ok(())
         }
     }
@@ -3994,17 +3417,16 @@ pub mod play {
     pub struct HeldItemSlotResponse {
         pub slot: i8,
     }
-    pub(super) fn read_held_item_slot_response(
-        mut reader: &mut Reader,
-    ) -> Result<HeldItemSlotResponse> {
-        let slot: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for HeldItemSlotResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<HeldItemSlotResponse> {
+            let slot: i8 = MD::deserialize(reader)?;
 
-        let result = HeldItemSlotResponse { slot };
-        Ok(result)
-    }
-    impl HeldItemSlotResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, slot: i8) -> IoResult<()> {
-            writer.write_i8(slot)?;
+            let result = HeldItemSlotResponse { slot };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x48)?;
+            self.slot.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4013,23 +3435,18 @@ pub mod play {
         pub chunk_x: i32,
         pub chunk_z: i32,
     }
-    pub(super) fn read_update_view_position_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateViewPositionResponse> {
-        let chunk_x: i32 = read_varint(&mut reader)?;
-        let chunk_z: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for UpdateViewPositionResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UpdateViewPositionResponse> {
+            let chunk_x: i32 = read_varint(&mut reader)?;
+            let chunk_z: i32 = read_varint(&mut reader)?;
 
-        let result = UpdateViewPositionResponse { chunk_x, chunk_z };
-        Ok(result)
-    }
-    impl UpdateViewPositionResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            chunk_x: i32,
-            chunk_z: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, chunk_x as u32)?;
-            write_varint(&mut writer, chunk_z as u32)?;
+            let result = UpdateViewPositionResponse { chunk_x, chunk_z };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x49)?;
+            write_varint(&mut writer, self.chunk_x as u32)?;
+            write_varint(&mut writer, self.chunk_z as u32)?;
             Ok(())
         }
     }
@@ -4037,56 +3454,50 @@ pub mod play {
     pub struct UpdateViewDistanceResponse {
         pub view_distance: i32,
     }
-    pub(super) fn read_update_view_distance_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateViewDistanceResponse> {
-        let view_distance: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for UpdateViewDistanceResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UpdateViewDistanceResponse> {
+            let view_distance: i32 = read_varint(&mut reader)?;
 
-        let result = UpdateViewDistanceResponse { view_distance };
-        Ok(result)
-    }
-    impl UpdateViewDistanceResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, view_distance: i32) -> IoResult<()> {
-            write_varint(&mut writer, view_distance as u32)?;
+            let result = UpdateViewDistanceResponse { view_distance };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4a)?;
+            write_varint(&mut writer, self.view_distance as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct ScoreboardDisplayObjectiveResponse {
+    pub struct ScoreboardDisplayObjectiveResponse<'p> {
         pub position: i8,
-        pub name: IndexedString,
+        pub name: &'p str,
     }
-    pub(super) fn read_scoreboard_display_objective_response(
-        mut reader: &mut Reader,
-    ) -> Result<ScoreboardDisplayObjectiveResponse> {
-        let position: i8 = MD::deserialize(reader)?;
-        let name: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ScoreboardDisplayObjectiveResponse<'p> {
+        fn deserialize(
+            mut reader: &mut &'p [u8],
+        ) -> Result<ScoreboardDisplayObjectiveResponse<'p>> {
+            let position: i8 = MD::deserialize(reader)?;
+            let name: &'p str = MD::deserialize(reader)?;
 
-        let result = ScoreboardDisplayObjectiveResponse { position, name };
-        Ok(result)
-    }
-    impl ScoreboardDisplayObjectiveResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            position: i8,
-            name: &str,
-        ) -> IoResult<()> {
-            writer.write_i8(position)?;
-            write_varint(&mut writer, name.len() as u32)?;
-            writer.write_all(name.as_bytes())?;
+            let result = ScoreboardDisplayObjectiveResponse { position, name };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4c)?;
+            self.position.serialize(&mut writer)?;
+            self.name.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct EntityMetadataResponse {}
-    pub(super) fn read_entity_metadata_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EntityMetadataResponse> {
-        let result = EntityMetadataResponse {};
-        Ok(result)
-    }
-    impl EntityMetadataResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for EntityMetadataResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<EntityMetadataResponse> {
+            let result = EntityMetadataResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4d)?;
             Ok(())
         }
     }
@@ -4095,26 +3506,21 @@ pub mod play {
         pub entity_id: i32,
         pub vehicle_id: i32,
     }
-    pub(super) fn read_attach_entity_response(
-        mut reader: &mut Reader,
-    ) -> Result<AttachEntityResponse> {
-        let entity_id: i32 = MD::deserialize(reader)?;
-        let vehicle_id: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for AttachEntityResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<AttachEntityResponse> {
+            let entity_id: i32 = MD::deserialize(reader)?;
+            let vehicle_id: i32 = MD::deserialize(reader)?;
 
-        let result = AttachEntityResponse {
-            entity_id,
-            vehicle_id,
-        };
-        Ok(result)
-    }
-    impl AttachEntityResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            vehicle_id: i32,
-        ) -> IoResult<()> {
-            writer.write_i32::<BE>(entity_id)?;
-            writer.write_i32::<BE>(vehicle_id)?;
+            let result = AttachEntityResponse {
+                entity_id,
+                vehicle_id,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4e)?;
+            self.entity_id.serialize(&mut writer)?;
+            self.vehicle_id.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4125,47 +3531,39 @@ pub mod play {
         pub velocity_y: i16,
         pub velocity_z: i16,
     }
-    pub(super) fn read_entity_velocity_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityVelocityResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let velocity_x: i16 = MD::deserialize(reader)?;
-        let velocity_y: i16 = MD::deserialize(reader)?;
-        let velocity_z: i16 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityVelocityResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityVelocityResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let velocity_x: i16 = MD::deserialize(reader)?;
+            let velocity_y: i16 = MD::deserialize(reader)?;
+            let velocity_z: i16 = MD::deserialize(reader)?;
 
-        let result = EntityVelocityResponse {
-            entity_id,
-            velocity_x,
-            velocity_y,
-            velocity_z,
-        };
-        Ok(result)
-    }
-    impl EntityVelocityResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            velocity_x: i16,
-            velocity_y: i16,
-            velocity_z: i16,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_i16::<BE>(velocity_x)?;
-            writer.write_i16::<BE>(velocity_y)?;
-            writer.write_i16::<BE>(velocity_z)?;
+            let result = EntityVelocityResponse {
+                entity_id,
+                velocity_x,
+                velocity_y,
+                velocity_z,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4f)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.velocity_x.serialize(&mut writer)?;
+            self.velocity_y.serialize(&mut writer)?;
+            self.velocity_z.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct EntityEquipmentResponse {}
-    pub(super) fn read_entity_equipment_response(
-        mut _reader: &mut Reader,
-    ) -> Result<EntityEquipmentResponse> {
-        let result = EntityEquipmentResponse {};
-        Ok(result)
-    }
-    impl EntityEquipmentResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for EntityEquipmentResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<EntityEquipmentResponse> {
+            let result = EntityEquipmentResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x50)?;
             Ok(())
         }
     }
@@ -4175,28 +3573,24 @@ pub mod play {
         pub level: i32,
         pub total_experience: i32,
     }
-    pub(super) fn read_experience_response(mut reader: &mut Reader) -> Result<ExperienceResponse> {
-        let experience_bar: f32 = MD::deserialize(reader)?;
-        let level: i32 = read_varint(&mut reader)?;
-        let total_experience: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for ExperienceResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ExperienceResponse> {
+            let experience_bar: f32 = MD::deserialize(reader)?;
+            let level: i32 = read_varint(&mut reader)?;
+            let total_experience: i32 = read_varint(&mut reader)?;
 
-        let result = ExperienceResponse {
-            experience_bar,
-            level,
-            total_experience,
-        };
-        Ok(result)
-    }
-    impl ExperienceResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            experience_bar: f32,
-            level: i32,
-            total_experience: i32,
-        ) -> IoResult<()> {
-            writer.write_f32::<BE>(experience_bar)?;
-            write_varint(&mut writer, level as u32)?;
-            write_varint(&mut writer, total_experience as u32)?;
+            let result = ExperienceResponse {
+                experience_bar,
+                level,
+                total_experience,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x51)?;
+            self.experience_bar.serialize(&mut writer)?;
+            write_varint(&mut writer, self.level as u32)?;
+            write_varint(&mut writer, self.total_experience as u32)?;
             Ok(())
         }
     }
@@ -4206,43 +3600,36 @@ pub mod play {
         pub food: i32,
         pub food_saturation: f32,
     }
-    pub(super) fn read_update_health_response(
-        mut reader: &mut Reader,
-    ) -> Result<UpdateHealthResponse> {
-        let health: f32 = MD::deserialize(reader)?;
-        let food: i32 = read_varint(&mut reader)?;
-        let food_saturation: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateHealthResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UpdateHealthResponse> {
+            let health: f32 = MD::deserialize(reader)?;
+            let food: i32 = read_varint(&mut reader)?;
+            let food_saturation: f32 = MD::deserialize(reader)?;
 
-        let result = UpdateHealthResponse {
-            health,
-            food,
-            food_saturation,
-        };
-        Ok(result)
-    }
-    impl UpdateHealthResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            health: f32,
-            food: i32,
-            food_saturation: f32,
-        ) -> IoResult<()> {
-            writer.write_f32::<BE>(health)?;
-            write_varint(&mut writer, food as u32)?;
-            writer.write_f32::<BE>(food_saturation)?;
+            let result = UpdateHealthResponse {
+                health,
+                food,
+                food_saturation,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x52)?;
+            self.health.serialize(&mut writer)?;
+            write_varint(&mut writer, self.food as u32)?;
+            self.food_saturation.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct ScoreboardObjectiveResponse {}
-    pub(super) fn read_scoreboard_objective_response(
-        mut _reader: &mut Reader,
-    ) -> Result<ScoreboardObjectiveResponse> {
-        let result = ScoreboardObjectiveResponse {};
-        Ok(result)
-    }
-    impl ScoreboardObjectiveResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for ScoreboardObjectiveResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<ScoreboardObjectiveResponse> {
+            let result = ScoreboardObjectiveResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x53)?;
             Ok(())
         }
     }
@@ -4251,53 +3638,47 @@ pub mod play {
         pub entity_id: i32,
         pub passengers: Vec<i32>,
     }
-    pub(super) fn read_set_passengers_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetPassengersResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut passengers = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: i32 = read_varint(&mut reader)?;
-            passengers.push(x);
-        }
+    impl<'p> MD<'p> for SetPassengersResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SetPassengersResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut passengers = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i32 = read_varint(&mut reader)?;
+                passengers.push(x);
+            }
 
-        let result = SetPassengersResponse {
-            entity_id,
-            passengers,
-        };
-        Ok(result)
-    }
-    impl SetPassengersResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _entity_id: i32,
-            _passengers: &[i32],
-        ) -> IoResult<()> {
+            let result = SetPassengersResponse {
+                entity_id,
+                passengers,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
     #[derive(Debug)]
     pub struct TeamsResponse {}
-    pub(super) fn read_teams_response(mut _reader: &mut Reader) -> Result<TeamsResponse> {
-        let result = TeamsResponse {};
-        Ok(result)
-    }
-    impl TeamsResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for TeamsResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<TeamsResponse> {
+            let result = TeamsResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x55)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct ScoreboardScoreResponse {}
-    pub(super) fn read_scoreboard_score_response(
-        mut _reader: &mut Reader,
-    ) -> Result<ScoreboardScoreResponse> {
-        let result = ScoreboardScoreResponse {};
-        Ok(result)
-    }
-    impl ScoreboardScoreResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for ScoreboardScoreResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<ScoreboardScoreResponse> {
+            let result = ScoreboardScoreResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x56)?;
             Ok(())
         }
     }
@@ -4306,23 +3687,18 @@ pub mod play {
         pub location: Position,
         pub angle: f32,
     }
-    pub(super) fn read_spawn_position_response(
-        mut reader: &mut Reader,
-    ) -> Result<SpawnPositionResponse> {
-        let location: Position = MD::deserialize(reader)?;
-        let angle: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SpawnPositionResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SpawnPositionResponse> {
+            let location: Position = MD::deserialize(reader)?;
+            let angle: f32 = MD::deserialize(reader)?;
 
-        let result = SpawnPositionResponse { location, angle };
-        Ok(result)
-    }
-    impl SpawnPositionResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            angle: f32,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            writer.write_f32::<BE>(angle)?;
+            let result = SpawnPositionResponse { location, angle };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x4b)?;
+            self.location.serialize(&mut writer)?;
+            self.angle.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4331,17 +3707,18 @@ pub mod play {
         pub age: i64,
         pub time: i64,
     }
-    pub(super) fn read_update_time_response(mut reader: &mut Reader) -> Result<UpdateTimeResponse> {
-        let age: i64 = MD::deserialize(reader)?;
-        let time: i64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for UpdateTimeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<UpdateTimeResponse> {
+            let age: i64 = MD::deserialize(reader)?;
+            let time: i64 = MD::deserialize(reader)?;
 
-        let result = UpdateTimeResponse { age, time };
-        Ok(result)
-    }
-    impl UpdateTimeResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, age: i64, time: i64) -> IoResult<()> {
-            writer.write_i64::<BE>(age)?;
-            writer.write_i64::<BE>(time)?;
+            let result = UpdateTimeResponse { age, time };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x59)?;
+            self.age.serialize(&mut writer)?;
+            self.time.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4353,49 +3730,42 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn read_entity_sound_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntitySoundEffectResponse> {
-        let sound_id: i32 = read_varint(&mut reader)?;
-        let sound_category: i32 = read_varint(&mut reader)?;
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let volume: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntitySoundEffectResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntitySoundEffectResponse> {
+            let sound_id: i32 = read_varint(&mut reader)?;
+            let sound_category: i32 = read_varint(&mut reader)?;
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let volume: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
 
-        let result = EntitySoundEffectResponse {
-            sound_id,
-            sound_category,
-            entity_id,
-            volume,
-            pitch,
-        };
-        Ok(result)
-    }
-    impl EntitySoundEffectResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            sound_id: i32,
-            sound_category: i32,
-            entity_id: i32,
-            volume: f32,
-            pitch: f32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, sound_id as u32)?;
-            write_varint(&mut writer, sound_category as u32)?;
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_f32::<BE>(volume)?;
-            writer.write_f32::<BE>(pitch)?;
+            let result = EntitySoundEffectResponse {
+                sound_id,
+                sound_category,
+                entity_id,
+                volume,
+                pitch,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5c)?;
+            write_varint(&mut writer, self.sound_id as u32)?;
+            write_varint(&mut writer, self.sound_category as u32)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.volume.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct StopSoundResponse {}
-    pub(super) fn read_stop_sound_response(mut _reader: &mut Reader) -> Result<StopSoundResponse> {
-        let result = StopSoundResponse {};
-        Ok(result)
-    }
-    impl StopSoundResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for StopSoundResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<StopSoundResponse> {
+            let result = StopSoundResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5e)?;
             Ok(())
         }
     }
@@ -4409,73 +3779,56 @@ pub mod play {
         pub volume: f32,
         pub pitch: f32,
     }
-    pub(super) fn read_sound_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<SoundEffectResponse> {
-        let sound_id: i32 = read_varint(&mut reader)?;
-        let sound_category: i32 = read_varint(&mut reader)?;
-        let x: i32 = MD::deserialize(reader)?;
-        let y: i32 = MD::deserialize(reader)?;
-        let z: i32 = MD::deserialize(reader)?;
-        let volume: f32 = MD::deserialize(reader)?;
-        let pitch: f32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SoundEffectResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SoundEffectResponse> {
+            let sound_id: i32 = read_varint(&mut reader)?;
+            let sound_category: i32 = read_varint(&mut reader)?;
+            let x: i32 = MD::deserialize(reader)?;
+            let y: i32 = MD::deserialize(reader)?;
+            let z: i32 = MD::deserialize(reader)?;
+            let volume: f32 = MD::deserialize(reader)?;
+            let pitch: f32 = MD::deserialize(reader)?;
 
-        let result = SoundEffectResponse {
-            sound_id,
-            sound_category,
-            x,
-            y,
-            z,
-            volume,
-            pitch,
-        };
-        Ok(result)
-    }
-    impl SoundEffectResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            sound_id: i32,
-            sound_category: i32,
-            x: i32,
-            y: i32,
-            z: i32,
-            volume: f32,
-            pitch: f32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, sound_id as u32)?;
-            write_varint(&mut writer, sound_category as u32)?;
-            writer.write_i32::<BE>(x)?;
-            writer.write_i32::<BE>(y)?;
-            writer.write_i32::<BE>(z)?;
-            writer.write_f32::<BE>(volume)?;
-            writer.write_f32::<BE>(pitch)?;
+            let result = SoundEffectResponse {
+                sound_id,
+                sound_category,
+                x,
+                y,
+                z,
+                volume,
+                pitch,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5d)?;
+            write_varint(&mut writer, self.sound_id as u32)?;
+            write_varint(&mut writer, self.sound_category as u32)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.volume.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct PlayerlistHeaderResponse {
-        pub header: IndexedString,
-        pub footer: IndexedString,
+    pub struct PlayerlistHeaderResponse<'p> {
+        pub header: &'p str,
+        pub footer: &'p str,
     }
-    pub(super) fn read_playerlist_header_response(
-        mut reader: &mut Reader,
-    ) -> Result<PlayerlistHeaderResponse> {
-        let header: IndexedString = MD::deserialize(reader)?;
-        let footer: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PlayerlistHeaderResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<PlayerlistHeaderResponse<'p>> {
+            let header: &'p str = MD::deserialize(reader)?;
+            let footer: &'p str = MD::deserialize(reader)?;
 
-        let result = PlayerlistHeaderResponse { header, footer };
-        Ok(result)
-    }
-    impl PlayerlistHeaderResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            header: &str,
-            footer: &str,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, header.len() as u32)?;
-            writer.write_all(header.as_bytes())?;
-            write_varint(&mut writer, footer.len() as u32)?;
-            writer.write_all(footer.as_bytes())?;
+            let result = PlayerlistHeaderResponse { header, footer };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5f)?;
+            self.header.serialize(&mut writer)?;
+            self.footer.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4485,28 +3838,24 @@ pub mod play {
         pub collector_entity_id: i32,
         pub pickup_item_count: i32,
     }
-    pub(super) fn read_collect_response(mut reader: &mut Reader) -> Result<CollectResponse> {
-        let collected_entity_id: i32 = read_varint(&mut reader)?;
-        let collector_entity_id: i32 = read_varint(&mut reader)?;
-        let pickup_item_count: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for CollectResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<CollectResponse> {
+            let collected_entity_id: i32 = read_varint(&mut reader)?;
+            let collector_entity_id: i32 = read_varint(&mut reader)?;
+            let pickup_item_count: i32 = read_varint(&mut reader)?;
 
-        let result = CollectResponse {
-            collected_entity_id,
-            collector_entity_id,
-            pickup_item_count,
-        };
-        Ok(result)
-    }
-    impl CollectResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            collected_entity_id: i32,
-            collector_entity_id: i32,
-            pickup_item_count: i32,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, collected_entity_id as u32)?;
-            write_varint(&mut writer, collector_entity_id as u32)?;
-            write_varint(&mut writer, pickup_item_count as u32)?;
+            let result = CollectResponse {
+                collected_entity_id,
+                collector_entity_id,
+                pickup_item_count,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x61)?;
+            write_varint(&mut writer, self.collected_entity_id as u32)?;
+            write_varint(&mut writer, self.collector_entity_id as u32)?;
+            write_varint(&mut writer, self.pickup_item_count as u32)?;
             Ok(())
         }
     }
@@ -4520,46 +3869,36 @@ pub mod play {
         pub pitch: i8,
         pub on_ground: bool,
     }
-    pub(super) fn read_entity_teleport_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityTeleportResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let x: f64 = MD::deserialize(reader)?;
-        let y: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let yaw: i8 = MD::deserialize(reader)?;
-        let pitch: i8 = MD::deserialize(reader)?;
-        let on_ground: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityTeleportResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityTeleportResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let x: f64 = MD::deserialize(reader)?;
+            let y: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let yaw: i8 = MD::deserialize(reader)?;
+            let pitch: i8 = MD::deserialize(reader)?;
+            let on_ground: bool = MD::deserialize(reader)?;
 
-        let result = EntityTeleportResponse {
-            entity_id,
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-            on_ground,
-        };
-        Ok(result)
-    }
-    impl EntityTeleportResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            x: f64,
-            y: f64,
-            z: f64,
-            yaw: i8,
-            pitch: i8,
-            on_ground: bool,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(y)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_i8(yaw)?;
-            writer.write_i8(pitch)?;
-            writer.write_all(&[on_ground as u8])?;
+            let result = EntityTeleportResponse {
+                entity_id,
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+                on_ground,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x62)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            self.x.serialize(&mut writer)?;
+            self.y.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.yaw.serialize(&mut writer)?;
+            self.pitch.serialize(&mut writer)?;
+            self.on_ground.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4569,98 +3908,80 @@ pub mod play {
         pub amount: f64,
         pub operation: i8,
     }
-    pub(super) fn read_entity_update_attributes_response_modifiers(
-        mut reader: &mut Reader,
-    ) -> Result<EntityUpdateAttributesResponse_Modifiers> {
-        let uuid: u128 = MD::deserialize(reader)?;
-        let amount: f64 = MD::deserialize(reader)?;
-        let operation: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityUpdateAttributesResponse_Modifiers {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityUpdateAttributesResponse_Modifiers> {
+            let uuid: u128 = MD::deserialize(reader)?;
+            let amount: f64 = MD::deserialize(reader)?;
+            let operation: i8 = MD::deserialize(reader)?;
 
-        let result = EntityUpdateAttributesResponse_Modifiers {
-            uuid,
-            amount,
-            operation,
-        };
-        Ok(result)
-    }
-    impl EntityUpdateAttributesResponse_Modifiers {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            uuid: u128,
-            amount: f64,
-            operation: i8,
-        ) -> IoResult<()> {
-            writer.write_u128::<BE>(uuid)?;
-            writer.write_f64::<BE>(amount)?;
-            writer.write_i8(operation)?;
+            let result = EntityUpdateAttributesResponse_Modifiers {
+                uuid,
+                amount,
+                operation,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            self.uuid.serialize(&mut writer)?;
+            self.amount.serialize(&mut writer)?;
+            self.operation.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct EntityUpdateAttributesResponse_Properties {
-        pub key: IndexedString,
+    pub struct EntityUpdateAttributesResponse_Properties<'p> {
+        pub key: &'p str,
         pub value: f64,
         pub modifiers: Vec<EntityUpdateAttributesResponse_Modifiers>,
     }
-    pub(super) fn read_entity_update_attributes_response_properties(
-        mut reader: &mut Reader,
-    ) -> Result<EntityUpdateAttributesResponse_Properties> {
-        let key: IndexedString = MD::deserialize(reader)?;
-        let value: f64 = MD::deserialize(reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut modifiers = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: EntityUpdateAttributesResponse_Modifiers =
-                read_entity_update_attributes_response_modifiers(reader)?;
-            modifiers.push(x);
-        }
+    impl<'p> MD<'p> for EntityUpdateAttributesResponse_Properties<'p> {
+        fn deserialize(
+            mut reader: &mut &'p [u8],
+        ) -> Result<EntityUpdateAttributesResponse_Properties<'p>> {
+            let key: &'p str = MD::deserialize(reader)?;
+            let value: f64 = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut modifiers = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: EntityUpdateAttributesResponse_Modifiers =
+                    EntityUpdateAttributesResponse_Modifiers::deserialize(reader)?;
+                modifiers.push(x);
+            }
 
-        let result = EntityUpdateAttributesResponse_Properties {
-            key,
-            value,
-            modifiers,
-        };
-        Ok(result)
-    }
-    impl EntityUpdateAttributesResponse_Properties {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _key: &str,
-            _value: f64,
-            _modifiers: &[EntityUpdateAttributesResponse_Modifiers],
-        ) -> IoResult<()> {
+            let result = EntityUpdateAttributesResponse_Properties {
+                key,
+                value,
+                modifiers,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
     #[derive(Debug)]
-    pub struct EntityUpdateAttributesResponse {
+    pub struct EntityUpdateAttributesResponse<'p> {
         pub entity_id: i32,
-        pub properties: Vec<EntityUpdateAttributesResponse_Properties>,
+        pub properties: Vec<EntityUpdateAttributesResponse_Properties<'p>>,
     }
-    pub(super) fn read_entity_update_attributes_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityUpdateAttributesResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let count_array: i32 = read_varint(&mut reader)?;
-        let mut properties = Vec::with_capacity(count_array as usize);
-        for _ in 0..count_array {
-            let x: EntityUpdateAttributesResponse_Properties =
-                read_entity_update_attributes_response_properties(reader)?;
-            properties.push(x);
-        }
+    impl<'p> MD<'p> for EntityUpdateAttributesResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<EntityUpdateAttributesResponse<'p>> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut properties = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: EntityUpdateAttributesResponse_Properties =
+                    EntityUpdateAttributesResponse_Properties::deserialize(reader)?;
+                properties.push(x);
+            }
 
-        let result = EntityUpdateAttributesResponse {
-            entity_id,
-            properties,
-        };
-        Ok(result)
-    }
-    impl EntityUpdateAttributesResponse {
-        pub(crate) fn write<W: Write>(
-            mut _writer: &mut W,
-            _entity_id: i32,
-            _properties: &[EntityUpdateAttributesResponse_Properties],
-        ) -> IoResult<()> {
+            let result = EntityUpdateAttributesResponse {
+                entity_id,
+                properties,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
             unimplemented!();
         }
     }
@@ -4672,89 +3993,111 @@ pub mod play {
         pub duration: i32,
         pub hide_particles: i8,
     }
-    pub(super) fn read_entity_effect_response(
-        mut reader: &mut Reader,
-    ) -> Result<EntityEffectResponse> {
-        let entity_id: i32 = read_varint(&mut reader)?;
-        let effect_id: i32 = read_varint(&mut reader)?;
-        let amplifier: i8 = MD::deserialize(reader)?;
-        let duration: i32 = read_varint(&mut reader)?;
-        let hide_particles: i8 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for EntityEffectResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<EntityEffectResponse> {
+            let entity_id: i32 = read_varint(&mut reader)?;
+            let effect_id: i32 = read_varint(&mut reader)?;
+            let amplifier: i8 = MD::deserialize(reader)?;
+            let duration: i32 = read_varint(&mut reader)?;
+            let hide_particles: i8 = MD::deserialize(reader)?;
 
-        let result = EntityEffectResponse {
-            entity_id,
-            effect_id,
-            amplifier,
-            duration,
-            hide_particles,
-        };
-        Ok(result)
-    }
-    impl EntityEffectResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            entity_id: i32,
-            effect_id: i32,
-            amplifier: i8,
-            duration: i32,
-            hide_particles: i8,
-        ) -> IoResult<()> {
-            write_varint(&mut writer, entity_id as u32)?;
-            write_varint(&mut writer, effect_id as u32)?;
-            writer.write_i8(amplifier)?;
-            write_varint(&mut writer, duration as u32)?;
-            writer.write_i8(hide_particles)?;
+            let result = EntityEffectResponse {
+                entity_id,
+                effect_id,
+                amplifier,
+                duration,
+                hide_particles,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x65)?;
+            write_varint(&mut writer, self.entity_id as u32)?;
+            write_varint(&mut writer, self.effect_id as u32)?;
+            self.amplifier.serialize(&mut writer)?;
+            write_varint(&mut writer, self.duration as u32)?;
+            self.hide_particles.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SelectAdvancementTabResponse {
-        pub id: Option<IndexedString>,
+    pub struct SelectAdvancementTabResponse<'p> {
+        pub id: Option<&'p str>,
     }
-    pub(super) fn read_select_advancement_tab_response(
-        mut reader: &mut Reader,
-    ) -> Result<SelectAdvancementTabResponse> {
-        let id: Option<IndexedString> = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SelectAdvancementTabResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SelectAdvancementTabResponse<'p>> {
+            let id: Option<&'p str> = MD::deserialize(reader)?;
 
-        let result = SelectAdvancementTabResponse { id };
-        Ok(result)
+            let result = SelectAdvancementTabResponse { id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x40)?;
+            self.id.serialize(&mut writer)?;
+            Ok(())
+        }
     }
-    impl SelectAdvancementTabResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, id: Option<&str>) -> IoResult<()> {
-            match id {
-                Some(id_1) => {
-                    writer.write_all(&[1])?;
-
-                    write_varint(&mut writer, id_1.len() as u32)?;
-                    writer.write_all(id_1.as_bytes())?;
-                }
-                None => writer.write_all(&[0])?,
+    #[derive(Debug)]
+    pub struct DeclareRecipesResponse_Recipes {}
+    impl<'p> MD<'p> for DeclareRecipesResponse_Recipes {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<DeclareRecipesResponse_Recipes> {
+            let result = DeclareRecipesResponse_Recipes {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            Ok(())
+        }
+    }
+    #[derive(Debug)]
+    pub struct DeclareRecipesResponse {
+        pub recipes: Vec<DeclareRecipesResponse_Recipes>,
+    }
+    impl<'p> MD<'p> for DeclareRecipesResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<DeclareRecipesResponse> {
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut recipes = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: DeclareRecipesResponse_Recipes =
+                    DeclareRecipesResponse_Recipes::deserialize(reader)?;
+                recipes.push(x);
             }
+
+            let result = DeclareRecipesResponse { recipes };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
+    #[derive(Debug)]
+    pub struct TagsResponse_Tags {}
+    impl<'p> MD<'p> for TagsResponse_Tags {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<TagsResponse_Tags> {
+            let result = TagsResponse_Tags {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct DeclareRecipesResponse {}
-    pub(super) fn read_declare_recipes_response(
-        mut _reader: &mut Reader,
-    ) -> Result<DeclareRecipesResponse> {
-        let result = DeclareRecipesResponse {};
-        Ok(result)
+    pub struct TagsResponse {
+        pub tags: Vec<TagsResponse_Tags>,
     }
-    impl DeclareRecipesResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
-            Ok(())
+    impl<'p> MD<'p> for TagsResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<TagsResponse> {
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut tags = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: TagsResponse_Tags = TagsResponse_Tags::deserialize(reader)?;
+                tags.push(x);
+            }
+
+            let result = TagsResponse { tags };
+            Ok(result)
         }
-    }
-    #[derive(Debug)]
-    pub struct TagsResponse {}
-    pub(super) fn read_tags_response(mut _reader: &mut Reader) -> Result<TagsResponse> {
-        let result = TagsResponse {};
-        Ok(result)
-    }
-    impl TagsResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
-            Ok(())
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
+            unimplemented!();
         }
     }
     #[derive(Debug)]
@@ -4764,47 +4107,39 @@ pub mod play {
         pub status: i32,
         pub successful: bool,
     }
-    pub(super) fn read_acknowledge_player_digging_response(
-        mut reader: &mut Reader,
-    ) -> Result<AcknowledgePlayerDiggingResponse> {
-        let location: Position = MD::deserialize(reader)?;
-        let block: i32 = read_varint(&mut reader)?;
-        let status: i32 = read_varint(&mut reader)?;
-        let successful: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for AcknowledgePlayerDiggingResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<AcknowledgePlayerDiggingResponse> {
+            let location: Position = MD::deserialize(reader)?;
+            let block: i32 = read_varint(&mut reader)?;
+            let status: i32 = read_varint(&mut reader)?;
+            let successful: bool = MD::deserialize(reader)?;
 
-        let result = AcknowledgePlayerDiggingResponse {
-            location,
-            block,
-            status,
-            successful,
-        };
-        Ok(result)
-    }
-    impl AcknowledgePlayerDiggingResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            location: Position,
-            block: i32,
-            status: i32,
-            successful: bool,
-        ) -> IoResult<()> {
-            location.write(&mut writer)?;
-            write_varint(&mut writer, block as u32)?;
-            write_varint(&mut writer, status as u32)?;
-            writer.write_all(&[successful as u8])?;
+            let result = AcknowledgePlayerDiggingResponse {
+                location,
+                block,
+                status,
+                successful,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x8)?;
+            self.location.serialize(&mut writer)?;
+            write_varint(&mut writer, self.block as u32)?;
+            write_varint(&mut writer, self.status as u32)?;
+            self.successful.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
     pub struct SculkVibrationSignalResponse {}
-    pub(super) fn read_sculk_vibration_signal_response(
-        mut _reader: &mut Reader,
-    ) -> Result<SculkVibrationSignalResponse> {
-        let result = SculkVibrationSignalResponse {};
-        Ok(result)
-    }
-    impl SculkVibrationSignalResponse {
-        pub(crate) fn write<W: Write>(mut _writer: &mut W) -> IoResult<()> {
+    impl<'p> MD<'p> for SculkVibrationSignalResponse {
+        fn deserialize(mut _reader: &mut &[u8]) -> Result<SculkVibrationSignalResponse> {
+            let result = SculkVibrationSignalResponse {};
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5)?;
             Ok(())
         }
     }
@@ -4812,17 +4147,16 @@ pub mod play {
     pub struct ClearTitlesResponse {
         pub reset: bool,
     }
-    pub(super) fn read_clear_titles_response(
-        mut reader: &mut Reader,
-    ) -> Result<ClearTitlesResponse> {
-        let reset: bool = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ClearTitlesResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<ClearTitlesResponse> {
+            let reset: bool = MD::deserialize(reader)?;
 
-        let result = ClearTitlesResponse { reset };
-        Ok(result)
-    }
-    impl ClearTitlesResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, reset: bool) -> IoResult<()> {
-            writer.write_all(&[reset as u8])?;
+            let result = ClearTitlesResponse { reset };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x10)?;
+            self.reset.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4837,67 +4171,56 @@ pub mod play {
         pub warning_blocks: i32,
         pub warning_time: i32,
     }
-    pub(super) fn read_initialize_world_border_response(
-        mut reader: &mut Reader,
-    ) -> Result<InitializeWorldBorderResponse> {
-        let x: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
-        let old_diameter: f64 = MD::deserialize(reader)?;
-        let new_diameter: f64 = MD::deserialize(reader)?;
-        let speed: i64 = read_varlong(&mut reader)?;
-        let portal_teleport_boundary: i32 = read_varint(&mut reader)?;
-        let warning_blocks: i32 = read_varint(&mut reader)?;
-        let warning_time: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for InitializeWorldBorderResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<InitializeWorldBorderResponse> {
+            let x: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
+            let old_diameter: f64 = MD::deserialize(reader)?;
+            let new_diameter: f64 = MD::deserialize(reader)?;
+            let speed: i64 = read_varlong(&mut reader)?;
+            let portal_teleport_boundary: i32 = read_varint(&mut reader)?;
+            let warning_blocks: i32 = read_varint(&mut reader)?;
+            let warning_time: i32 = read_varint(&mut reader)?;
 
-        let result = InitializeWorldBorderResponse {
-            x,
-            z,
-            old_diameter,
-            new_diameter,
-            speed,
-            portal_teleport_boundary,
-            warning_blocks,
-            warning_time,
-        };
-        Ok(result)
-    }
-    impl InitializeWorldBorderResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            x: f64,
-            z: f64,
-            old_diameter: f64,
-            new_diameter: f64,
-            speed: i64,
-            portal_teleport_boundary: i32,
-            warning_blocks: i32,
-            warning_time: i32,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(z)?;
-            writer.write_f64::<BE>(old_diameter)?;
-            writer.write_f64::<BE>(new_diameter)?;
-            write_varlong(&mut writer, speed as u64)?;
-            write_varint(&mut writer, portal_teleport_boundary as u32)?;
-            write_varint(&mut writer, warning_blocks as u32)?;
-            write_varint(&mut writer, warning_time as u32)?;
+            let result = InitializeWorldBorderResponse {
+                x,
+                z,
+                old_diameter,
+                new_diameter,
+                speed,
+                portal_teleport_boundary,
+                warning_blocks,
+                warning_time,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x20)?;
+            self.x.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
+            self.old_diameter.serialize(&mut writer)?;
+            self.new_diameter.serialize(&mut writer)?;
+            write_varlong(&mut writer, self.speed as u64)?;
+            write_varint(&mut writer, self.portal_teleport_boundary as u32)?;
+            write_varint(&mut writer, self.warning_blocks as u32)?;
+            write_varint(&mut writer, self.warning_time as u32)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct ActionBarResponse {
-        pub text: IndexedString,
+    pub struct ActionBarResponse<'p> {
+        pub text: &'p str,
     }
-    pub(super) fn read_action_bar_response(mut reader: &mut Reader) -> Result<ActionBarResponse> {
-        let text: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for ActionBarResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<ActionBarResponse<'p>> {
+            let text: &'p str = MD::deserialize(reader)?;
 
-        let result = ActionBarResponse { text };
-        Ok(result)
-    }
-    impl ActionBarResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, text: &str) -> IoResult<()> {
-            write_varint(&mut writer, text.len() as u32)?;
-            writer.write_all(text.as_bytes())?;
+            let result = ActionBarResponse { text };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x41)?;
+            self.text.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4906,19 +4229,18 @@ pub mod play {
         pub x: f64,
         pub z: f64,
     }
-    pub(super) fn read_world_border_center_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderCenterResponse> {
-        let x: f64 = MD::deserialize(reader)?;
-        let z: f64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for WorldBorderCenterResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<WorldBorderCenterResponse> {
+            let x: f64 = MD::deserialize(reader)?;
+            let z: f64 = MD::deserialize(reader)?;
 
-        let result = WorldBorderCenterResponse { x, z };
-        Ok(result)
-    }
-    impl WorldBorderCenterResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, x: f64, z: f64) -> IoResult<()> {
-            writer.write_f64::<BE>(x)?;
-            writer.write_f64::<BE>(z)?;
+            let result = WorldBorderCenterResponse { x, z };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x42)?;
+            self.x.serialize(&mut writer)?;
+            self.z.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4928,30 +4250,24 @@ pub mod play {
         pub new_diameter: f64,
         pub speed: i64,
     }
-    pub(super) fn read_world_border_lerp_size_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderLerpSizeResponse> {
-        let old_diameter: f64 = MD::deserialize(reader)?;
-        let new_diameter: f64 = MD::deserialize(reader)?;
-        let speed: i64 = read_varlong(&mut reader)?;
+    impl<'p> MD<'p> for WorldBorderLerpSizeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<WorldBorderLerpSizeResponse> {
+            let old_diameter: f64 = MD::deserialize(reader)?;
+            let new_diameter: f64 = MD::deserialize(reader)?;
+            let speed: i64 = read_varlong(&mut reader)?;
 
-        let result = WorldBorderLerpSizeResponse {
-            old_diameter,
-            new_diameter,
-            speed,
-        };
-        Ok(result)
-    }
-    impl WorldBorderLerpSizeResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            old_diameter: f64,
-            new_diameter: f64,
-            speed: i64,
-        ) -> IoResult<()> {
-            writer.write_f64::<BE>(old_diameter)?;
-            writer.write_f64::<BE>(new_diameter)?;
-            write_varlong(&mut writer, speed as u64)?;
+            let result = WorldBorderLerpSizeResponse {
+                old_diameter,
+                new_diameter,
+                speed,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x43)?;
+            self.old_diameter.serialize(&mut writer)?;
+            self.new_diameter.serialize(&mut writer)?;
+            write_varlong(&mut writer, self.speed as u64)?;
             Ok(())
         }
     }
@@ -4959,17 +4275,16 @@ pub mod play {
     pub struct WorldBorderSizeResponse {
         pub diameter: f64,
     }
-    pub(super) fn read_world_border_size_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderSizeResponse> {
-        let diameter: f64 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for WorldBorderSizeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<WorldBorderSizeResponse> {
+            let diameter: f64 = MD::deserialize(reader)?;
 
-        let result = WorldBorderSizeResponse { diameter };
-        Ok(result)
-    }
-    impl WorldBorderSizeResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, diameter: f64) -> IoResult<()> {
-            writer.write_f64::<BE>(diameter)?;
+            let result = WorldBorderSizeResponse { diameter };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x44)?;
+            self.diameter.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -4977,17 +4292,16 @@ pub mod play {
     pub struct WorldBorderWarningDelayResponse {
         pub warning_time: i32,
     }
-    pub(super) fn read_world_border_warning_delay_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderWarningDelayResponse> {
-        let warning_time: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for WorldBorderWarningDelayResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<WorldBorderWarningDelayResponse> {
+            let warning_time: i32 = read_varint(&mut reader)?;
 
-        let result = WorldBorderWarningDelayResponse { warning_time };
-        Ok(result)
-    }
-    impl WorldBorderWarningDelayResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, warning_time: i32) -> IoResult<()> {
-            write_varint(&mut writer, warning_time as u32)?;
+            let result = WorldBorderWarningDelayResponse { warning_time };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x45)?;
+            write_varint(&mut writer, self.warning_time as u32)?;
             Ok(())
         }
     }
@@ -4995,17 +4309,16 @@ pub mod play {
     pub struct WorldBorderWarningReachResponse {
         pub warning_blocks: i32,
     }
-    pub(super) fn read_world_border_warning_reach_response(
-        mut reader: &mut Reader,
-    ) -> Result<WorldBorderWarningReachResponse> {
-        let warning_blocks: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for WorldBorderWarningReachResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<WorldBorderWarningReachResponse> {
+            let warning_blocks: i32 = read_varint(&mut reader)?;
 
-        let result = WorldBorderWarningReachResponse { warning_blocks };
-        Ok(result)
-    }
-    impl WorldBorderWarningReachResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, warning_blocks: i32) -> IoResult<()> {
-            write_varint(&mut writer, warning_blocks as u32)?;
+            let result = WorldBorderWarningReachResponse { warning_blocks };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x46)?;
+            write_varint(&mut writer, self.warning_blocks as u32)?;
             Ok(())
         }
     }
@@ -5013,53 +4326,50 @@ pub mod play {
     pub struct PlayPingResponse {
         pub id: i32,
     }
-    pub(super) fn read_play_ping_response(mut reader: &mut Reader) -> Result<PlayPingResponse> {
-        let id: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for PlayPingResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<PlayPingResponse> {
+            let id: i32 = MD::deserialize(reader)?;
 
-        let result = PlayPingResponse { id };
-        Ok(result)
-    }
-    impl PlayPingResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, id: i32) -> IoResult<()> {
-            writer.write_i32::<BE>(id)?;
+            let result = PlayPingResponse { id };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x30)?;
+            self.id.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SetTitleSubtitleResponse {
-        pub text: IndexedString,
+    pub struct SetTitleSubtitleResponse<'p> {
+        pub text: &'p str,
     }
-    pub(super) fn read_set_title_subtitle_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetTitleSubtitleResponse> {
-        let text: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SetTitleSubtitleResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SetTitleSubtitleResponse<'p>> {
+            let text: &'p str = MD::deserialize(reader)?;
 
-        let result = SetTitleSubtitleResponse { text };
-        Ok(result)
-    }
-    impl SetTitleSubtitleResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, text: &str) -> IoResult<()> {
-            write_varint(&mut writer, text.len() as u32)?;
-            writer.write_all(text.as_bytes())?;
+            let result = SetTitleSubtitleResponse { text };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x58)?;
+            self.text.serialize(&mut writer)?;
             Ok(())
         }
     }
     #[derive(Debug)]
-    pub struct SetTitleTextResponse {
-        pub text: IndexedString,
+    pub struct SetTitleTextResponse<'p> {
+        pub text: &'p str,
     }
-    pub(super) fn read_set_title_text_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetTitleTextResponse> {
-        let text: IndexedString = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SetTitleTextResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<SetTitleTextResponse<'p>> {
+            let text: &'p str = MD::deserialize(reader)?;
 
-        let result = SetTitleTextResponse { text };
-        Ok(result)
-    }
-    impl SetTitleTextResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, text: &str) -> IoResult<()> {
-            write_varint(&mut writer, text.len() as u32)?;
-            writer.write_all(text.as_bytes())?;
+            let result = SetTitleTextResponse { text };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5a)?;
+            self.text.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -5069,30 +4379,24 @@ pub mod play {
         pub stay: i32,
         pub fade_out: i32,
     }
-    pub(super) fn read_set_title_time_response(
-        mut reader: &mut Reader,
-    ) -> Result<SetTitleTimeResponse> {
-        let fade_in: i32 = MD::deserialize(reader)?;
-        let stay: i32 = MD::deserialize(reader)?;
-        let fade_out: i32 = MD::deserialize(reader)?;
+    impl<'p> MD<'p> for SetTitleTimeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SetTitleTimeResponse> {
+            let fade_in: i32 = MD::deserialize(reader)?;
+            let stay: i32 = MD::deserialize(reader)?;
+            let fade_out: i32 = MD::deserialize(reader)?;
 
-        let result = SetTitleTimeResponse {
-            fade_in,
-            stay,
-            fade_out,
-        };
-        Ok(result)
-    }
-    impl SetTitleTimeResponse {
-        pub(crate) fn write<W: Write>(
-            mut writer: &mut W,
-            fade_in: i32,
-            stay: i32,
-            fade_out: i32,
-        ) -> IoResult<()> {
-            writer.write_i32::<BE>(fade_in)?;
-            writer.write_i32::<BE>(stay)?;
-            writer.write_i32::<BE>(fade_out)?;
+            let result = SetTitleTimeResponse {
+                fade_in,
+                stay,
+                fade_out,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x5b)?;
+            self.fade_in.serialize(&mut writer)?;
+            self.stay.serialize(&mut writer)?;
+            self.fade_out.serialize(&mut writer)?;
             Ok(())
         }
     }
@@ -5100,57 +4404,56 @@ pub mod play {
     pub struct SimulationDistanceResponse {
         pub distance: i32,
     }
-    pub(super) fn read_simulation_distance_response(
-        mut reader: &mut Reader,
-    ) -> Result<SimulationDistanceResponse> {
-        let distance: i32 = read_varint(&mut reader)?;
+    impl<'p> MD<'p> for SimulationDistanceResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<SimulationDistanceResponse> {
+            let distance: i32 = read_varint(&mut reader)?;
 
-        let result = SimulationDistanceResponse { distance };
-        Ok(result)
-    }
-    impl SimulationDistanceResponse {
-        pub(crate) fn write<W: Write>(mut writer: &mut W, distance: i32) -> IoResult<()> {
-            write_varint(&mut writer, distance as u32)?;
+            let result = SimulationDistanceResponse { distance };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
+            write_varint(&mut writer, 0x57)?;
+            write_varint(&mut writer, self.distance as u32)?;
             Ok(())
         }
     }
 }
 #[derive(Debug)]
-pub enum Packet {
-    SetProtocolRequest(handshaking::SetProtocolRequest),
+pub enum Packet<'p> {
+    SetProtocolRequest(handshaking::SetProtocolRequest<'p>),
     LegacyServerListPingRequest(handshaking::LegacyServerListPingRequest),
     PingStartRequest(status::PingStartRequest),
     PingRequest(status::PingRequest),
-    ServerInfoResponse(status::ServerInfoResponse),
+    ServerInfoResponse(status::ServerInfoResponse<'p>),
     PingResponse(status::PingResponse),
-    LoginStartRequest(login::LoginStartRequest),
-    EncryptionBeginRequest(login::EncryptionBeginRequest),
-    LoginPluginResponse(login::LoginPluginResponse),
-    DisconnectResponse(login::DisconnectResponse),
-    EncryptionBeginResponse(login::EncryptionBeginResponse),
-    SuccessResponse(login::SuccessResponse),
+    LoginStartRequest(login::LoginStartRequest<'p>),
+    EncryptionBeginRequest(login::EncryptionBeginRequest<'p>),
+    LoginPluginResponse(login::LoginPluginResponse<'p>),
+    DisconnectResponse(login::DisconnectResponse<'p>),
+    EncryptionBeginResponse(login::EncryptionBeginResponse<'p>),
+    SuccessResponse(login::SuccessResponse<'p>),
     CompressResponse(login::CompressResponse),
-    LoginPluginRequest(login::LoginPluginRequest),
+    LoginPluginRequest(login::LoginPluginRequest<'p>),
     TeleportConfirmRequest(play::TeleportConfirmRequest),
     QueryBlockNbtRequest(play::QueryBlockNbtRequest),
     SetDifficultyRequest(play::SetDifficultyRequest),
-    EditBookRequest(play::EditBookRequest),
+    EditBookRequest(play::EditBookRequest<'p>),
     QueryEntityNbtRequest(play::QueryEntityNbtRequest),
     PickItemRequest(play::PickItemRequest),
-    NameItemRequest(play::NameItemRequest),
+    NameItemRequest(play::NameItemRequest<'p>),
     SelectTradeRequest(play::SelectTradeRequest),
     SetBeaconEffectRequest(play::SetBeaconEffectRequest),
-    UpdateCommandBlockRequest(play::UpdateCommandBlockRequest),
-    UpdateCommandBlockMinecartRequest(play::UpdateCommandBlockMinecartRequest),
-    UpdateStructureBlockRequest(play::UpdateStructureBlockRequest),
-    TabCompleteRequest(play::TabCompleteRequest),
-    ChatRequest(play::ChatRequest),
+    UpdateCommandBlockRequest(play::UpdateCommandBlockRequest<'p>),
+    UpdateCommandBlockMinecartRequest(play::UpdateCommandBlockMinecartRequest<'p>),
+    UpdateStructureBlockRequest(play::UpdateStructureBlockRequest<'p>),
+    TabCompleteRequest(play::TabCompleteRequest<'p>),
+    ChatRequest(play::ChatRequest<'p>),
     ClientCommandRequest(play::ClientCommandRequest),
-    SettingsRequest(play::SettingsRequest),
+    SettingsRequest(play::SettingsRequest<'p>),
     EnchantItemRequest(play::EnchantItemRequest),
-    WindowClickRequest(play::WindowClickRequest),
+    WindowClickRequest(play::WindowClickRequest<'p>),
     CloseWindowRequest(play::CloseWindowRequest),
-    CustomPayloadRequest(play::CustomPayloadRequest),
+    CustomPayloadRequest(play::CustomPayloadRequest<'p>),
     UseEntityRequest(play::UseEntityRequest),
     GenerateStructureRequest(play::GenerateStructureRequest),
     KeepAliveRequest(play::KeepAliveRequest),
@@ -5161,18 +4464,18 @@ pub enum Packet {
     FlyingRequest(play::FlyingRequest),
     VehicleMoveRequest(play::VehicleMoveRequest),
     SteerBoatRequest(play::SteerBoatRequest),
-    CraftRecipeRequest(play::CraftRecipeRequest),
+    CraftRecipeRequest(play::CraftRecipeRequest<'p>),
     AbilitiesRequest(play::AbilitiesRequest),
     BlockDigRequest(play::BlockDigRequest),
     EntityActionRequest(play::EntityActionRequest),
     SteerVehicleRequest(play::SteerVehicleRequest),
-    DisplayedRecipeRequest(play::DisplayedRecipeRequest),
+    DisplayedRecipeRequest(play::DisplayedRecipeRequest<'p>),
     RecipeBookRequest(play::RecipeBookRequest),
     ResourcePackReceiveRequest(play::ResourcePackReceiveRequest),
     HeldItemSlotRequest(play::HeldItemSlotRequest),
-    SetCreativeSlotRequest(play::SetCreativeSlotRequest),
-    UpdateJigsawBlockRequest(play::UpdateJigsawBlockRequest),
-    UpdateSignRequest(play::UpdateSignRequest),
+    SetCreativeSlotRequest(play::SetCreativeSlotRequest<'p>),
+    UpdateJigsawBlockRequest(play::UpdateJigsawBlockRequest<'p>),
+    UpdateSignRequest(play::UpdateSignRequest<'p>),
     ArmAnimationRequest(play::ArmAnimationRequest),
     SpectateRequest(play::SpectateRequest),
     BlockPlaceRequest(play::BlockPlaceRequest),
@@ -5188,26 +4491,26 @@ pub enum Packet {
     StatisticsResponse(play::StatisticsResponse),
     AdvancementsResponse(play::AdvancementsResponse),
     BlockBreakAnimationResponse(play::BlockBreakAnimationResponse),
-    TileEntityDataResponse(play::TileEntityDataResponse),
+    TileEntityDataResponse(play::TileEntityDataResponse<'p>),
     BlockActionResponse(play::BlockActionResponse),
     BlockChangeResponse(play::BlockChangeResponse),
     BossBarResponse(play::BossBarResponse),
     DifficultyResponse(play::DifficultyResponse),
-    TabCompleteResponse(play::TabCompleteResponse),
+    TabCompleteResponse(play::TabCompleteResponse<'p>),
     DeclareCommandsResponse(play::DeclareCommandsResponse),
     FacePlayerResponse(play::FacePlayerResponse),
-    NbtQueryResponse(play::NbtQueryResponse),
-    ChatResponse(play::ChatResponse),
+    NbtQueryResponse(play::NbtQueryResponse<'p>),
+    ChatResponse(play::ChatResponse<'p>),
     MultiBlockChangeResponse(play::MultiBlockChangeResponse),
     CloseWindowResponse(play::CloseWindowResponse),
-    OpenWindowResponse(play::OpenWindowResponse),
-    WindowItemsResponse(play::WindowItemsResponse),
+    OpenWindowResponse(play::OpenWindowResponse<'p>),
+    WindowItemsResponse(play::WindowItemsResponse<'p>),
     CraftProgressBarResponse(play::CraftProgressBarResponse),
-    SetSlotResponse(play::SetSlotResponse),
+    SetSlotResponse(play::SetSlotResponse<'p>),
     SetCooldownResponse(play::SetCooldownResponse),
-    CustomPayloadResponse(play::CustomPayloadResponse),
-    NamedSoundEffectResponse(play::NamedSoundEffectResponse),
-    KickDisconnectResponse(play::KickDisconnectResponse),
+    CustomPayloadResponse(play::CustomPayloadResponse<'p>),
+    NamedSoundEffectResponse(play::NamedSoundEffectResponse<'p>),
+    KickDisconnectResponse(play::KickDisconnectResponse<'p>),
     EntityStatusResponse(play::EntityStatusResponse),
     ExplosionResponse(play::ExplosionResponse),
     UnloadChunkResponse(play::UnloadChunkResponse),
@@ -5218,33 +4521,33 @@ pub enum Packet {
     WorldEventResponse(play::WorldEventResponse),
     WorldParticlesResponse(play::WorldParticlesResponse),
     UpdateLightResponse(play::UpdateLightResponse),
-    LoginResponse(play::LoginResponse),
+    LoginResponse(play::LoginResponse<'p>),
     MapResponse(play::MapResponse),
-    TradeListResponse(play::TradeListResponse),
+    TradeListResponse(play::TradeListResponse<'p>),
     RelEntityMoveResponse(play::RelEntityMoveResponse),
     EntityMoveLookResponse(play::EntityMoveLookResponse),
     EntityLookResponse(play::EntityLookResponse),
     VehicleMoveResponse(play::VehicleMoveResponse),
     OpenBookResponse(play::OpenBookResponse),
     OpenSignEntityResponse(play::OpenSignEntityResponse),
-    CraftRecipeResponse(play::CraftRecipeResponse),
+    CraftRecipeResponse(play::CraftRecipeResponse<'p>),
     AbilitiesResponse(play::AbilitiesResponse),
     EndCombatEventResponse(play::EndCombatEventResponse),
     EnterCombatEventResponse(play::EnterCombatEventResponse),
-    DeathCombatEventResponse(play::DeathCombatEventResponse),
+    DeathCombatEventResponse(play::DeathCombatEventResponse<'p>),
     PlayerInfoResponse(play::PlayerInfoResponse),
     PositionResponse(play::PositionResponse),
     UnlockRecipesResponse(play::UnlockRecipesResponse),
     EntityDestroyResponse(play::EntityDestroyResponse),
     RemoveEntityEffectResponse(play::RemoveEntityEffectResponse),
-    ResourcePackSendResponse(play::ResourcePackSendResponse),
-    RespawnResponse(play::RespawnResponse),
+    ResourcePackSendResponse(play::ResourcePackSendResponse<'p>),
+    RespawnResponse(play::RespawnResponse<'p>),
     EntityHeadRotationResponse(play::EntityHeadRotationResponse),
     CameraResponse(play::CameraResponse),
     HeldItemSlotResponse(play::HeldItemSlotResponse),
     UpdateViewPositionResponse(play::UpdateViewPositionResponse),
     UpdateViewDistanceResponse(play::UpdateViewDistanceResponse),
-    ScoreboardDisplayObjectiveResponse(play::ScoreboardDisplayObjectiveResponse),
+    ScoreboardDisplayObjectiveResponse(play::ScoreboardDisplayObjectiveResponse<'p>),
     EntityMetadataResponse(play::EntityMetadataResponse),
     AttachEntityResponse(play::AttachEntityResponse),
     EntityVelocityResponse(play::EntityVelocityResponse),
@@ -5260,27 +4563,27 @@ pub enum Packet {
     EntitySoundEffectResponse(play::EntitySoundEffectResponse),
     StopSoundResponse(play::StopSoundResponse),
     SoundEffectResponse(play::SoundEffectResponse),
-    PlayerlistHeaderResponse(play::PlayerlistHeaderResponse),
+    PlayerlistHeaderResponse(play::PlayerlistHeaderResponse<'p>),
     CollectResponse(play::CollectResponse),
     EntityTeleportResponse(play::EntityTeleportResponse),
-    EntityUpdateAttributesResponse(play::EntityUpdateAttributesResponse),
+    EntityUpdateAttributesResponse(play::EntityUpdateAttributesResponse<'p>),
     EntityEffectResponse(play::EntityEffectResponse),
-    SelectAdvancementTabResponse(play::SelectAdvancementTabResponse),
+    SelectAdvancementTabResponse(play::SelectAdvancementTabResponse<'p>),
     DeclareRecipesResponse(play::DeclareRecipesResponse),
     TagsResponse(play::TagsResponse),
     AcknowledgePlayerDiggingResponse(play::AcknowledgePlayerDiggingResponse),
     SculkVibrationSignalResponse(play::SculkVibrationSignalResponse),
     ClearTitlesResponse(play::ClearTitlesResponse),
     InitializeWorldBorderResponse(play::InitializeWorldBorderResponse),
-    ActionBarResponse(play::ActionBarResponse),
+    ActionBarResponse(play::ActionBarResponse<'p>),
     WorldBorderCenterResponse(play::WorldBorderCenterResponse),
     WorldBorderLerpSizeResponse(play::WorldBorderLerpSizeResponse),
     WorldBorderSizeResponse(play::WorldBorderSizeResponse),
     WorldBorderWarningDelayResponse(play::WorldBorderWarningDelayResponse),
     WorldBorderWarningReachResponse(play::WorldBorderWarningReachResponse),
     PlayPingResponse(play::PlayPingResponse),
-    SetTitleSubtitleResponse(play::SetTitleSubtitleResponse),
-    SetTitleTextResponse(play::SetTitleTextResponse),
+    SetTitleSubtitleResponse(play::SetTitleSubtitleResponse<'p>),
+    SetTitleTextResponse(play::SetTitleTextResponse<'p>),
     SetTitleTimeResponse(play::SetTitleTimeResponse),
     SimulationDistanceResponse(play::SimulationDistanceResponse),
 }
@@ -5289,674 +4592,674 @@ pub fn de_packets<'r>(
     state: ConnectionState,
     direction: PacketDirection,
     id: u32,
-    reader: &'r mut Reader<'r>,
-) -> Result<Packet> {
+    reader: &mut &'r [u8],
+) -> Result<Packet<'r>> {
     use ConnectionState as S;
     use PacketDirection as D;
 
     let packet = match (state, direction, id) {
         (S::Handshaking, D::ClientToServer, 0x0) => {
-            let p = handshaking::read_set_protocol_request(reader)?;
+            let p = handshaking::SetProtocolRequest::deserialize(reader)?;
             Packet::SetProtocolRequest(p)
         }
         (S::Handshaking, D::ClientToServer, 0xfe) => {
-            let p = handshaking::read_legacy_server_list_ping_request(reader)?;
+            let p = handshaking::LegacyServerListPingRequest::deserialize(reader)?;
             Packet::LegacyServerListPingRequest(p)
         }
         (S::Status, D::ClientToServer, 0x0) => {
-            let p = status::read_ping_start_request(reader)?;
+            let p = status::PingStartRequest::deserialize(reader)?;
             Packet::PingStartRequest(p)
         }
         (S::Status, D::ClientToServer, 0x1) => {
-            let p = status::read_ping_request(reader)?;
+            let p = status::PingRequest::deserialize(reader)?;
             Packet::PingRequest(p)
         }
         (S::Status, D::ServerToClient, 0x0) => {
-            let p = status::read_server_info_response(reader)?;
+            let p = status::ServerInfoResponse::deserialize(reader)?;
             Packet::ServerInfoResponse(p)
         }
         (S::Status, D::ServerToClient, 0x1) => {
-            let p = status::read_ping_response(reader)?;
+            let p = status::PingResponse::deserialize(reader)?;
             Packet::PingResponse(p)
         }
         (S::Login, D::ClientToServer, 0x0) => {
-            let p = login::read_login_start_request(reader)?;
+            let p = login::LoginStartRequest::deserialize(reader)?;
             Packet::LoginStartRequest(p)
         }
         (S::Login, D::ClientToServer, 0x1) => {
-            let p = login::read_encryption_begin_request(reader)?;
+            let p = login::EncryptionBeginRequest::deserialize(reader)?;
             Packet::EncryptionBeginRequest(p)
         }
         (S::Login, D::ClientToServer, 0x2) => {
-            let p = login::read_login_plugin_response(reader)?;
+            let p = login::LoginPluginResponse::deserialize(reader)?;
             Packet::LoginPluginResponse(p)
         }
         (S::Login, D::ServerToClient, 0x0) => {
-            let p = login::read_disconnect_response(reader)?;
+            let p = login::DisconnectResponse::deserialize(reader)?;
             Packet::DisconnectResponse(p)
         }
         (S::Login, D::ServerToClient, 0x1) => {
-            let p = login::read_encryption_begin_response(reader)?;
+            let p = login::EncryptionBeginResponse::deserialize(reader)?;
             Packet::EncryptionBeginResponse(p)
         }
         (S::Login, D::ServerToClient, 0x2) => {
-            let p = login::read_success_response(reader)?;
+            let p = login::SuccessResponse::deserialize(reader)?;
             Packet::SuccessResponse(p)
         }
         (S::Login, D::ServerToClient, 0x3) => {
-            let p = login::read_compress_response(reader)?;
+            let p = login::CompressResponse::deserialize(reader)?;
             Packet::CompressResponse(p)
         }
         (S::Login, D::ServerToClient, 0x4) => {
-            let p = login::read_login_plugin_request(reader)?;
+            let p = login::LoginPluginRequest::deserialize(reader)?;
             Packet::LoginPluginRequest(p)
         }
         (S::Play, D::ClientToServer, 0x0) => {
-            let p = play::read_teleport_confirm_request(reader)?;
+            let p = play::TeleportConfirmRequest::deserialize(reader)?;
             Packet::TeleportConfirmRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1) => {
-            let p = play::read_query_block_nbt_request(reader)?;
+            let p = play::QueryBlockNbtRequest::deserialize(reader)?;
             Packet::QueryBlockNbtRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2) => {
-            let p = play::read_set_difficulty_request(reader)?;
+            let p = play::SetDifficultyRequest::deserialize(reader)?;
             Packet::SetDifficultyRequest(p)
         }
         (S::Play, D::ClientToServer, 0x3) => {
-            let p = play::read_chat_request(reader)?;
+            let p = play::ChatRequest::deserialize(reader)?;
             Packet::ChatRequest(p)
         }
         (S::Play, D::ClientToServer, 0x4) => {
-            let p = play::read_client_command_request(reader)?;
+            let p = play::ClientCommandRequest::deserialize(reader)?;
             Packet::ClientCommandRequest(p)
         }
         (S::Play, D::ClientToServer, 0x5) => {
-            let p = play::read_settings_request(reader)?;
+            let p = play::SettingsRequest::deserialize(reader)?;
             Packet::SettingsRequest(p)
         }
         (S::Play, D::ClientToServer, 0x6) => {
-            let p = play::read_tab_complete_request(reader)?;
+            let p = play::TabCompleteRequest::deserialize(reader)?;
             Packet::TabCompleteRequest(p)
         }
         (S::Play, D::ClientToServer, 0x7) => {
-            let p = play::read_enchant_item_request(reader)?;
+            let p = play::EnchantItemRequest::deserialize(reader)?;
             Packet::EnchantItemRequest(p)
         }
         (S::Play, D::ClientToServer, 0x8) => {
-            let p = play::read_window_click_request(reader)?;
+            let p = play::WindowClickRequest::deserialize(reader)?;
             Packet::WindowClickRequest(p)
         }
         (S::Play, D::ClientToServer, 0x9) => {
-            let p = play::read_close_window_request(reader)?;
+            let p = play::CloseWindowRequest::deserialize(reader)?;
             Packet::CloseWindowRequest(p)
         }
         (S::Play, D::ClientToServer, 0xa) => {
-            let p = play::read_custom_payload_request(reader)?;
+            let p = play::CustomPayloadRequest::deserialize(reader)?;
             Packet::CustomPayloadRequest(p)
         }
         (S::Play, D::ClientToServer, 0xb) => {
-            let p = play::read_edit_book_request(reader)?;
+            let p = play::EditBookRequest::deserialize(reader)?;
             Packet::EditBookRequest(p)
         }
         (S::Play, D::ClientToServer, 0xc) => {
-            let p = play::read_query_entity_nbt_request(reader)?;
+            let p = play::QueryEntityNbtRequest::deserialize(reader)?;
             Packet::QueryEntityNbtRequest(p)
         }
         (S::Play, D::ClientToServer, 0xd) => {
-            let p = play::read_use_entity_request(reader)?;
+            let p = play::UseEntityRequest::deserialize(reader)?;
             Packet::UseEntityRequest(p)
         }
         (S::Play, D::ClientToServer, 0xe) => {
-            let p = play::read_generate_structure_request(reader)?;
+            let p = play::GenerateStructureRequest::deserialize(reader)?;
             Packet::GenerateStructureRequest(p)
         }
         (S::Play, D::ClientToServer, 0xf) => {
-            let p = play::read_keep_alive_request(reader)?;
+            let p = play::KeepAliveRequest::deserialize(reader)?;
             Packet::KeepAliveRequest(p)
         }
         (S::Play, D::ClientToServer, 0x10) => {
-            let p = play::read_lock_difficulty_request(reader)?;
+            let p = play::LockDifficultyRequest::deserialize(reader)?;
             Packet::LockDifficultyRequest(p)
         }
         (S::Play, D::ClientToServer, 0x11) => {
-            let p = play::read_position_request(reader)?;
+            let p = play::PositionRequest::deserialize(reader)?;
             Packet::PositionRequest(p)
         }
         (S::Play, D::ClientToServer, 0x12) => {
-            let p = play::read_position_look_request(reader)?;
+            let p = play::PositionLookRequest::deserialize(reader)?;
             Packet::PositionLookRequest(p)
         }
         (S::Play, D::ClientToServer, 0x13) => {
-            let p = play::read_look_request(reader)?;
+            let p = play::LookRequest::deserialize(reader)?;
             Packet::LookRequest(p)
         }
         (S::Play, D::ClientToServer, 0x14) => {
-            let p = play::read_flying_request(reader)?;
+            let p = play::FlyingRequest::deserialize(reader)?;
             Packet::FlyingRequest(p)
         }
         (S::Play, D::ClientToServer, 0x15) => {
-            let p = play::read_vehicle_move_request(reader)?;
+            let p = play::VehicleMoveRequest::deserialize(reader)?;
             Packet::VehicleMoveRequest(p)
         }
         (S::Play, D::ClientToServer, 0x16) => {
-            let p = play::read_steer_boat_request(reader)?;
+            let p = play::SteerBoatRequest::deserialize(reader)?;
             Packet::SteerBoatRequest(p)
         }
         (S::Play, D::ClientToServer, 0x17) => {
-            let p = play::read_pick_item_request(reader)?;
+            let p = play::PickItemRequest::deserialize(reader)?;
             Packet::PickItemRequest(p)
         }
         (S::Play, D::ClientToServer, 0x18) => {
-            let p = play::read_craft_recipe_request(reader)?;
+            let p = play::CraftRecipeRequest::deserialize(reader)?;
             Packet::CraftRecipeRequest(p)
         }
         (S::Play, D::ClientToServer, 0x19) => {
-            let p = play::read_abilities_request(reader)?;
+            let p = play::AbilitiesRequest::deserialize(reader)?;
             Packet::AbilitiesRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1a) => {
-            let p = play::read_block_dig_request(reader)?;
+            let p = play::BlockDigRequest::deserialize(reader)?;
             Packet::BlockDigRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1b) => {
-            let p = play::read_entity_action_request(reader)?;
+            let p = play::EntityActionRequest::deserialize(reader)?;
             Packet::EntityActionRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1c) => {
-            let p = play::read_steer_vehicle_request(reader)?;
+            let p = play::SteerVehicleRequest::deserialize(reader)?;
             Packet::SteerVehicleRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1d) => {
-            let p = play::read_pong_request(reader)?;
+            let p = play::PongRequest::deserialize(reader)?;
             Packet::PongRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1e) => {
-            let p = play::read_recipe_book_request(reader)?;
+            let p = play::RecipeBookRequest::deserialize(reader)?;
             Packet::RecipeBookRequest(p)
         }
         (S::Play, D::ClientToServer, 0x1f) => {
-            let p = play::read_displayed_recipe_request(reader)?;
+            let p = play::DisplayedRecipeRequest::deserialize(reader)?;
             Packet::DisplayedRecipeRequest(p)
         }
         (S::Play, D::ClientToServer, 0x20) => {
-            let p = play::read_name_item_request(reader)?;
+            let p = play::NameItemRequest::deserialize(reader)?;
             Packet::NameItemRequest(p)
         }
         (S::Play, D::ClientToServer, 0x21) => {
-            let p = play::read_resource_pack_receive_request(reader)?;
+            let p = play::ResourcePackReceiveRequest::deserialize(reader)?;
             Packet::ResourcePackReceiveRequest(p)
         }
         (S::Play, D::ClientToServer, 0x22) => {
-            let p = play::read_advancement_tab_request(reader)?;
+            let p = play::AdvancementTabRequest::deserialize(reader)?;
             Packet::AdvancementTabRequest(p)
         }
         (S::Play, D::ClientToServer, 0x23) => {
-            let p = play::read_select_trade_request(reader)?;
+            let p = play::SelectTradeRequest::deserialize(reader)?;
             Packet::SelectTradeRequest(p)
         }
         (S::Play, D::ClientToServer, 0x24) => {
-            let p = play::read_set_beacon_effect_request(reader)?;
+            let p = play::SetBeaconEffectRequest::deserialize(reader)?;
             Packet::SetBeaconEffectRequest(p)
         }
         (S::Play, D::ClientToServer, 0x25) => {
-            let p = play::read_held_item_slot_request(reader)?;
+            let p = play::HeldItemSlotRequest::deserialize(reader)?;
             Packet::HeldItemSlotRequest(p)
         }
         (S::Play, D::ClientToServer, 0x26) => {
-            let p = play::read_update_command_block_request(reader)?;
+            let p = play::UpdateCommandBlockRequest::deserialize(reader)?;
             Packet::UpdateCommandBlockRequest(p)
         }
         (S::Play, D::ClientToServer, 0x27) => {
-            let p = play::read_update_command_block_minecart_request(reader)?;
+            let p = play::UpdateCommandBlockMinecartRequest::deserialize(reader)?;
             Packet::UpdateCommandBlockMinecartRequest(p)
         }
         (S::Play, D::ClientToServer, 0x28) => {
-            let p = play::read_set_creative_slot_request(reader)?;
+            let p = play::SetCreativeSlotRequest::deserialize(reader)?;
             Packet::SetCreativeSlotRequest(p)
         }
         (S::Play, D::ClientToServer, 0x29) => {
-            let p = play::read_update_jigsaw_block_request(reader)?;
+            let p = play::UpdateJigsawBlockRequest::deserialize(reader)?;
             Packet::UpdateJigsawBlockRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2a) => {
-            let p = play::read_update_structure_block_request(reader)?;
+            let p = play::UpdateStructureBlockRequest::deserialize(reader)?;
             Packet::UpdateStructureBlockRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2b) => {
-            let p = play::read_update_sign_request(reader)?;
+            let p = play::UpdateSignRequest::deserialize(reader)?;
             Packet::UpdateSignRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2c) => {
-            let p = play::read_arm_animation_request(reader)?;
+            let p = play::ArmAnimationRequest::deserialize(reader)?;
             Packet::ArmAnimationRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2d) => {
-            let p = play::read_spectate_request(reader)?;
+            let p = play::SpectateRequest::deserialize(reader)?;
             Packet::SpectateRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2e) => {
-            let p = play::read_block_place_request(reader)?;
+            let p = play::BlockPlaceRequest::deserialize(reader)?;
             Packet::BlockPlaceRequest(p)
         }
         (S::Play, D::ClientToServer, 0x2f) => {
-            let p = play::read_use_item_request(reader)?;
+            let p = play::UseItemRequest::deserialize(reader)?;
             Packet::UseItemRequest(p)
         }
         (S::Play, D::ServerToClient, 0x0) => {
-            let p = play::read_spawn_entity_response(reader)?;
+            let p = play::SpawnEntityResponse::deserialize(reader)?;
             Packet::SpawnEntityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1) => {
-            let p = play::read_spawn_entity_experience_orb_response(reader)?;
+            let p = play::SpawnEntityExperienceOrbResponse::deserialize(reader)?;
             Packet::SpawnEntityExperienceOrbResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2) => {
-            let p = play::read_spawn_entity_living_response(reader)?;
+            let p = play::SpawnEntityLivingResponse::deserialize(reader)?;
             Packet::SpawnEntityLivingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3) => {
-            let p = play::read_spawn_entity_painting_response(reader)?;
+            let p = play::SpawnEntityPaintingResponse::deserialize(reader)?;
             Packet::SpawnEntityPaintingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4) => {
-            let p = play::read_named_entity_spawn_response(reader)?;
+            let p = play::NamedEntitySpawnResponse::deserialize(reader)?;
             Packet::NamedEntitySpawnResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5) => {
-            let p = play::read_sculk_vibration_signal_response(reader)?;
+            let p = play::SculkVibrationSignalResponse::deserialize(reader)?;
             Packet::SculkVibrationSignalResponse(p)
         }
         (S::Play, D::ServerToClient, 0x6) => {
-            let p = play::read_animation_response(reader)?;
+            let p = play::AnimationResponse::deserialize(reader)?;
             Packet::AnimationResponse(p)
         }
         (S::Play, D::ServerToClient, 0x7) => {
-            let p = play::read_statistics_response(reader)?;
+            let p = play::StatisticsResponse::deserialize(reader)?;
             Packet::StatisticsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x8) => {
-            let p = play::read_acknowledge_player_digging_response(reader)?;
+            let p = play::AcknowledgePlayerDiggingResponse::deserialize(reader)?;
             Packet::AcknowledgePlayerDiggingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x9) => {
-            let p = play::read_block_break_animation_response(reader)?;
+            let p = play::BlockBreakAnimationResponse::deserialize(reader)?;
             Packet::BlockBreakAnimationResponse(p)
         }
         (S::Play, D::ServerToClient, 0xa) => {
-            let p = play::read_tile_entity_data_response(reader)?;
+            let p = play::TileEntityDataResponse::deserialize(reader)?;
             Packet::TileEntityDataResponse(p)
         }
         (S::Play, D::ServerToClient, 0xb) => {
-            let p = play::read_block_action_response(reader)?;
+            let p = play::BlockActionResponse::deserialize(reader)?;
             Packet::BlockActionResponse(p)
         }
         (S::Play, D::ServerToClient, 0xc) => {
-            let p = play::read_block_change_response(reader)?;
+            let p = play::BlockChangeResponse::deserialize(reader)?;
             Packet::BlockChangeResponse(p)
         }
         (S::Play, D::ServerToClient, 0xd) => {
-            let p = play::read_boss_bar_response(reader)?;
+            let p = play::BossBarResponse::deserialize(reader)?;
             Packet::BossBarResponse(p)
         }
         (S::Play, D::ServerToClient, 0xe) => {
-            let p = play::read_difficulty_response(reader)?;
+            let p = play::DifficultyResponse::deserialize(reader)?;
             Packet::DifficultyResponse(p)
         }
         (S::Play, D::ServerToClient, 0xf) => {
-            let p = play::read_chat_response(reader)?;
+            let p = play::ChatResponse::deserialize(reader)?;
             Packet::ChatResponse(p)
         }
         (S::Play, D::ServerToClient, 0x10) => {
-            let p = play::read_clear_titles_response(reader)?;
+            let p = play::ClearTitlesResponse::deserialize(reader)?;
             Packet::ClearTitlesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x11) => {
-            let p = play::read_tab_complete_response(reader)?;
+            let p = play::TabCompleteResponse::deserialize(reader)?;
             Packet::TabCompleteResponse(p)
         }
         (S::Play, D::ServerToClient, 0x12) => {
-            let p = play::read_declare_commands_response(reader)?;
+            let p = play::DeclareCommandsResponse::deserialize(reader)?;
             Packet::DeclareCommandsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x13) => {
-            let p = play::read_close_window_response(reader)?;
+            let p = play::CloseWindowResponse::deserialize(reader)?;
             Packet::CloseWindowResponse(p)
         }
         (S::Play, D::ServerToClient, 0x14) => {
-            let p = play::read_window_items_response(reader)?;
+            let p = play::WindowItemsResponse::deserialize(reader)?;
             Packet::WindowItemsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x15) => {
-            let p = play::read_craft_progress_bar_response(reader)?;
+            let p = play::CraftProgressBarResponse::deserialize(reader)?;
             Packet::CraftProgressBarResponse(p)
         }
         (S::Play, D::ServerToClient, 0x16) => {
-            let p = play::read_set_slot_response(reader)?;
+            let p = play::SetSlotResponse::deserialize(reader)?;
             Packet::SetSlotResponse(p)
         }
         (S::Play, D::ServerToClient, 0x17) => {
-            let p = play::read_set_cooldown_response(reader)?;
+            let p = play::SetCooldownResponse::deserialize(reader)?;
             Packet::SetCooldownResponse(p)
         }
         (S::Play, D::ServerToClient, 0x18) => {
-            let p = play::read_custom_payload_response(reader)?;
+            let p = play::CustomPayloadResponse::deserialize(reader)?;
             Packet::CustomPayloadResponse(p)
         }
         (S::Play, D::ServerToClient, 0x19) => {
-            let p = play::read_named_sound_effect_response(reader)?;
+            let p = play::NamedSoundEffectResponse::deserialize(reader)?;
             Packet::NamedSoundEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1a) => {
-            let p = play::read_kick_disconnect_response(reader)?;
+            let p = play::KickDisconnectResponse::deserialize(reader)?;
             Packet::KickDisconnectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1b) => {
-            let p = play::read_entity_status_response(reader)?;
+            let p = play::EntityStatusResponse::deserialize(reader)?;
             Packet::EntityStatusResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1c) => {
-            let p = play::read_explosion_response(reader)?;
+            let p = play::ExplosionResponse::deserialize(reader)?;
             Packet::ExplosionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1d) => {
-            let p = play::read_unload_chunk_response(reader)?;
+            let p = play::UnloadChunkResponse::deserialize(reader)?;
             Packet::UnloadChunkResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1e) => {
-            let p = play::read_game_state_change_response(reader)?;
+            let p = play::GameStateChangeResponse::deserialize(reader)?;
             Packet::GameStateChangeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x1f) => {
-            let p = play::read_open_horse_window_response(reader)?;
+            let p = play::OpenHorseWindowResponse::deserialize(reader)?;
             Packet::OpenHorseWindowResponse(p)
         }
         (S::Play, D::ServerToClient, 0x20) => {
-            let p = play::read_initialize_world_border_response(reader)?;
+            let p = play::InitializeWorldBorderResponse::deserialize(reader)?;
             Packet::InitializeWorldBorderResponse(p)
         }
         (S::Play, D::ServerToClient, 0x21) => {
-            let p = play::read_keep_alive_response(reader)?;
+            let p = play::KeepAliveResponse::deserialize(reader)?;
             Packet::KeepAliveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x22) => {
-            let p = play::read_map_chunk_response(reader)?;
+            let p = play::MapChunkResponse::deserialize(reader)?;
             Packet::MapChunkResponse(p)
         }
         (S::Play, D::ServerToClient, 0x23) => {
-            let p = play::read_world_event_response(reader)?;
+            let p = play::WorldEventResponse::deserialize(reader)?;
             Packet::WorldEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x24) => {
-            let p = play::read_world_particles_response(reader)?;
+            let p = play::WorldParticlesResponse::deserialize(reader)?;
             Packet::WorldParticlesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x25) => {
-            let p = play::read_update_light_response(reader)?;
+            let p = play::UpdateLightResponse::deserialize(reader)?;
             Packet::UpdateLightResponse(p)
         }
         (S::Play, D::ServerToClient, 0x26) => {
-            let p = play::read_login_response(reader)?;
+            let p = play::LoginResponse::deserialize(reader)?;
             Packet::LoginResponse(p)
         }
         (S::Play, D::ServerToClient, 0x27) => {
-            let p = play::read_map_response(reader)?;
+            let p = play::MapResponse::deserialize(reader)?;
             Packet::MapResponse(p)
         }
         (S::Play, D::ServerToClient, 0x28) => {
-            let p = play::read_trade_list_response(reader)?;
+            let p = play::TradeListResponse::deserialize(reader)?;
             Packet::TradeListResponse(p)
         }
         (S::Play, D::ServerToClient, 0x29) => {
-            let p = play::read_rel_entity_move_response(reader)?;
+            let p = play::RelEntityMoveResponse::deserialize(reader)?;
             Packet::RelEntityMoveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2a) => {
-            let p = play::read_entity_move_look_response(reader)?;
+            let p = play::EntityMoveLookResponse::deserialize(reader)?;
             Packet::EntityMoveLookResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2b) => {
-            let p = play::read_entity_look_response(reader)?;
+            let p = play::EntityLookResponse::deserialize(reader)?;
             Packet::EntityLookResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2c) => {
-            let p = play::read_vehicle_move_response(reader)?;
+            let p = play::VehicleMoveResponse::deserialize(reader)?;
             Packet::VehicleMoveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2d) => {
-            let p = play::read_open_book_response(reader)?;
+            let p = play::OpenBookResponse::deserialize(reader)?;
             Packet::OpenBookResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2e) => {
-            let p = play::read_open_window_response(reader)?;
+            let p = play::OpenWindowResponse::deserialize(reader)?;
             Packet::OpenWindowResponse(p)
         }
         (S::Play, D::ServerToClient, 0x2f) => {
-            let p = play::read_open_sign_entity_response(reader)?;
+            let p = play::OpenSignEntityResponse::deserialize(reader)?;
             Packet::OpenSignEntityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x30) => {
-            let p = play::read_play_ping_response(reader)?;
+            let p = play::PlayPingResponse::deserialize(reader)?;
             Packet::PlayPingResponse(p)
         }
         (S::Play, D::ServerToClient, 0x31) => {
-            let p = play::read_craft_recipe_response(reader)?;
+            let p = play::CraftRecipeResponse::deserialize(reader)?;
             Packet::CraftRecipeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x32) => {
-            let p = play::read_abilities_response(reader)?;
+            let p = play::AbilitiesResponse::deserialize(reader)?;
             Packet::AbilitiesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x33) => {
-            let p = play::read_end_combat_event_response(reader)?;
+            let p = play::EndCombatEventResponse::deserialize(reader)?;
             Packet::EndCombatEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x34) => {
-            let p = play::read_enter_combat_event_response(reader)?;
+            let p = play::EnterCombatEventResponse::deserialize(reader)?;
             Packet::EnterCombatEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x35) => {
-            let p = play::read_death_combat_event_response(reader)?;
+            let p = play::DeathCombatEventResponse::deserialize(reader)?;
             Packet::DeathCombatEventResponse(p)
         }
         (S::Play, D::ServerToClient, 0x36) => {
-            let p = play::read_player_info_response(reader)?;
+            let p = play::PlayerInfoResponse::deserialize(reader)?;
             Packet::PlayerInfoResponse(p)
         }
         (S::Play, D::ServerToClient, 0x37) => {
-            let p = play::read_face_player_response(reader)?;
+            let p = play::FacePlayerResponse::deserialize(reader)?;
             Packet::FacePlayerResponse(p)
         }
         (S::Play, D::ServerToClient, 0x38) => {
-            let p = play::read_position_response(reader)?;
+            let p = play::PositionResponse::deserialize(reader)?;
             Packet::PositionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x39) => {
-            let p = play::read_unlock_recipes_response(reader)?;
+            let p = play::UnlockRecipesResponse::deserialize(reader)?;
             Packet::UnlockRecipesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3a) => {
-            let p = play::read_entity_destroy_response(reader)?;
+            let p = play::EntityDestroyResponse::deserialize(reader)?;
             Packet::EntityDestroyResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3b) => {
-            let p = play::read_remove_entity_effect_response(reader)?;
+            let p = play::RemoveEntityEffectResponse::deserialize(reader)?;
             Packet::RemoveEntityEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3c) => {
-            let p = play::read_resource_pack_send_response(reader)?;
+            let p = play::ResourcePackSendResponse::deserialize(reader)?;
             Packet::ResourcePackSendResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3d) => {
-            let p = play::read_respawn_response(reader)?;
+            let p = play::RespawnResponse::deserialize(reader)?;
             Packet::RespawnResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3e) => {
-            let p = play::read_entity_head_rotation_response(reader)?;
+            let p = play::EntityHeadRotationResponse::deserialize(reader)?;
             Packet::EntityHeadRotationResponse(p)
         }
         (S::Play, D::ServerToClient, 0x3f) => {
-            let p = play::read_multi_block_change_response(reader)?;
+            let p = play::MultiBlockChangeResponse::deserialize(reader)?;
             Packet::MultiBlockChangeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x40) => {
-            let p = play::read_select_advancement_tab_response(reader)?;
+            let p = play::SelectAdvancementTabResponse::deserialize(reader)?;
             Packet::SelectAdvancementTabResponse(p)
         }
         (S::Play, D::ServerToClient, 0x41) => {
-            let p = play::read_action_bar_response(reader)?;
+            let p = play::ActionBarResponse::deserialize(reader)?;
             Packet::ActionBarResponse(p)
         }
         (S::Play, D::ServerToClient, 0x42) => {
-            let p = play::read_world_border_center_response(reader)?;
+            let p = play::WorldBorderCenterResponse::deserialize(reader)?;
             Packet::WorldBorderCenterResponse(p)
         }
         (S::Play, D::ServerToClient, 0x43) => {
-            let p = play::read_world_border_lerp_size_response(reader)?;
+            let p = play::WorldBorderLerpSizeResponse::deserialize(reader)?;
             Packet::WorldBorderLerpSizeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x44) => {
-            let p = play::read_world_border_size_response(reader)?;
+            let p = play::WorldBorderSizeResponse::deserialize(reader)?;
             Packet::WorldBorderSizeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x45) => {
-            let p = play::read_world_border_warning_delay_response(reader)?;
+            let p = play::WorldBorderWarningDelayResponse::deserialize(reader)?;
             Packet::WorldBorderWarningDelayResponse(p)
         }
         (S::Play, D::ServerToClient, 0x46) => {
-            let p = play::read_world_border_warning_reach_response(reader)?;
+            let p = play::WorldBorderWarningReachResponse::deserialize(reader)?;
             Packet::WorldBorderWarningReachResponse(p)
         }
         (S::Play, D::ServerToClient, 0x47) => {
-            let p = play::read_camera_response(reader)?;
+            let p = play::CameraResponse::deserialize(reader)?;
             Packet::CameraResponse(p)
         }
         (S::Play, D::ServerToClient, 0x48) => {
-            let p = play::read_held_item_slot_response(reader)?;
+            let p = play::HeldItemSlotResponse::deserialize(reader)?;
             Packet::HeldItemSlotResponse(p)
         }
         (S::Play, D::ServerToClient, 0x49) => {
-            let p = play::read_update_view_position_response(reader)?;
+            let p = play::UpdateViewPositionResponse::deserialize(reader)?;
             Packet::UpdateViewPositionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4a) => {
-            let p = play::read_update_view_distance_response(reader)?;
+            let p = play::UpdateViewDistanceResponse::deserialize(reader)?;
             Packet::UpdateViewDistanceResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4b) => {
-            let p = play::read_spawn_position_response(reader)?;
+            let p = play::SpawnPositionResponse::deserialize(reader)?;
             Packet::SpawnPositionResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4c) => {
-            let p = play::read_scoreboard_display_objective_response(reader)?;
+            let p = play::ScoreboardDisplayObjectiveResponse::deserialize(reader)?;
             Packet::ScoreboardDisplayObjectiveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4d) => {
-            let p = play::read_entity_metadata_response(reader)?;
+            let p = play::EntityMetadataResponse::deserialize(reader)?;
             Packet::EntityMetadataResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4e) => {
-            let p = play::read_attach_entity_response(reader)?;
+            let p = play::AttachEntityResponse::deserialize(reader)?;
             Packet::AttachEntityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x4f) => {
-            let p = play::read_entity_velocity_response(reader)?;
+            let p = play::EntityVelocityResponse::deserialize(reader)?;
             Packet::EntityVelocityResponse(p)
         }
         (S::Play, D::ServerToClient, 0x50) => {
-            let p = play::read_entity_equipment_response(reader)?;
+            let p = play::EntityEquipmentResponse::deserialize(reader)?;
             Packet::EntityEquipmentResponse(p)
         }
         (S::Play, D::ServerToClient, 0x51) => {
-            let p = play::read_experience_response(reader)?;
+            let p = play::ExperienceResponse::deserialize(reader)?;
             Packet::ExperienceResponse(p)
         }
         (S::Play, D::ServerToClient, 0x52) => {
-            let p = play::read_update_health_response(reader)?;
+            let p = play::UpdateHealthResponse::deserialize(reader)?;
             Packet::UpdateHealthResponse(p)
         }
         (S::Play, D::ServerToClient, 0x53) => {
-            let p = play::read_scoreboard_objective_response(reader)?;
+            let p = play::ScoreboardObjectiveResponse::deserialize(reader)?;
             Packet::ScoreboardObjectiveResponse(p)
         }
         (S::Play, D::ServerToClient, 0x54) => {
-            let p = play::read_set_passengers_response(reader)?;
+            let p = play::SetPassengersResponse::deserialize(reader)?;
             Packet::SetPassengersResponse(p)
         }
         (S::Play, D::ServerToClient, 0x55) => {
-            let p = play::read_teams_response(reader)?;
+            let p = play::TeamsResponse::deserialize(reader)?;
             Packet::TeamsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x56) => {
-            let p = play::read_scoreboard_score_response(reader)?;
+            let p = play::ScoreboardScoreResponse::deserialize(reader)?;
             Packet::ScoreboardScoreResponse(p)
         }
         (S::Play, D::ServerToClient, 0x57) => {
-            let p = play::read_simulation_distance_response(reader)?;
+            let p = play::SimulationDistanceResponse::deserialize(reader)?;
             Packet::SimulationDistanceResponse(p)
         }
         (S::Play, D::ServerToClient, 0x58) => {
-            let p = play::read_set_title_subtitle_response(reader)?;
+            let p = play::SetTitleSubtitleResponse::deserialize(reader)?;
             Packet::SetTitleSubtitleResponse(p)
         }
         (S::Play, D::ServerToClient, 0x59) => {
-            let p = play::read_update_time_response(reader)?;
+            let p = play::UpdateTimeResponse::deserialize(reader)?;
             Packet::UpdateTimeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5a) => {
-            let p = play::read_set_title_text_response(reader)?;
+            let p = play::SetTitleTextResponse::deserialize(reader)?;
             Packet::SetTitleTextResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5b) => {
-            let p = play::read_set_title_time_response(reader)?;
+            let p = play::SetTitleTimeResponse::deserialize(reader)?;
             Packet::SetTitleTimeResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5c) => {
-            let p = play::read_entity_sound_effect_response(reader)?;
+            let p = play::EntitySoundEffectResponse::deserialize(reader)?;
             Packet::EntitySoundEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5d) => {
-            let p = play::read_sound_effect_response(reader)?;
+            let p = play::SoundEffectResponse::deserialize(reader)?;
             Packet::SoundEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5e) => {
-            let p = play::read_stop_sound_response(reader)?;
+            let p = play::StopSoundResponse::deserialize(reader)?;
             Packet::StopSoundResponse(p)
         }
         (S::Play, D::ServerToClient, 0x5f) => {
-            let p = play::read_playerlist_header_response(reader)?;
+            let p = play::PlayerlistHeaderResponse::deserialize(reader)?;
             Packet::PlayerlistHeaderResponse(p)
         }
         (S::Play, D::ServerToClient, 0x60) => {
-            let p = play::read_nbt_query_response(reader)?;
+            let p = play::NbtQueryResponse::deserialize(reader)?;
             Packet::NbtQueryResponse(p)
         }
         (S::Play, D::ServerToClient, 0x61) => {
-            let p = play::read_collect_response(reader)?;
+            let p = play::CollectResponse::deserialize(reader)?;
             Packet::CollectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x62) => {
-            let p = play::read_entity_teleport_response(reader)?;
+            let p = play::EntityTeleportResponse::deserialize(reader)?;
             Packet::EntityTeleportResponse(p)
         }
         (S::Play, D::ServerToClient, 0x63) => {
-            let p = play::read_advancements_response(reader)?;
+            let p = play::AdvancementsResponse::deserialize(reader)?;
             Packet::AdvancementsResponse(p)
         }
         (S::Play, D::ServerToClient, 0x64) => {
-            let p = play::read_entity_update_attributes_response(reader)?;
+            let p = play::EntityUpdateAttributesResponse::deserialize(reader)?;
             Packet::EntityUpdateAttributesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x65) => {
-            let p = play::read_entity_effect_response(reader)?;
+            let p = play::EntityEffectResponse::deserialize(reader)?;
             Packet::EntityEffectResponse(p)
         }
         (S::Play, D::ServerToClient, 0x66) => {
-            let p = play::read_declare_recipes_response(reader)?;
+            let p = play::DeclareRecipesResponse::deserialize(reader)?;
             Packet::DeclareRecipesResponse(p)
         }
         (S::Play, D::ServerToClient, 0x67) => {
-            let p = play::read_tags_response(reader)?;
+            let p = play::TagsResponse::deserialize(reader)?;
             Packet::TagsResponse(p)
         }
         _ => {

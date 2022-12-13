@@ -4,7 +4,6 @@ pub(crate) mod varint;
 
 use crate::protocol::varint::{read_varint, read_varint_with_size};
 use anyhow::Result;
-use de::Reader;
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
 use std::io::Read;
@@ -28,66 +27,24 @@ pub enum PacketDirection {
 }
 
 #[derive(Debug)]
-pub struct IndexedString {
-    // I wanted to make this Range<u32> but that is not Copy because reasons so that'll have to suffice.
-    // 2 minutes later: on the other hand this is not Copy either so :shrug: :whatever:
-    pub start: u32,
-    pub end: u32,
-}
-
-impl IndexedString {
-    pub fn len(&self) -> u32 {
-        self.end - self.start
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn get<'s>(&self, x: &'s [u8]) -> &'s str {
-        let b = &x[self.start as usize..self.end as usize];
-        std::str::from_utf8(b).unwrap()
-        // this unwrap is legit, it shouldn't ever fail
-    }
-}
-
-#[derive(Debug)]
-pub struct IndexedBuffer {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl IndexedBuffer {
-    pub fn len(&self) -> u32 {
-        self.end - self.start
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn get<'b>(&self, x: &'b [u8]) -> &'b [u8] {
-        &x[self.start as usize..self.end as usize]
-    }
-}
-
-#[derive(Debug)]
-pub struct InventorySlotData {
+pub struct InventorySlotData<'x> {
     pub item_id: i32,
     pub count: u8,
-    pub nbt: Option<IndexedBuffer>,
+    pub nbt: Option<&'x [u8]>,
 }
 
 #[derive(Debug)]
-pub struct InventorySlot {
-    pub data: Option<InventorySlotData>,
+pub struct InventorySlot<'x> {
+    pub data: Option<InventorySlotData<'x>>,
 }
 
 #[derive(Debug)]
-pub struct IndexedOptionNbt {
-    pub nbt: Option<IndexedBuffer>,
+pub struct IndexedOptionNbt<'x> {
+    pub nbt: Option<&'x [u8]>,
 }
 #[derive(Debug)]
-pub struct IndexedNbt {
-    pub nbt: IndexedBuffer,
+pub struct IndexedNbt<'x> {
+    pub nbt: &'x [u8],
 }
 
 pub struct PacketData {
@@ -117,7 +74,8 @@ pub fn read_packet_info<'r>(
     if !has_enough_bytes(buffer) {
         return Ok(None);
     }
-    let mut reader = Reader::new(buffer);
+    let mut original = buffer;
+    let mut reader = buffer;
     let (length, length_size) = read_varint_with_size(&mut reader)?;
 
     let total_size_original = length as usize + length_size;
@@ -130,7 +88,8 @@ pub fn read_packet_info<'r>(
 
             let mut decompress = ZlibDecoder::new(&mut reader);
             decompress.read_to_end(tmp)?;
-            reader = Reader::new(tmp);
+            reader = &tmp;
+            original = reader;
             total_size = tmp.len();
         }
     }
@@ -140,7 +99,7 @@ pub fn read_packet_info<'r>(
         id,
         total_size,
         total_size_original,
-        header_size: reader.offset(),
+        header_size: reader.as_ptr() as usize - original.as_ptr() as usize,
         compression,
     };
 
@@ -151,14 +110,15 @@ pub fn just_deserialize<'r>(
     direction: PacketDirection,
     state: ConnectionState,
     id: u32,
-    reader: &'r mut Reader<'r>,
-) -> Result<Packet> {
+    reader: &mut &'r [u8],
+) -> Result<Packet<'r>> {
     let packet = de_packets(state, direction, id, reader)?;
     Ok(packet)
 }
 
 fn has_enough_bytes(bytes: &[u8]) -> bool {
-    match read_varint_with_size(bytes) {
+    let mut tmp = bytes;
+    match read_varint_with_size(&mut tmp) {
         Ok((value, size)) => size + value as usize <= bytes.len(),
         Err(_) => false,
     }

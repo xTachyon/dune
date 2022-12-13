@@ -1,3 +1,5 @@
+mod protocol;
+
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Write;
 use std::process::Command;
@@ -7,11 +9,12 @@ use std::{collections::HashMap, fs};
 struct Version {
     items_path: String,
     enchants_path: String,
+    protocol_path: String,
 }
 
 fn get_path(version_path: &str, name: &str) -> String {
     format!(
-        "packet_gen/minecraft-data/data/{}/{}.json",
+        "dune_data_gen/minecraft-data/data/{}/{}.json",
         version_path, name
     )
 }
@@ -21,21 +24,24 @@ fn new(name: &str) -> Version {
     struct DataPathsVersion<'x> {
         items: Option<&'x str>,
         enchantments: Option<&'x str>,
+        protocol: Option<&'x str>,
     }
     #[derive(Debug, Deserialize)]
     struct DataPathsJson<'x> {
         #[serde(borrow)]
         pc: HashMap<&'x str, DataPathsVersion<'x>>,
     }
-    let content = fs::read("packet_gen/minecraft-data/data/dataPaths.json").unwrap();
+    let content = fs::read("dune_data_gen/minecraft-data/data/dataPaths.json").unwrap();
     let data: DataPathsJson = serde_json::from_slice(&content).unwrap();
 
     let v = data.pc.get(name).unwrap();
     let items_path = get_path(v.items.unwrap(), "items");
     let enchants_path = get_path(v.enchantments.unwrap(), "enchantments");
+    let protocol_path = get_path(v.protocol.unwrap(), "protocol");
     Version {
         items_path,
         enchants_path,
+        protocol_path,
     }
 }
 
@@ -214,6 +220,9 @@ impl Enchantment {
 
 fn main() {
     let versions: HashMap<&str, Version> = [(V1_18_2, new(V1_18_2))].into_iter().collect();
-    process_items(&versions);
-    process_enchants(&versions);
+    if false {
+        process_items(&versions);
+        process_enchants(&versions);
+    }
+    protocol::run(&versions[V1_18_2].protocol_path);
 }

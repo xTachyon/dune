@@ -2,7 +2,7 @@ use anyhow::Result;
 use byteorder::ReadBytesExt;
 use std::io::{Read, Result as IoResult, Write};
 
-pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
+pub(crate) fn read_varint_with_size<R: Read>(reader: &mut R) -> Result<(i32, usize)> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
@@ -22,12 +22,12 @@ pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usiz
     Ok((result as i32, bytes_read))
 }
 
-pub(crate) fn read_varint<R: Read>(reader: R) -> Result<i32> {
+pub(crate) fn read_varint<R: Read>(reader: &mut R) -> Result<i32> {
     let (value, _) = read_varint_with_size(reader)?;
     Ok(value)
 }
 
-pub(crate) fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
+pub(crate) fn read_varlong<R: Read>(reader: &mut R) -> Result<i64> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {

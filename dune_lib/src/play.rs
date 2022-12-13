@@ -1,5 +1,4 @@
-use crate::events::{EventSubscriber, Position, Trades, UseEntity};
-use crate::protocol::de::Reader;
+use crate::events::{EventSubscriber, Position, UseEntity};
 use crate::protocol::{ConnectionState, Packet};
 use crate::{protocol, DiskPacket};
 use anyhow::Result;
@@ -27,12 +26,12 @@ impl TrafficPlayer {
     }
 
     fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
-        let mut reader = Reader::new(disk_packet.data);
+        let mut data = disk_packet.data;
         let packet = protocol::just_deserialize(
             disk_packet.direction,
             self.state,
             disk_packet.id,
-            &mut reader,
+            &mut data,
         )?;
 
         // println!("{:?}", packet);
@@ -46,10 +45,9 @@ impl TrafficPlayer {
             }
             Packet::SuccessResponse(p) => {
                 self.state = ConnectionState::Play;
-                self.handler
-                    .player_info(p.username.get(disk_packet.data), p.uuid)?;
+                self.handler.player_info(p.username, p.uuid)?;
             }
-            Packet::ChatResponse(p) => self.handler.on_chat(p.message.get(disk_packet.data))?,
+            Packet::ChatResponse(p) => self.handler.on_chat(p.message)?,
             Packet::PositionRequest(p) => self.handler.position(Position {
                 x: p.x,
                 y: p.y,
@@ -60,10 +58,7 @@ impl TrafficPlayer {
                 y: p.y,
                 z: p.z,
             })?,
-            Packet::TradeListResponse(p) => self.handler.trades(Trades {
-                packet: p,
-                buffer: disk_packet.data,
-            })?,
+            Packet::TradeListResponse(p) => self.handler.trades(p)?,
             Packet::UseEntityRequest(p) => self.handler.interact(UseEntity {
                 entity_id: p.entity_id,
                 kind: p.kind,
@@ -76,6 +71,7 @@ impl TrafficPlayer {
     fn run(&mut self) -> Result<()> {
         let mut buffer = Vec::with_capacity(64 * 1024);
         let mut tmp = [0; 64 * 1024];
+        let mut count = 0;
         loop {
             let read = self.reader.read(&mut tmp)?;
             if read == 0 {
@@ -87,15 +83,16 @@ impl TrafficPlayer {
             }
             buffer.extend_from_slice(&tmp[..read]);
 
-            let mut cursor = Reader::new(&buffer);
-            while DiskPacket::has_enough_bytes(&buffer[cursor.offset()..]) {
-                let disk_packet = DiskPacket::read(&mut cursor)?;
+            let mut data = buffer.as_slice();
+            while DiskPacket::has_enough_bytes(data) {
+                let disk_packet = DiskPacket::read(&mut data)?;
                 if let Err(err) = self.do_packet(disk_packet) {
-                    warn!("{:?}", err);
+                    warn!("{}. {:?}", count, err);
                 }
+                count += 1;
             }
 
-            buffer.drain(..cursor.offset());
+            buffer.drain(..data.as_ptr() as usize - buffer.as_ptr() as usize);
         }
 
         Ok(())
