@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::io;
+use std::io::Read;
+use std::io::Result as IoResult;
 use std::io::Write;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -19,9 +21,9 @@ mod data;
 pub mod events;
 mod game;
 pub mod nbt;
-pub mod replay;
 pub mod protocol;
 pub mod record;
+pub mod replay;
 pub mod world;
 
 pub use data::enchantments::Enchantment;
@@ -123,5 +125,26 @@ impl Deref for Buffer {
 impl DerefMut for Buffer {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+trait ReadSkip: Read {
+    fn skip_all(&mut self, size: usize) -> IoResult<()>;
+}
+impl<R: ReadSkip> ReadSkip for &mut R {
+    fn skip_all(&mut self, size: usize) -> IoResult<()> {
+        (**self).skip_all(size)
+    }
+}
+impl ReadSkip for &[u8] {
+    fn skip_all(&mut self, size: usize) -> IoResult<()> {
+        if size > self.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "failed to fill whole buffer",
+            ));
+        }
+        *self = &self[size..];
+        Ok(())
     }
 }

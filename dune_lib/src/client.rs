@@ -20,7 +20,7 @@ fn send_packet<'x, P: MD<'x>, W: Write>(
     tmp: &mut Vec<u8>,
 ) -> Result<()> {
     tmp.clear();
-    
+
     packet.serialize(tmp)?;
     write_varint(&mut writer, tmp.len() as u32)?;
     writer.write_all(tmp)?;
@@ -39,7 +39,9 @@ fn send_start<W: Write>(writer: &mut W) -> Result<()> {
     };
     send_packet(writer, p, &mut tmp)?;
 
-    let p = LoginStartRequest { username: "TheTachyon" };
+    let p = LoginStartRequest {
+        username: "TheTachyon",
+    };
     send_packet(writer, p, &mut tmp)?;
 
     Ok(())

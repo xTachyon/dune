@@ -222,7 +222,11 @@ fn parse_array<'x>(
     let t = Ty::Array(TyArray { count_ty, subtype });
     Some(parser.alloc_type(t))
 }
-fn parse_type_simple<'x>(parser: &Parser<'x>, input: &str, struct_name: &str) -> Option<&'x Ty<'x>> {
+fn parse_type_simple<'x>(
+    parser: &Parser<'x>,
+    input: &str,
+    struct_name: &str,
+) -> Option<&'x Ty<'x>> {
     let r = match input {
         "u8" => parser.ty_u8,
         "u16" => parser.ty_u16,

@@ -9,8 +9,16 @@ use std::fmt::Write;
 type Result<T> = std::result::Result<T, std::fmt::Error>;
 
 fn lifetime(ty: &Ty) -> &'static str {
-    let b =
-        ty.needs_lifetime() && ![Ty::STRING, Ty::BUFFER, Ty::RESTBUFFER, Ty::SLOT, Ty::NBT, Ty::OPTIONALNBT].contains(ty);
+    let b = ty.needs_lifetime()
+        && ![
+            Ty::STRING,
+            Ty::BUFFER,
+            Ty::RESTBUFFER,
+            Ty::SLOT,
+            Ty::NBT,
+            Ty::OPTIONALNBT,
+        ]
+        .contains(ty);
     if b {
         "<'p>"
     } else {
@@ -80,7 +88,13 @@ fn underscore(b: bool) -> &'static str {
         ""
     }
 }
-fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str, id: Option<u16>) -> Result<()> {
+fn serialize_struct(
+    out: &mut String,
+    ty: &Ty,
+    ty_struct: &TyStruct,
+    name: &str,
+    id: Option<u16>,
+) -> Result<()> {
     // TODO:
     if name == "UseEntityRequest" {
         *out += r#"

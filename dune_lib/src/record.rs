@@ -1,6 +1,6 @@
 use crate::protocol::varint::write_varint;
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
-use crate::{protocol, DiskPacket, Buffer};
+use crate::{protocol, Buffer, DiskPacket};
 use anyhow::Result;
 use byteorder::WriteBytesExt;
 use cfb8::cipher::AsyncStreamCipher;

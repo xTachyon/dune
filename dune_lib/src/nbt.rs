@@ -7,6 +7,8 @@ use std::fmt::{Display, Write};
 use std::io::Read;
 use std::str;
 
+use crate::ReadSkip;
+
 #[derive(Debug)]
 pub enum Tag<'n> {
     Byte(i8),
@@ -189,100 +191,81 @@ pub fn read<R: Read>(mut reader: R, bump: &Bump) -> Result<RootTag> {
 
 // skip
 
-struct Skipper<'r, R: Read> {
-    tmp_buf: [u8; 1024],
-    reader: &'r mut R,
+fn skip_string<R: ReadSkip>(reader: &mut R) -> Result<()> {
+    let size = reader.read_u16::<BE>()? as usize;
+    reader.skip_all(size)?;
+    Ok(())
 }
 
-impl<'r, R: Read> Skipper<'r, R> {
-    fn skip_buf(&mut self, mut size: usize) -> Result<()> {
-        while size > 0 {
-            let to_read = size.min(self.tmp_buf.len());
-            let read = self.reader.read(&mut self.tmp_buf[..to_read])?;
-            size -= read;
+fn skip_impl<R: ReadSkip>(reader: &mut R, tag: u8) -> Result<()> {
+    match tag {
+        1 => reader.skip_all(1)?, // tag_byte
+        2 => reader.skip_all(2)?, // tag_short
+        3 => reader.skip_all(4)?, // tag_int
+        4 => reader.skip_all(8)?, // tag_long
+        5 => reader.skip_all(4)?, // tag_float
+        6 => reader.skip_all(8)?, // tag_double
+        7 => {
+            // tag_byte_array
+            let size = reader.read_i32::<BE>()? as usize;
+            reader.skip_all(size)?;
         }
-        Ok(())
-    }
-
-    fn skip_string(&mut self) -> Result<()> {
-        let size = self.reader.read_u16::<BE>()? as usize;
-        self.skip_buf(size)
-    }
-
-    fn skip_impl(&mut self, tag: u8) -> Result<()> {
-        match tag {
-            1 => self.skip_buf(1)?, // tag_byte
-            2 => self.skip_buf(2)?, // tag_short
-            3 => self.skip_buf(4)?, // tag_int
-            4 => self.skip_buf(8)?, // tag_long
-            5 => self.skip_buf(4)?, // tag_float
-            6 => self.skip_buf(8)?, // tag_double
-            7 => {
-                // tag_byte_array
-                let size = self.reader.read_i32::<BE>()? as usize;
-                self.skip_buf(size)?;
-            }
-            8 => {
-                // tag_string
-                self.skip_string()?;
-            }
-            9 => {
-                // tag_list
-                let kind = self.reader.read_u8()?;
-                let size = self.reader.read_i32::<BE>()?;
-                for _ in 0..size {
-                    self.skip_impl(kind)?;
-                }
-            }
-            10 => {
-                // tag_compound
-                loop {
-                    let kind = self.reader.read_u8()?;
-                    if kind == 0 {
-                        // tag_end
-                        break;
-                    }
-                    self.skip_string()?;
-                    self.skip_impl(kind)?;
-                }
-            }
-            11 => {
-                // tag_int_array
-                let size = self.reader.read_i32::<BE>()?;
-                for _ in 0..size {
-                    self.skip_buf(4)?;
-                }
-            }
-            12 => {
-                // tag_long_array
-                let size = self.reader.read_i32::<BE>()?;
-                for _ in 0..size {
-                    self.skip_buf(8)?;
-                }
-            }
-            _ => return Err(anyhow!("unknown tag {}", tag)),
+        8 => {
+            // tag_string
+            skip_string(reader)?;
         }
-        Ok(())
+        9 => {
+            // tag_list
+            let kind = reader.read_u8()?;
+            let size = reader.read_i32::<BE>()?;
+            for _ in 0..size {
+                skip_impl(reader, kind)?;
+            }
+        }
+        10 => {
+            // tag_compound
+            loop {
+                let kind = reader.read_u8()?;
+                if kind == 0 {
+                    // tag_end
+                    break;
+                }
+                skip_string(reader)?;
+                skip_impl(reader, kind)?;
+            }
+        }
+        11 => {
+            // tag_int_array
+            let size = reader.read_i32::<BE>()?;
+            for _ in 0..size {
+                reader.skip_all(4)?;
+            }
+        }
+        12 => {
+            // tag_long_array
+            let size = reader.read_i32::<BE>()?;
+            for _ in 0..size {
+                reader.skip_all(8)?;
+            }
+        }
+        _ => return Err(anyhow!("unknown tag {}", tag)),
     }
+    Ok(())
 }
 
-fn skip_start<R: Read>(reader: &mut R, tag: u8) -> Result<()> {
+fn skip_start<R: ReadSkip>(reader: &mut R, tag: u8) -> Result<()> {
     if tag != 10 {
         return Err(anyhow!(
             "expected the stream to start with a compound tag, found {}",
             tag
         ));
     }
-    let mut skipper = Skipper {
-        tmp_buf: [0; 1024],
-        reader,
-    };
-    skipper.skip_string()?;
-    skipper.skip_impl(tag)?;
+    skip_string(reader)?;
+    skip_impl(reader, tag)?;
     Ok(())
 }
 
-pub(crate) fn skip_option<R: Read>(mut reader: R) -> Result<bool> {
+pub(crate) fn skip_option<R: ReadSkip>(mut reader: R) -> Result<bool> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     let r = if tag == 0 {
@@ -294,7 +277,7 @@ pub(crate) fn skip_option<R: Read>(mut reader: R) -> Result<bool> {
     Ok(r)
 }
 
-pub(crate) fn skip<R: Read>(mut reader: R) -> Result<()> {
+pub(crate) fn skip<R: ReadSkip>(mut reader: R) -> Result<()> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     skip_start(reader, tag)
