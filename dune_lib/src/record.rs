@@ -1,6 +1,6 @@
 use crate::protocol::varint::write_varint;
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
-use crate::{protocol, DiskPacket};
+use crate::{protocol, DiskPacket, Buffer};
 use anyhow::Result;
 use byteorder::WriteBytesExt;
 use cfb8::cipher::AsyncStreamCipher;
@@ -24,16 +24,16 @@ pub(crate) struct Encryption {
 }
 
 pub(crate) struct Session {
-    pub(crate) read_buf: Vec<u8>,
-    pub(crate) write_buf: Vec<u8>,
+    pub(crate) read_buf: Buffer,
+    pub(crate) write_buf: Buffer,
     pub(crate) crypt: Option<Encryption>,
 }
 
 impl Session {
     pub(crate) fn new() -> Session {
         Session {
-            read_buf: vec![],
-            write_buf: vec![],
+            read_buf: Buffer::new(),
+            write_buf: Buffer::new(),
             crypt: None,
         }
     }
@@ -249,7 +249,7 @@ impl Proxy {
             }
             offset += packet_data.total_size_original;
         }
-        src.read_buf.drain(..offset);
+        src.read_buf.advance(offset);
 
         Ok(())
     }
@@ -325,11 +325,11 @@ fn run(
                 if ev.key == CLIENT_KEY {
                     let wrote = client_socket.write(&client.write_buf)?;
                     stats.write += wrote;
-                    client.write_buf.drain(..wrote);
+                    client.write_buf.advance(wrote);
                 } else {
                     let wrote = server_socket.write(&server.write_buf)?;
                     stats.write += wrote;
-                    server.write_buf.drain(..wrote);
+                    server.write_buf.advance(wrote);
                 }
             }
         }

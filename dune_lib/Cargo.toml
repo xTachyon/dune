@@ -16,6 +16,7 @@ ureq = "2"
 num-bigint = "0.4.3"
 log = "0.4"
 bitvec = "1"
+slice-ring-buffer = "0.3.2"
 
 serde = "1"
 serde_json = "1"

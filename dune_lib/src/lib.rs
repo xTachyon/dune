@@ -3,11 +3,15 @@ use crate::protocol::PacketDirection;
 use anyhow::bail;
 use anyhow::Result;
 use protocol::de::MemoryExt;
+use slice_ring_buffer::SliceRingBuffer;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
+use std::io;
 use std::io::Write;
+use std::ops::Deref;
+use std::ops::DerefMut;
 
 pub mod chat;
 pub mod client;
@@ -15,7 +19,7 @@ mod data;
 pub mod events;
 mod game;
 pub mod nbt;
-pub mod play;
+pub mod replay;
 pub mod protocol;
 pub mod record;
 pub mod world;
@@ -86,5 +90,38 @@ impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
             Some(x) => Ok(x),
             None => bail!("unknown key `{:?}`", key),
         }
+    }
+}
+
+pub(crate) struct Buffer(SliceRingBuffer<u8>);
+impl Buffer {
+    fn new() -> Buffer {
+        Buffer(SliceRingBuffer::new())
+    }
+    fn advance(&mut self, size: usize) {
+        let truncate_to = self.len() - size;
+        self.truncate_front(truncate_to);
+    }
+}
+impl Write for Buffer {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+impl Deref for Buffer {
+    type Target = SliceRingBuffer<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Buffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

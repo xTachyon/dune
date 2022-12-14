@@ -366,6 +366,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha1",
+ "slice-ring-buffer",
  "ureq",
 ]
 
@@ -536,6 +537,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6389c490849ff5bc16be905ae24bc913a9c8892e19b2341dbc175e14c341c2b8"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "mach"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -908,6 +918,17 @@ dependencies = [
  "atty",
  "colored",
  "log",
+ "winapi",
+]
+
+[[package]]
+name = "slice-ring-buffer"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc8eb449302fd7a6672a999c6846311a43865aaec54083948b911829a20d893"
+dependencies = [
+ "libc",
+ "mach",
  "winapi",
 ]
 

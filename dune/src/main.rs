@@ -13,7 +13,7 @@ use clap::Parser;
 use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, UseEntityKind};
 use dune_lib::nbt::Tag;
-use dune_lib::play::play;
+use dune_lib::replay::play;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
 use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};

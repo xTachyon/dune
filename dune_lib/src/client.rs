@@ -14,21 +14,21 @@ use std::net::{SocketAddr, TcpStream};
 // }
 // impl Client {
 // }
-fn send_packet<'x, P: MD<'x>>(
-    mut writer: &mut Vec<u8>,
+fn send_packet<'x, P: MD<'x>, W: Write>(
+    mut writer: &mut W,
     packet: P,
     tmp: &mut Vec<u8>,
 ) -> Result<()> {
     tmp.clear();
+    
     packet.serialize(tmp)?;
-
     write_varint(&mut writer, tmp.len() as u32)?;
-    writer.extend_from_slice(tmp);
+    writer.write_all(tmp)?;
 
     Ok(())
 }
 
-fn send_start(writer: &mut Vec<u8>) -> Result<()> {
+fn send_start<W: Write>(writer: &mut W) -> Result<()> {
     let mut tmp = Vec::new();
 
     let p = SetProtocolRequest {
@@ -69,13 +69,12 @@ pub fn run(addr: SocketAddr) -> Result<()> {
                 if read == 0 {
                     return Ok(());
                 }
-                println!("{:?}", &buffer[..read]);
                 session.read(&buffer[..read]);
             }
 
             if ev.writable {
                 let wrote = socket.write(&session.write_buf)?;
-                session.write_buf.drain(..wrote);
+                session.write_buf.advance(wrote);
             }
         }
 
