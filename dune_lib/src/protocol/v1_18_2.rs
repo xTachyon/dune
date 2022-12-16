@@ -4598,667 +4598,667 @@ pub fn de_packets<'r>(
     use PacketDirection as D;
 
     let packet = match (state, direction, id) {
-        (S::Handshaking, D::ClientToServer, 0x0) => {
+        (S::Handshaking, D::C2S, 0x0) => {
             let p = handshaking::SetProtocolRequest::deserialize(reader)?;
             Packet::SetProtocolRequest(p)
         }
-        (S::Handshaking, D::ClientToServer, 0xfe) => {
+        (S::Handshaking, D::C2S, 0xfe) => {
             let p = handshaking::LegacyServerListPingRequest::deserialize(reader)?;
             Packet::LegacyServerListPingRequest(p)
         }
-        (S::Status, D::ClientToServer, 0x0) => {
+        (S::Status, D::C2S, 0x0) => {
             let p = status::PingStartRequest::deserialize(reader)?;
             Packet::PingStartRequest(p)
         }
-        (S::Status, D::ClientToServer, 0x1) => {
+        (S::Status, D::C2S, 0x1) => {
             let p = status::PingRequest::deserialize(reader)?;
             Packet::PingRequest(p)
         }
-        (S::Status, D::ServerToClient, 0x0) => {
+        (S::Status, D::S2C, 0x0) => {
             let p = status::ServerInfoResponse::deserialize(reader)?;
             Packet::ServerInfoResponse(p)
         }
-        (S::Status, D::ServerToClient, 0x1) => {
+        (S::Status, D::S2C, 0x1) => {
             let p = status::PingResponse::deserialize(reader)?;
             Packet::PingResponse(p)
         }
-        (S::Login, D::ClientToServer, 0x0) => {
+        (S::Login, D::C2S, 0x0) => {
             let p = login::LoginStartRequest::deserialize(reader)?;
             Packet::LoginStartRequest(p)
         }
-        (S::Login, D::ClientToServer, 0x1) => {
+        (S::Login, D::C2S, 0x1) => {
             let p = login::EncryptionBeginRequest::deserialize(reader)?;
             Packet::EncryptionBeginRequest(p)
         }
-        (S::Login, D::ClientToServer, 0x2) => {
+        (S::Login, D::C2S, 0x2) => {
             let p = login::LoginPluginResponse::deserialize(reader)?;
             Packet::LoginPluginResponse(p)
         }
-        (S::Login, D::ServerToClient, 0x0) => {
+        (S::Login, D::S2C, 0x0) => {
             let p = login::DisconnectResponse::deserialize(reader)?;
             Packet::DisconnectResponse(p)
         }
-        (S::Login, D::ServerToClient, 0x1) => {
+        (S::Login, D::S2C, 0x1) => {
             let p = login::EncryptionBeginResponse::deserialize(reader)?;
             Packet::EncryptionBeginResponse(p)
         }
-        (S::Login, D::ServerToClient, 0x2) => {
+        (S::Login, D::S2C, 0x2) => {
             let p = login::SuccessResponse::deserialize(reader)?;
             Packet::SuccessResponse(p)
         }
-        (S::Login, D::ServerToClient, 0x3) => {
+        (S::Login, D::S2C, 0x3) => {
             let p = login::CompressResponse::deserialize(reader)?;
             Packet::CompressResponse(p)
         }
-        (S::Login, D::ServerToClient, 0x4) => {
+        (S::Login, D::S2C, 0x4) => {
             let p = login::LoginPluginRequest::deserialize(reader)?;
             Packet::LoginPluginRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x0) => {
+        (S::Play, D::C2S, 0x0) => {
             let p = play::TeleportConfirmRequest::deserialize(reader)?;
             Packet::TeleportConfirmRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1) => {
+        (S::Play, D::C2S, 0x1) => {
             let p = play::QueryBlockNbtRequest::deserialize(reader)?;
             Packet::QueryBlockNbtRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2) => {
+        (S::Play, D::C2S, 0x2) => {
             let p = play::SetDifficultyRequest::deserialize(reader)?;
             Packet::SetDifficultyRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x3) => {
+        (S::Play, D::C2S, 0x3) => {
             let p = play::ChatRequest::deserialize(reader)?;
             Packet::ChatRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x4) => {
+        (S::Play, D::C2S, 0x4) => {
             let p = play::ClientCommandRequest::deserialize(reader)?;
             Packet::ClientCommandRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x5) => {
+        (S::Play, D::C2S, 0x5) => {
             let p = play::SettingsRequest::deserialize(reader)?;
             Packet::SettingsRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x6) => {
+        (S::Play, D::C2S, 0x6) => {
             let p = play::TabCompleteRequest::deserialize(reader)?;
             Packet::TabCompleteRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x7) => {
+        (S::Play, D::C2S, 0x7) => {
             let p = play::EnchantItemRequest::deserialize(reader)?;
             Packet::EnchantItemRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x8) => {
+        (S::Play, D::C2S, 0x8) => {
             let p = play::WindowClickRequest::deserialize(reader)?;
             Packet::WindowClickRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x9) => {
+        (S::Play, D::C2S, 0x9) => {
             let p = play::CloseWindowRequest::deserialize(reader)?;
             Packet::CloseWindowRequest(p)
         }
-        (S::Play, D::ClientToServer, 0xa) => {
+        (S::Play, D::C2S, 0xa) => {
             let p = play::CustomPayloadRequest::deserialize(reader)?;
             Packet::CustomPayloadRequest(p)
         }
-        (S::Play, D::ClientToServer, 0xb) => {
+        (S::Play, D::C2S, 0xb) => {
             let p = play::EditBookRequest::deserialize(reader)?;
             Packet::EditBookRequest(p)
         }
-        (S::Play, D::ClientToServer, 0xc) => {
+        (S::Play, D::C2S, 0xc) => {
             let p = play::QueryEntityNbtRequest::deserialize(reader)?;
             Packet::QueryEntityNbtRequest(p)
         }
-        (S::Play, D::ClientToServer, 0xd) => {
+        (S::Play, D::C2S, 0xd) => {
             let p = play::UseEntityRequest::deserialize(reader)?;
             Packet::UseEntityRequest(p)
         }
-        (S::Play, D::ClientToServer, 0xe) => {
+        (S::Play, D::C2S, 0xe) => {
             let p = play::GenerateStructureRequest::deserialize(reader)?;
             Packet::GenerateStructureRequest(p)
         }
-        (S::Play, D::ClientToServer, 0xf) => {
+        (S::Play, D::C2S, 0xf) => {
             let p = play::KeepAliveRequest::deserialize(reader)?;
             Packet::KeepAliveRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x10) => {
+        (S::Play, D::C2S, 0x10) => {
             let p = play::LockDifficultyRequest::deserialize(reader)?;
             Packet::LockDifficultyRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x11) => {
+        (S::Play, D::C2S, 0x11) => {
             let p = play::PositionRequest::deserialize(reader)?;
             Packet::PositionRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x12) => {
+        (S::Play, D::C2S, 0x12) => {
             let p = play::PositionLookRequest::deserialize(reader)?;
             Packet::PositionLookRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x13) => {
+        (S::Play, D::C2S, 0x13) => {
             let p = play::LookRequest::deserialize(reader)?;
             Packet::LookRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x14) => {
+        (S::Play, D::C2S, 0x14) => {
             let p = play::FlyingRequest::deserialize(reader)?;
             Packet::FlyingRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x15) => {
+        (S::Play, D::C2S, 0x15) => {
             let p = play::VehicleMoveRequest::deserialize(reader)?;
             Packet::VehicleMoveRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x16) => {
+        (S::Play, D::C2S, 0x16) => {
             let p = play::SteerBoatRequest::deserialize(reader)?;
             Packet::SteerBoatRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x17) => {
+        (S::Play, D::C2S, 0x17) => {
             let p = play::PickItemRequest::deserialize(reader)?;
             Packet::PickItemRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x18) => {
+        (S::Play, D::C2S, 0x18) => {
             let p = play::CraftRecipeRequest::deserialize(reader)?;
             Packet::CraftRecipeRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x19) => {
+        (S::Play, D::C2S, 0x19) => {
             let p = play::AbilitiesRequest::deserialize(reader)?;
             Packet::AbilitiesRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1a) => {
+        (S::Play, D::C2S, 0x1a) => {
             let p = play::BlockDigRequest::deserialize(reader)?;
             Packet::BlockDigRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1b) => {
+        (S::Play, D::C2S, 0x1b) => {
             let p = play::EntityActionRequest::deserialize(reader)?;
             Packet::EntityActionRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1c) => {
+        (S::Play, D::C2S, 0x1c) => {
             let p = play::SteerVehicleRequest::deserialize(reader)?;
             Packet::SteerVehicleRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1d) => {
+        (S::Play, D::C2S, 0x1d) => {
             let p = play::PongRequest::deserialize(reader)?;
             Packet::PongRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1e) => {
+        (S::Play, D::C2S, 0x1e) => {
             let p = play::RecipeBookRequest::deserialize(reader)?;
             Packet::RecipeBookRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x1f) => {
+        (S::Play, D::C2S, 0x1f) => {
             let p = play::DisplayedRecipeRequest::deserialize(reader)?;
             Packet::DisplayedRecipeRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x20) => {
+        (S::Play, D::C2S, 0x20) => {
             let p = play::NameItemRequest::deserialize(reader)?;
             Packet::NameItemRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x21) => {
+        (S::Play, D::C2S, 0x21) => {
             let p = play::ResourcePackReceiveRequest::deserialize(reader)?;
             Packet::ResourcePackReceiveRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x22) => {
+        (S::Play, D::C2S, 0x22) => {
             let p = play::AdvancementTabRequest::deserialize(reader)?;
             Packet::AdvancementTabRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x23) => {
+        (S::Play, D::C2S, 0x23) => {
             let p = play::SelectTradeRequest::deserialize(reader)?;
             Packet::SelectTradeRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x24) => {
+        (S::Play, D::C2S, 0x24) => {
             let p = play::SetBeaconEffectRequest::deserialize(reader)?;
             Packet::SetBeaconEffectRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x25) => {
+        (S::Play, D::C2S, 0x25) => {
             let p = play::HeldItemSlotRequest::deserialize(reader)?;
             Packet::HeldItemSlotRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x26) => {
+        (S::Play, D::C2S, 0x26) => {
             let p = play::UpdateCommandBlockRequest::deserialize(reader)?;
             Packet::UpdateCommandBlockRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x27) => {
+        (S::Play, D::C2S, 0x27) => {
             let p = play::UpdateCommandBlockMinecartRequest::deserialize(reader)?;
             Packet::UpdateCommandBlockMinecartRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x28) => {
+        (S::Play, D::C2S, 0x28) => {
             let p = play::SetCreativeSlotRequest::deserialize(reader)?;
             Packet::SetCreativeSlotRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x29) => {
+        (S::Play, D::C2S, 0x29) => {
             let p = play::UpdateJigsawBlockRequest::deserialize(reader)?;
             Packet::UpdateJigsawBlockRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2a) => {
+        (S::Play, D::C2S, 0x2a) => {
             let p = play::UpdateStructureBlockRequest::deserialize(reader)?;
             Packet::UpdateStructureBlockRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2b) => {
+        (S::Play, D::C2S, 0x2b) => {
             let p = play::UpdateSignRequest::deserialize(reader)?;
             Packet::UpdateSignRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2c) => {
+        (S::Play, D::C2S, 0x2c) => {
             let p = play::ArmAnimationRequest::deserialize(reader)?;
             Packet::ArmAnimationRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2d) => {
+        (S::Play, D::C2S, 0x2d) => {
             let p = play::SpectateRequest::deserialize(reader)?;
             Packet::SpectateRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2e) => {
+        (S::Play, D::C2S, 0x2e) => {
             let p = play::BlockPlaceRequest::deserialize(reader)?;
             Packet::BlockPlaceRequest(p)
         }
-        (S::Play, D::ClientToServer, 0x2f) => {
+        (S::Play, D::C2S, 0x2f) => {
             let p = play::UseItemRequest::deserialize(reader)?;
             Packet::UseItemRequest(p)
         }
-        (S::Play, D::ServerToClient, 0x0) => {
+        (S::Play, D::S2C, 0x0) => {
             let p = play::SpawnEntityResponse::deserialize(reader)?;
             Packet::SpawnEntityResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1) => {
+        (S::Play, D::S2C, 0x1) => {
             let p = play::SpawnEntityExperienceOrbResponse::deserialize(reader)?;
             Packet::SpawnEntityExperienceOrbResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2) => {
+        (S::Play, D::S2C, 0x2) => {
             let p = play::SpawnEntityLivingResponse::deserialize(reader)?;
             Packet::SpawnEntityLivingResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3) => {
+        (S::Play, D::S2C, 0x3) => {
             let p = play::SpawnEntityPaintingResponse::deserialize(reader)?;
             Packet::SpawnEntityPaintingResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4) => {
+        (S::Play, D::S2C, 0x4) => {
             let p = play::NamedEntitySpawnResponse::deserialize(reader)?;
             Packet::NamedEntitySpawnResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5) => {
+        (S::Play, D::S2C, 0x5) => {
             let p = play::SculkVibrationSignalResponse::deserialize(reader)?;
             Packet::SculkVibrationSignalResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x6) => {
+        (S::Play, D::S2C, 0x6) => {
             let p = play::AnimationResponse::deserialize(reader)?;
             Packet::AnimationResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x7) => {
+        (S::Play, D::S2C, 0x7) => {
             let p = play::StatisticsResponse::deserialize(reader)?;
             Packet::StatisticsResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x8) => {
+        (S::Play, D::S2C, 0x8) => {
             let p = play::AcknowledgePlayerDiggingResponse::deserialize(reader)?;
             Packet::AcknowledgePlayerDiggingResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x9) => {
+        (S::Play, D::S2C, 0x9) => {
             let p = play::BlockBreakAnimationResponse::deserialize(reader)?;
             Packet::BlockBreakAnimationResponse(p)
         }
-        (S::Play, D::ServerToClient, 0xa) => {
+        (S::Play, D::S2C, 0xa) => {
             let p = play::TileEntityDataResponse::deserialize(reader)?;
             Packet::TileEntityDataResponse(p)
         }
-        (S::Play, D::ServerToClient, 0xb) => {
+        (S::Play, D::S2C, 0xb) => {
             let p = play::BlockActionResponse::deserialize(reader)?;
             Packet::BlockActionResponse(p)
         }
-        (S::Play, D::ServerToClient, 0xc) => {
+        (S::Play, D::S2C, 0xc) => {
             let p = play::BlockChangeResponse::deserialize(reader)?;
             Packet::BlockChangeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0xd) => {
+        (S::Play, D::S2C, 0xd) => {
             let p = play::BossBarResponse::deserialize(reader)?;
             Packet::BossBarResponse(p)
         }
-        (S::Play, D::ServerToClient, 0xe) => {
+        (S::Play, D::S2C, 0xe) => {
             let p = play::DifficultyResponse::deserialize(reader)?;
             Packet::DifficultyResponse(p)
         }
-        (S::Play, D::ServerToClient, 0xf) => {
+        (S::Play, D::S2C, 0xf) => {
             let p = play::ChatResponse::deserialize(reader)?;
             Packet::ChatResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x10) => {
+        (S::Play, D::S2C, 0x10) => {
             let p = play::ClearTitlesResponse::deserialize(reader)?;
             Packet::ClearTitlesResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x11) => {
+        (S::Play, D::S2C, 0x11) => {
             let p = play::TabCompleteResponse::deserialize(reader)?;
             Packet::TabCompleteResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x12) => {
+        (S::Play, D::S2C, 0x12) => {
             let p = play::DeclareCommandsResponse::deserialize(reader)?;
             Packet::DeclareCommandsResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x13) => {
+        (S::Play, D::S2C, 0x13) => {
             let p = play::CloseWindowResponse::deserialize(reader)?;
             Packet::CloseWindowResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x14) => {
+        (S::Play, D::S2C, 0x14) => {
             let p = play::WindowItemsResponse::deserialize(reader)?;
             Packet::WindowItemsResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x15) => {
+        (S::Play, D::S2C, 0x15) => {
             let p = play::CraftProgressBarResponse::deserialize(reader)?;
             Packet::CraftProgressBarResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x16) => {
+        (S::Play, D::S2C, 0x16) => {
             let p = play::SetSlotResponse::deserialize(reader)?;
             Packet::SetSlotResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x17) => {
+        (S::Play, D::S2C, 0x17) => {
             let p = play::SetCooldownResponse::deserialize(reader)?;
             Packet::SetCooldownResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x18) => {
+        (S::Play, D::S2C, 0x18) => {
             let p = play::CustomPayloadResponse::deserialize(reader)?;
             Packet::CustomPayloadResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x19) => {
+        (S::Play, D::S2C, 0x19) => {
             let p = play::NamedSoundEffectResponse::deserialize(reader)?;
             Packet::NamedSoundEffectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1a) => {
+        (S::Play, D::S2C, 0x1a) => {
             let p = play::KickDisconnectResponse::deserialize(reader)?;
             Packet::KickDisconnectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1b) => {
+        (S::Play, D::S2C, 0x1b) => {
             let p = play::EntityStatusResponse::deserialize(reader)?;
             Packet::EntityStatusResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1c) => {
+        (S::Play, D::S2C, 0x1c) => {
             let p = play::ExplosionResponse::deserialize(reader)?;
             Packet::ExplosionResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1d) => {
+        (S::Play, D::S2C, 0x1d) => {
             let p = play::UnloadChunkResponse::deserialize(reader)?;
             Packet::UnloadChunkResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1e) => {
+        (S::Play, D::S2C, 0x1e) => {
             let p = play::GameStateChangeResponse::deserialize(reader)?;
             Packet::GameStateChangeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x1f) => {
+        (S::Play, D::S2C, 0x1f) => {
             let p = play::OpenHorseWindowResponse::deserialize(reader)?;
             Packet::OpenHorseWindowResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x20) => {
+        (S::Play, D::S2C, 0x20) => {
             let p = play::InitializeWorldBorderResponse::deserialize(reader)?;
             Packet::InitializeWorldBorderResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x21) => {
+        (S::Play, D::S2C, 0x21) => {
             let p = play::KeepAliveResponse::deserialize(reader)?;
             Packet::KeepAliveResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x22) => {
+        (S::Play, D::S2C, 0x22) => {
             let p = play::MapChunkResponse::deserialize(reader)?;
             Packet::MapChunkResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x23) => {
+        (S::Play, D::S2C, 0x23) => {
             let p = play::WorldEventResponse::deserialize(reader)?;
             Packet::WorldEventResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x24) => {
+        (S::Play, D::S2C, 0x24) => {
             let p = play::WorldParticlesResponse::deserialize(reader)?;
             Packet::WorldParticlesResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x25) => {
+        (S::Play, D::S2C, 0x25) => {
             let p = play::UpdateLightResponse::deserialize(reader)?;
             Packet::UpdateLightResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x26) => {
+        (S::Play, D::S2C, 0x26) => {
             let p = play::LoginResponse::deserialize(reader)?;
             Packet::LoginResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x27) => {
+        (S::Play, D::S2C, 0x27) => {
             let p = play::MapResponse::deserialize(reader)?;
             Packet::MapResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x28) => {
+        (S::Play, D::S2C, 0x28) => {
             let p = play::TradeListResponse::deserialize(reader)?;
             Packet::TradeListResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x29) => {
+        (S::Play, D::S2C, 0x29) => {
             let p = play::RelEntityMoveResponse::deserialize(reader)?;
             Packet::RelEntityMoveResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2a) => {
+        (S::Play, D::S2C, 0x2a) => {
             let p = play::EntityMoveLookResponse::deserialize(reader)?;
             Packet::EntityMoveLookResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2b) => {
+        (S::Play, D::S2C, 0x2b) => {
             let p = play::EntityLookResponse::deserialize(reader)?;
             Packet::EntityLookResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2c) => {
+        (S::Play, D::S2C, 0x2c) => {
             let p = play::VehicleMoveResponse::deserialize(reader)?;
             Packet::VehicleMoveResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2d) => {
+        (S::Play, D::S2C, 0x2d) => {
             let p = play::OpenBookResponse::deserialize(reader)?;
             Packet::OpenBookResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2e) => {
+        (S::Play, D::S2C, 0x2e) => {
             let p = play::OpenWindowResponse::deserialize(reader)?;
             Packet::OpenWindowResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x2f) => {
+        (S::Play, D::S2C, 0x2f) => {
             let p = play::OpenSignEntityResponse::deserialize(reader)?;
             Packet::OpenSignEntityResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x30) => {
+        (S::Play, D::S2C, 0x30) => {
             let p = play::PlayPingResponse::deserialize(reader)?;
             Packet::PlayPingResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x31) => {
+        (S::Play, D::S2C, 0x31) => {
             let p = play::CraftRecipeResponse::deserialize(reader)?;
             Packet::CraftRecipeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x32) => {
+        (S::Play, D::S2C, 0x32) => {
             let p = play::AbilitiesResponse::deserialize(reader)?;
             Packet::AbilitiesResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x33) => {
+        (S::Play, D::S2C, 0x33) => {
             let p = play::EndCombatEventResponse::deserialize(reader)?;
             Packet::EndCombatEventResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x34) => {
+        (S::Play, D::S2C, 0x34) => {
             let p = play::EnterCombatEventResponse::deserialize(reader)?;
             Packet::EnterCombatEventResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x35) => {
+        (S::Play, D::S2C, 0x35) => {
             let p = play::DeathCombatEventResponse::deserialize(reader)?;
             Packet::DeathCombatEventResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x36) => {
+        (S::Play, D::S2C, 0x36) => {
             let p = play::PlayerInfoResponse::deserialize(reader)?;
             Packet::PlayerInfoResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x37) => {
+        (S::Play, D::S2C, 0x37) => {
             let p = play::FacePlayerResponse::deserialize(reader)?;
             Packet::FacePlayerResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x38) => {
+        (S::Play, D::S2C, 0x38) => {
             let p = play::PositionResponse::deserialize(reader)?;
             Packet::PositionResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x39) => {
+        (S::Play, D::S2C, 0x39) => {
             let p = play::UnlockRecipesResponse::deserialize(reader)?;
             Packet::UnlockRecipesResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3a) => {
+        (S::Play, D::S2C, 0x3a) => {
             let p = play::EntityDestroyResponse::deserialize(reader)?;
             Packet::EntityDestroyResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3b) => {
+        (S::Play, D::S2C, 0x3b) => {
             let p = play::RemoveEntityEffectResponse::deserialize(reader)?;
             Packet::RemoveEntityEffectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3c) => {
+        (S::Play, D::S2C, 0x3c) => {
             let p = play::ResourcePackSendResponse::deserialize(reader)?;
             Packet::ResourcePackSendResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3d) => {
+        (S::Play, D::S2C, 0x3d) => {
             let p = play::RespawnResponse::deserialize(reader)?;
             Packet::RespawnResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3e) => {
+        (S::Play, D::S2C, 0x3e) => {
             let p = play::EntityHeadRotationResponse::deserialize(reader)?;
             Packet::EntityHeadRotationResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x3f) => {
+        (S::Play, D::S2C, 0x3f) => {
             let p = play::MultiBlockChangeResponse::deserialize(reader)?;
             Packet::MultiBlockChangeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x40) => {
+        (S::Play, D::S2C, 0x40) => {
             let p = play::SelectAdvancementTabResponse::deserialize(reader)?;
             Packet::SelectAdvancementTabResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x41) => {
+        (S::Play, D::S2C, 0x41) => {
             let p = play::ActionBarResponse::deserialize(reader)?;
             Packet::ActionBarResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x42) => {
+        (S::Play, D::S2C, 0x42) => {
             let p = play::WorldBorderCenterResponse::deserialize(reader)?;
             Packet::WorldBorderCenterResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x43) => {
+        (S::Play, D::S2C, 0x43) => {
             let p = play::WorldBorderLerpSizeResponse::deserialize(reader)?;
             Packet::WorldBorderLerpSizeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x44) => {
+        (S::Play, D::S2C, 0x44) => {
             let p = play::WorldBorderSizeResponse::deserialize(reader)?;
             Packet::WorldBorderSizeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x45) => {
+        (S::Play, D::S2C, 0x45) => {
             let p = play::WorldBorderWarningDelayResponse::deserialize(reader)?;
             Packet::WorldBorderWarningDelayResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x46) => {
+        (S::Play, D::S2C, 0x46) => {
             let p = play::WorldBorderWarningReachResponse::deserialize(reader)?;
             Packet::WorldBorderWarningReachResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x47) => {
+        (S::Play, D::S2C, 0x47) => {
             let p = play::CameraResponse::deserialize(reader)?;
             Packet::CameraResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x48) => {
+        (S::Play, D::S2C, 0x48) => {
             let p = play::HeldItemSlotResponse::deserialize(reader)?;
             Packet::HeldItemSlotResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x49) => {
+        (S::Play, D::S2C, 0x49) => {
             let p = play::UpdateViewPositionResponse::deserialize(reader)?;
             Packet::UpdateViewPositionResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4a) => {
+        (S::Play, D::S2C, 0x4a) => {
             let p = play::UpdateViewDistanceResponse::deserialize(reader)?;
             Packet::UpdateViewDistanceResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4b) => {
+        (S::Play, D::S2C, 0x4b) => {
             let p = play::SpawnPositionResponse::deserialize(reader)?;
             Packet::SpawnPositionResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4c) => {
+        (S::Play, D::S2C, 0x4c) => {
             let p = play::ScoreboardDisplayObjectiveResponse::deserialize(reader)?;
             Packet::ScoreboardDisplayObjectiveResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4d) => {
+        (S::Play, D::S2C, 0x4d) => {
             let p = play::EntityMetadataResponse::deserialize(reader)?;
             Packet::EntityMetadataResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4e) => {
+        (S::Play, D::S2C, 0x4e) => {
             let p = play::AttachEntityResponse::deserialize(reader)?;
             Packet::AttachEntityResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x4f) => {
+        (S::Play, D::S2C, 0x4f) => {
             let p = play::EntityVelocityResponse::deserialize(reader)?;
             Packet::EntityVelocityResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x50) => {
+        (S::Play, D::S2C, 0x50) => {
             let p = play::EntityEquipmentResponse::deserialize(reader)?;
             Packet::EntityEquipmentResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x51) => {
+        (S::Play, D::S2C, 0x51) => {
             let p = play::ExperienceResponse::deserialize(reader)?;
             Packet::ExperienceResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x52) => {
+        (S::Play, D::S2C, 0x52) => {
             let p = play::UpdateHealthResponse::deserialize(reader)?;
             Packet::UpdateHealthResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x53) => {
+        (S::Play, D::S2C, 0x53) => {
             let p = play::ScoreboardObjectiveResponse::deserialize(reader)?;
             Packet::ScoreboardObjectiveResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x54) => {
+        (S::Play, D::S2C, 0x54) => {
             let p = play::SetPassengersResponse::deserialize(reader)?;
             Packet::SetPassengersResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x55) => {
+        (S::Play, D::S2C, 0x55) => {
             let p = play::TeamsResponse::deserialize(reader)?;
             Packet::TeamsResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x56) => {
+        (S::Play, D::S2C, 0x56) => {
             let p = play::ScoreboardScoreResponse::deserialize(reader)?;
             Packet::ScoreboardScoreResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x57) => {
+        (S::Play, D::S2C, 0x57) => {
             let p = play::SimulationDistanceResponse::deserialize(reader)?;
             Packet::SimulationDistanceResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x58) => {
+        (S::Play, D::S2C, 0x58) => {
             let p = play::SetTitleSubtitleResponse::deserialize(reader)?;
             Packet::SetTitleSubtitleResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x59) => {
+        (S::Play, D::S2C, 0x59) => {
             let p = play::UpdateTimeResponse::deserialize(reader)?;
             Packet::UpdateTimeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5a) => {
+        (S::Play, D::S2C, 0x5a) => {
             let p = play::SetTitleTextResponse::deserialize(reader)?;
             Packet::SetTitleTextResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5b) => {
+        (S::Play, D::S2C, 0x5b) => {
             let p = play::SetTitleTimeResponse::deserialize(reader)?;
             Packet::SetTitleTimeResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5c) => {
+        (S::Play, D::S2C, 0x5c) => {
             let p = play::EntitySoundEffectResponse::deserialize(reader)?;
             Packet::EntitySoundEffectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5d) => {
+        (S::Play, D::S2C, 0x5d) => {
             let p = play::SoundEffectResponse::deserialize(reader)?;
             Packet::SoundEffectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5e) => {
+        (S::Play, D::S2C, 0x5e) => {
             let p = play::StopSoundResponse::deserialize(reader)?;
             Packet::StopSoundResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x5f) => {
+        (S::Play, D::S2C, 0x5f) => {
             let p = play::PlayerlistHeaderResponse::deserialize(reader)?;
             Packet::PlayerlistHeaderResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x60) => {
+        (S::Play, D::S2C, 0x60) => {
             let p = play::NbtQueryResponse::deserialize(reader)?;
             Packet::NbtQueryResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x61) => {
+        (S::Play, D::S2C, 0x61) => {
             let p = play::CollectResponse::deserialize(reader)?;
             Packet::CollectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x62) => {
+        (S::Play, D::S2C, 0x62) => {
             let p = play::EntityTeleportResponse::deserialize(reader)?;
             Packet::EntityTeleportResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x63) => {
+        (S::Play, D::S2C, 0x63) => {
             let p = play::AdvancementsResponse::deserialize(reader)?;
             Packet::AdvancementsResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x64) => {
+        (S::Play, D::S2C, 0x64) => {
             let p = play::EntityUpdateAttributesResponse::deserialize(reader)?;
             Packet::EntityUpdateAttributesResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x65) => {
+        (S::Play, D::S2C, 0x65) => {
             let p = play::EntityEffectResponse::deserialize(reader)?;
             Packet::EntityEffectResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x66) => {
+        (S::Play, D::S2C, 0x66) => {
             let p = play::DeclareRecipesResponse::deserialize(reader)?;
             Packet::DeclareRecipesResponse(p)
         }
-        (S::Play, D::ServerToClient, 0x67) => {
+        (S::Play, D::S2C, 0x67) => {
             let p = play::TagsResponse::deserialize(reader)?;
             Packet::TagsResponse(p)
         }

@@ -317,9 +317,7 @@ pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u3
 ";
 
     for state in states {
-        for (direction, direction_string) in
-            [(state.c2s, "ClientToServer"), (state.s2c, "ServerToClient")]
-        {
+        for (direction, direction_string) in [(state.c2s, "C2S"), (state.s2c, "S2C")] {
             let mut packets: Vec<Packet> = direction.packets.into_iter().collect();
             packets.sort_unstable_by_key(|x| x.id);
 

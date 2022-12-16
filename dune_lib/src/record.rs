@@ -262,8 +262,8 @@ impl Proxy {
         direction: PacketDirection,
     ) -> Result<()> {
         match direction {
-            PacketDirection::ClientToServer => self.forward(client, server, buf, direction),
-            PacketDirection::ServerToClient => self.forward(server, client, buf, direction),
+            PacketDirection::C2S => self.forward(client, server, buf, direction),
+            PacketDirection::S2C => self.forward(server, client, buf, direction),
         }
     }
 }
@@ -304,15 +304,9 @@ fn run(
         for ev in &events {
             if ev.readable {
                 let (read, direction) = if ev.key == CLIENT_KEY {
-                    (
-                        client_socket.read(&mut buffer)?,
-                        PacketDirection::ClientToServer,
-                    )
+                    (client_socket.read(&mut buffer)?, PacketDirection::C2S)
                 } else {
-                    (
-                        server_socket.read(&mut buffer)?,
-                        PacketDirection::ServerToClient,
-                    )
+                    (server_socket.read(&mut buffer)?, PacketDirection::S2C)
                 };
                 // println!("{:?}: {}", direction, read);
                 if read == 0 {

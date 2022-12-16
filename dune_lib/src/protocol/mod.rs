@@ -22,8 +22,8 @@ pub enum ConnectionState {
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, TryFromPrimitive)]
 pub enum PacketDirection {
-    ClientToServer,
-    ServerToClient,
+    C2S,
+    S2C,
 }
 
 #[derive(Debug)]

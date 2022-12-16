@@ -143,7 +143,7 @@ fn read_packet(
         };
     let mut data = packet_data.get_data(&reader.buffer, &reader.tmp);
     let packet = protocol::just_deserialize(
-        PacketDirection::ServerToClient,
+        PacketDirection::S2C,
         client.state,
         packet_data.id,
         &mut data,
