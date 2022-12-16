@@ -16,7 +16,7 @@ use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
+pub(crate) type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
 pub(crate) struct Encryption {
     enc: Aes128Cfb8,

@@ -18,6 +18,11 @@ const LANG_ENG: &[LangFormat] = &[
         no_of_captures: 2,
     },
     LangFormat {
+        name: "chat.type.announcement",
+        format: "[%s] %s",
+        no_of_captures: 2,
+    },
+    LangFormat {
         name: "multiplayer.player.joined",
         format: "%s joined the game",
         no_of_captures: 1,

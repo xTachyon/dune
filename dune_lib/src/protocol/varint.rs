@@ -47,6 +47,32 @@ pub(crate) fn read_varlong<R: Read>(reader: &mut R) -> Result<i64> {
     Ok(result as i64)
 }
 
+#[derive(Default)]
+pub(crate) struct VarintSerialized {
+    pub(crate) buffer: [u8; 5],
+    pub(crate) size: usize,
+}
+
+pub(crate) fn write_varint_serialize(mut value: u32) -> VarintSerialized {
+    let mut buffer = [0; 5];
+    let mut size = 0;
+    loop {
+        let mut temp = (value & 0b01111111) as u8;
+        value >>= 7;
+        if value != 0 {
+            temp |= 0b10000000;
+        }
+        buffer[size] = temp;
+        size += 1;
+
+        if value == 0 {
+            break;
+        }
+    }
+
+    VarintSerialized { buffer, size }
+}
+
 pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<u32> {
     let mut count = 0;
     loop {

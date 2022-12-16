@@ -95,6 +95,7 @@ impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct Buffer(SliceRingBuffer<u8>);
 impl Buffer {
     fn new() -> Buffer {
