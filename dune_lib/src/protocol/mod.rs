@@ -57,7 +57,7 @@ pub(crate) fn read_packet_info<'r>(
     buffer: &'r [u8],
     tmp: &'r mut Vec<u8>,
     mut compression: bool,
-) -> Result<Option<PacketData>> {
+) -> Result<Option<PacketData<'r>>> {
     if !has_enough_bytes(buffer) {
         return Ok(None);
     }
