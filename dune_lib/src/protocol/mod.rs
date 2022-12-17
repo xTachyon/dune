@@ -88,8 +88,8 @@ pub(crate) fn read_packet_info<'r>(
 }
 
 pub fn just_deserialize<'r>(
-    direction: PacketDirection,
     state: ConnectionState,
+    direction: PacketDirection,
     id: u32,
     reader: &mut &'r [u8],
 ) -> Result<Packet<'r>> {

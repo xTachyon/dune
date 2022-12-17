@@ -58,17 +58,15 @@ impl Proxy {
         &mut self,
         src_reader: &'p mut ClientReader,
         src_writer: &mut ClientWriter,
-        offset: usize,
         direction: PacketDirection,
     ) -> Result<Option<OnStartResult<'p>>> {
-        let src = &src_reader.buffer[offset..];
         let packet_data =
-            match protocol::read_packet_info(src, &mut src_reader.tmp, self.compression)? {
+            match protocol::read_packet_info(&src_reader.buffer, &mut src_reader.tmp, self.compression)? {
                 Some(x) => x,
                 None => return Ok(None),
             };
         let mut data = packet_data.data;
-        let packet = protocol::just_deserialize(direction, self.state, packet_data.id, &mut data)?;
+        let packet = protocol::just_deserialize(self.state, direction, packet_data.id, &mut data)?;
 
         println!("{:?}", packet);
         let mut skip = false;
@@ -159,8 +157,7 @@ impl Proxy {
     ) -> Result<()> {
         src_reader.add(buf);
 
-        let mut offset = 0;
-        while let Some(result) = self.on_start(src_reader, src_writer, offset, direction)? {
+        while let Some(result) = self.on_start(src_reader, src_writer, direction)? {
             let packet_data = result.packet_data;
             let data = packet_data.data;
             let total_size_original = packet_data.total_size_original;
@@ -173,12 +170,11 @@ impl Proxy {
                 };
                 disk_packet.write(&mut self.out_file)?;
 
-                let bytes = &src_reader.buffer[offset..offset + total_size_original];
+                let bytes = &src_reader.buffer[..total_size_original];
                 dest.add(bytes);
             }
-            offset += total_size_original;
+            src_reader.buffer.advance(total_size_original);
         }
-        src_reader.buffer.advance(offset);
 
         Ok(())
     }
