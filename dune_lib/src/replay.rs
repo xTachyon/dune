@@ -1,6 +1,6 @@
 use crate::events::{EventSubscriber, Position, UseEntity};
 use crate::protocol::{ConnectionState, Packet};
-use crate::{protocol, DiskPacket};
+use crate::{protocol, Buffer, DiskPacket};
 use anyhow::Result;
 use flate2::read::ZlibDecoder;
 use log::warn;
@@ -69,9 +69,9 @@ impl TrafficPlayer {
     }
 
     fn run(&mut self) -> Result<()> {
-        let mut buffer = Vec::with_capacity(64 * 1024);
-        let mut tmp = [0; 64 * 1024];
-        let mut count = 0;
+        let mut buffer = Buffer::default();
+        let mut tmp = [0; 4096];
+        let mut packet_count = 0u32;
         loop {
             let read = self.reader.read(&mut tmp)?;
             if read == 0 {
@@ -87,12 +87,12 @@ impl TrafficPlayer {
             while DiskPacket::has_enough_bytes(data) {
                 let disk_packet = DiskPacket::read(&mut data)?;
                 if let Err(err) = self.do_packet(disk_packet) {
-                    warn!("{}. {:?}", count, err);
+                    warn!("packet #{}. {:?}", packet_count, err);
                 }
-                count += 1;
+                packet_count += 1;
             }
 
-            buffer.drain(..data.as_ptr() as usize - buffer.as_ptr() as usize);
+            buffer.advance(data.as_ptr() as usize - buffer.as_ptr() as usize);
         }
 
         Ok(())

@@ -119,7 +119,7 @@ impl<'x> MD<'x> for InventorySlot<'x> {
 
         let data = if present {
             let item_id = read_varint(&mut memory)?;
-            let count = MD::deserialize(&mut memory)?;
+            let count = MD::deserialize(memory)?;
             let original = *memory;
 
             let nbt = if nbt::skip_option(&mut memory)? {

@@ -47,39 +47,24 @@ pub struct IndexedNbt<'x> {
     pub nbt: &'x [u8],
 }
 
-pub struct PacketData {
+pub(crate) struct PacketData<'x> {
     pub id: u32,
     pub total_size_original: usize,
-    pub total_size: usize,
-    pub header_size: usize,
-    pub compression: bool,
+    pub data: &'x [u8],
 }
 
-impl PacketData {
-    pub fn get_data<'b>(&self, normal: &'b [u8], tmp: &'b [u8]) -> &'b [u8] {
-        let r = self.header_size..self.total_size;
-        if self.compression {
-            &tmp[r]
-        } else {
-            &normal[r]
-        }
-    }
-}
-
-pub fn read_packet_info<'r>(
+pub(crate) fn read_packet_info<'r>(
     buffer: &'r [u8],
-    mut compression: bool,
     tmp: &'r mut Vec<u8>,
+    mut compression: bool,
 ) -> Result<Option<PacketData>> {
     if !has_enough_bytes(buffer) {
         return Ok(None);
     }
-    let mut original = buffer;
     let mut reader = buffer;
     let (length, length_size) = read_varint_with_size(&mut reader)?;
 
     let total_size_original = length as usize + length_size;
-    let mut total_size = total_size_original;
     if compression {
         let data_length = read_varint(&mut reader)?;
         compression = data_length != 0;
@@ -88,19 +73,15 @@ pub fn read_packet_info<'r>(
 
             let mut decompress = ZlibDecoder::new(&mut reader);
             decompress.read_to_end(tmp)?;
-            reader = &tmp;
-            original = reader;
-            total_size = tmp.len();
+            reader = tmp;
         }
     }
 
     let id = read_varint(&mut reader)? as u32;
     let result = PacketData {
         id,
-        total_size,
         total_size_original,
-        header_size: reader.as_ptr() as usize - original.as_ptr() as usize,
-        compression,
+        data: reader,
     };
 
     Ok(Some(result))

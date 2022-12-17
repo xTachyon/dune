@@ -5,6 +5,7 @@ use crate::protocol::v1_18_2::play::{ChatRequest, KeepAliveRequest};
 use crate::protocol::varint::{write_varint, write_varint_serialize, VarintSerialized};
 use crate::protocol::{self, ConnectionState, Packet, PacketDirection};
 use crate::{chat, Buffer};
+use aes::cipher::AsyncStreamCipher;
 use anyhow::Result;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
@@ -14,22 +15,44 @@ use std::borrow::Borrow;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 
+pub(crate) type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
+
 #[derive(Default)]
-struct ClientWriter {
-    buffer: Buffer,
-    // crypt: Option<Aes128Cfb8>,
+pub(crate) struct ClientReader {
+    pub(crate) buffer: Buffer,
+    pub(crate) crypt: Option<Aes128Cfb8>,
+    pub(crate) tmp: Vec<u8>,
+}
+impl ClientReader {
+    pub(crate) fn add(&mut self, buf: &[u8]) {
+        let offset = self.buffer.len();
+        self.buffer.extend_from_slice(buf);
+
+        if let Some(crypt) = &mut self.crypt {
+            crypt.decrypt(&mut self.buffer[offset..]);
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct ClientWriter {
+    pub(crate) buffer: Buffer,
+    pub(crate) crypt: Option<Aes128Cfb8>,
     tmp: Vec<u8>,
     tmp2: Vec<u8>,
     compression_threshold: Option<usize>,
 }
-#[derive(Default)]
-struct ClientReader {
-    buffer: Buffer,
-    // crypt: Option<Aes128Cfb8>,
-    tmp: Vec<u8>,
-}
 impl ClientWriter {
-    fn send_packet<'x, P, Q>(&mut self, packet: P) -> Result<()>
+    pub(crate) fn add(&mut self, buf: &[u8]) {
+        let offset = self.buffer.len();
+        self.buffer.extend_from_slice(buf);
+
+        if let Some(crypt) = &mut self.crypt {
+            crypt.encrypt(&mut self.buffer[offset..]);
+        }
+    }
+
+    pub(crate) fn send_packet<'x, P, Q>(&mut self, packet: P) -> Result<()>
     where
         Q: MD<'x>,
         P: Borrow<Q>,
@@ -137,11 +160,11 @@ fn read_packet(
     writer: &mut ClientWriter,
 ) -> Result<bool> {
     let packet_data =
-        match protocol::read_packet_info(&reader.buffer, client.compression, &mut reader.tmp)? {
+        match protocol::read_packet_info(&reader.buffer, &mut reader.tmp, client.compression)? {
             Some(x) => x,
             None => return Ok(false),
         };
-    let mut data = packet_data.get_data(&reader.buffer, &reader.tmp);
+    let mut data = packet_data.data;
     let packet = protocol::just_deserialize(
         PacketDirection::S2C,
         client.state,

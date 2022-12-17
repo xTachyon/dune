@@ -48,11 +48,11 @@ impl<'p> DiskPacket<'p> {
         Ok(())
     }
 
-    fn read(mut reader: &'p mut &[u8]) -> Result<DiskPacket<'p>> {
+    fn read(reader: &'p mut &[u8]) -> Result<DiskPacket<'p>> {
         let size: u32 = MD::deserialize(reader)?;
-        let id: u32 = MD::deserialize(&mut reader)?;
+        let id: u32 = MD::deserialize(reader)?;
 
-        let direction: u8 = MD::deserialize(&mut reader)?;
+        let direction: u8 = MD::deserialize(reader)?;
         let direction = PacketDirection::try_from(direction)?;
 
         let data = reader.read_mem(size as usize - 4 - 1)?;
@@ -98,9 +98,6 @@ impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
 #[derive(Default)]
 pub(crate) struct Buffer(SliceRingBuffer<u8>);
 impl Buffer {
-    fn new() -> Buffer {
-        Buffer(SliceRingBuffer::new())
-    }
     fn advance(&mut self, size: usize) {
         let truncate_to = self.len() - size;
         self.truncate_front(truncate_to);

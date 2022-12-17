@@ -1,10 +1,9 @@
-use crate::protocol::varint::write_varint;
+use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
+use crate::protocol::v1_18_2::login::EncryptionBeginRequest;
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
-use crate::{protocol, Buffer, DiskPacket};
+use crate::{protocol, DiskPacket};
+use aes::cipher::NewCipher;
 use anyhow::Result;
-use byteorder::WriteBytesExt;
-use cfb8::cipher::AsyncStreamCipher;
-use cfb8::cipher::NewCipher;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use polling::{Event, Poller};
@@ -13,51 +12,8 @@ use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::{Digest, Sha1};
 use std::fs::File;
-use std::io::{Cursor, Read, Write};
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-
-pub(crate) type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
-
-pub(crate) struct Encryption {
-    enc: Aes128Cfb8,
-    dec: Aes128Cfb8,
-}
-
-pub(crate) struct Session {
-    pub(crate) read_buf: Buffer,
-    pub(crate) write_buf: Buffer,
-    pub(crate) crypt: Option<Encryption>,
-}
-
-impl Session {
-    pub(crate) fn new() -> Session {
-        Session {
-            read_buf: Buffer::new(),
-            write_buf: Buffer::new(),
-            crypt: None,
-        }
-    }
-}
-
-impl Session {
-    pub(crate) fn write(&mut self, buf: &[u8]) {
-        let offset = self.write_buf.len();
-        self.write_buf.extend_from_slice(buf);
-
-        if let Some(crypt) = &mut self.crypt {
-            crypt.enc.encrypt(&mut self.write_buf[offset..]);
-        }
-    }
-
-    pub(crate) fn read(&mut self, buf: &[u8]) {
-        let offset = self.read_buf.len();
-        self.read_buf.extend_from_slice(buf);
-
-        if let Some(crypt) = &mut self.crypt {
-            crypt.dec.decrypt(&mut self.read_buf[offset..]);
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct AuthData {
@@ -70,13 +26,12 @@ struct Proxy {
     compression: bool,
     start_done: bool,
     auth_data: Option<AuthData>,
-    tmp: Vec<u8>,
     out_file: ZlibEncoder<File>,
 }
 
-struct OnStartResult {
+struct OnStartResult<'x> {
     skip: bool,
-    packet_data: PacketData,
+    packet_data: PacketData<'x>,
 }
 
 impl Proxy {
@@ -87,7 +42,6 @@ impl Proxy {
             compression: false,
             start_done: false,
             auth_data: Some(auth_data),
-            tmp: vec![],
             out_file: ZlibEncoder::new(file, Compression::best()),
         })
     }
@@ -100,45 +54,20 @@ impl Proxy {
         Ok(res)
     }
 
-    fn serialize_enc_response(shared_secret: &[u8], verify_token: &[u8]) -> Result<Vec<u8>> {
-        let mut cursor = Cursor::new(Vec::new());
-
-        // id = 1
-        cursor.write_u8(1)?;
-
-        // Shared Secret Length
-        write_varint(&mut cursor, shared_secret.len() as u32)?;
-
-        // Shared Secret
-        cursor.write_all(shared_secret)?;
-
-        // Verify Token Length
-        write_varint(&mut cursor, verify_token.len() as u32)?;
-
-        // Verify Token
-        cursor.write_all(verify_token)?;
-
-        let mut result = Vec::new();
-
-        // size
-        write_varint(&mut result, cursor.get_ref().len() as u32)?;
-        result.extend_from_slice(cursor.get_ref());
-
-        Ok(result)
-    }
-
     fn on_start<'p>(
-        &'p mut self,
-        src_session: &'p mut Session,
+        &mut self,
+        src_reader: &'p mut ClientReader,
+        src_writer: &mut ClientWriter,
         offset: usize,
         direction: PacketDirection,
-    ) -> Result<Option<OnStartResult>> {
-        let src = &src_session.read_buf[offset..];
-        let packet_data = match protocol::read_packet_info(src, self.compression, &mut self.tmp)? {
-            Some(x) => x,
-            None => return Ok(None),
-        };
-        let mut data = packet_data.get_data(src, &self.tmp);
+    ) -> Result<Option<OnStartResult<'p>>> {
+        let src = &src_reader.buffer[offset..];
+        let packet_data =
+            match protocol::read_packet_info(src, &mut src_reader.tmp, self.compression)? {
+                Some(x) => x,
+                None => return Ok(None),
+            };
+        let mut data = packet_data.data;
         let packet = protocol::just_deserialize(direction, self.state, packet_data.id, &mut data)?;
 
         println!("{:?}", packet);
@@ -205,16 +134,14 @@ impl Proxy {
                     return Err(anyhow::Error::msg("bad mojang auth"));
                 }
 
-                let buf = Proxy::serialize_enc_response(
-                    &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
-                    &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
-                )?;
-                src_session.write(&buf);
+                let p = EncryptionBeginRequest {
+                    shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
+                    verify_token: &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
+                };
+                src_writer.send_packet(p)?;
 
-                let enc = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
-                let dec = Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap();
-
-                src_session.crypt = Some(Encryption { enc, dec });
+                src_reader.crypt = Some(Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap());
+                src_writer.crypt = Some(Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap());
             }
             _ => {}
         }
@@ -224,17 +151,19 @@ impl Proxy {
 
     fn forward(
         &mut self,
-        src: &mut Session,
-        dest: &mut Session,
+        src_reader: &mut ClientReader,
+        src_writer: &mut ClientWriter,
+        dest: &mut ClientWriter,
         buf: &[u8],
         direction: PacketDirection,
     ) -> Result<()> {
-        src.read(buf);
+        src_reader.add(buf);
 
         let mut offset = 0;
-        while let Some(result) = self.on_start(src, offset, direction)? {
+        while let Some(result) = self.on_start(src_reader, src_writer, offset, direction)? {
             let packet_data = result.packet_data;
-            let data = packet_data.get_data(&src.read_buf[offset..], &self.tmp);
+            let data = packet_data.data;
+            let total_size_original = packet_data.total_size_original;
 
             if !result.skip {
                 let disk_packet = DiskPacket {
@@ -244,12 +173,12 @@ impl Proxy {
                 };
                 disk_packet.write(&mut self.out_file)?;
 
-                let bytes = &src.read_buf[offset..offset + packet_data.total_size_original];
-                dest.write(bytes);
+                let bytes = &src_reader.buffer[offset..offset + total_size_original];
+                dest.add(bytes);
             }
-            offset += packet_data.total_size_original;
+            offset += total_size_original;
         }
-        src.read_buf.advance(offset);
+        src_reader.buffer.advance(offset);
 
         Ok(())
     }
@@ -257,20 +186,21 @@ impl Proxy {
     fn on_recv(
         &mut self,
         buf: &[u8],
-        client: &mut Session,
-        server: &mut Session,
+        client_reader: &mut ClientReader,
+        client_writer: &mut ClientWriter,
+        server_reader: &mut ClientReader,
+        server_writer: &mut ClientWriter,
         direction: PacketDirection,
     ) -> Result<()> {
         match direction {
-            PacketDirection::C2S => self.forward(client, server, buf, direction),
-            PacketDirection::S2C => self.forward(server, client, buf, direction),
+            PacketDirection::C2S => {
+                self.forward(client_reader, client_writer, server_writer, buf, direction)
+            }
+            PacketDirection::S2C => {
+                self.forward(server_reader, server_writer, client_writer, buf, direction)
+            }
         }
     }
-}
-
-struct RunStats {
-    read: usize,
-    write: usize,
 }
 
 fn run(
@@ -278,13 +208,15 @@ fn run(
     mut server_socket: TcpStream,
     auth_data: AuthData,
     out_path: &str,
-    stats: &mut RunStats,
 ) -> Result<()> {
     const CLIENT_KEY: usize = 0;
     const SERVER_KEY: usize = 1;
 
-    let mut client = Session::new();
-    let mut server = Session::new();
+    let mut client_reader = ClientReader::default();
+    let mut client_writer = ClientWriter::default();
+    let mut server_reader = ClientReader::default();
+    let mut server_writer = ClientWriter::default();
+
     let mut proxy = Proxy::new(auth_data, out_path)?;
 
     let poller = Poller::new()?;
@@ -296,7 +228,7 @@ fn run(
     poller.add(&server_socket, Event::readable(SERVER_KEY))?;
 
     let mut events = Vec::new();
-    let mut buffer = [0; 64 * 1024];
+    let mut buffer = [0; 4096];
     loop {
         events.clear();
         poller.wait(&mut events, None)?;
@@ -312,19 +244,23 @@ fn run(
                 if read == 0 {
                     return Ok(());
                 }
-                stats.read += read;
-                proxy.on_recv(&buffer[..read], &mut client, &mut server, direction)?;
+                proxy.on_recv(
+                    &buffer[..read],
+                    &mut client_reader,
+                    &mut client_writer,
+                    &mut server_reader,
+                    &mut server_writer,
+                    direction,
+                )?;
             }
             if ev.writable {
-                if ev.key == CLIENT_KEY {
-                    let wrote = client_socket.write(&client.write_buf)?;
-                    stats.write += wrote;
-                    client.write_buf.advance(wrote);
+                let (socket, buffer) = if ev.key == CLIENT_KEY {
+                    (&mut client_socket, &mut client_writer.buffer)
                 } else {
-                    let wrote = server_socket.write(&server.write_buf)?;
-                    stats.write += wrote;
-                    server.write_buf.advance(wrote);
-                }
+                    (&mut server_socket, &mut server_writer.buffer)
+                };
+                let wrote = socket.write(buffer)?;
+                buffer.advance(wrote);
             }
         }
 
@@ -333,7 +269,7 @@ fn run(
             Event {
                 key: CLIENT_KEY,
                 readable: true,
-                writable: !client.write_buf.is_empty(),
+                writable: !client_writer.buffer.is_empty(),
             },
         )?;
         poller.modify(
@@ -341,7 +277,7 @@ fn run(
             Event {
                 key: SERVER_KEY,
                 readable: true,
-                writable: !server.write_buf.is_empty(),
+                writable: !server_writer.buffer.is_empty(),
             },
         )?;
     }
@@ -364,13 +300,7 @@ pub fn record_to_file(
     let server = TcpStream::connect(server_address)?;
     println!("connected to server");
 
-    let mut stats = RunStats { read: 0, write: 0 };
-    let res = run(client, server, auth_data, out_path, &mut stats);
+    let res = run(client, server, auth_data, out_path);
     println!("{:?}", res);
-    println!(
-        "total read: {}\ntotal write: {}",
-        stats.read / 2,
-        stats.write / 2
-    );
     Ok(())
 }
