@@ -60,11 +60,14 @@ impl Proxy {
         src_writer: &mut ClientWriter,
         direction: PacketDirection,
     ) -> Result<Option<OnStartResult<'p>>> {
-        let packet_data =
-            match protocol::read_packet_info(&src_reader.buffer, &mut src_reader.tmp, self.compression)? {
-                Some(x) => x,
-                None => return Ok(None),
-            };
+        let packet_data = match protocol::read_packet_info(
+            &src_reader.buffer,
+            &mut src_reader.tmp,
+            self.compression,
+        )? {
+            Some(x) => x,
+            None => return Ok(None),
+        };
         let mut data = packet_data.data;
         let packet = protocol::just_deserialize(self.state, direction, packet_data.id, &mut data)?;
 

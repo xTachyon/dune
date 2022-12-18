@@ -9,11 +9,14 @@ use aes::cipher::AsyncStreamCipher;
 use anyhow::Result;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use log::info;
+use log::{info, warn};
 use polling::{Event, Poller};
 use std::borrow::Borrow;
-use std::io::{Read, Write};
+use std::io::{stdin, BufRead, Read, Write};
 use std::net::{SocketAddr, TcpStream};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::thread;
 
 pub(crate) type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
@@ -115,9 +118,7 @@ fn send_start(client: &mut ClientWriter) -> Result<()> {
     };
     client.send_packet(p)?;
 
-    let p = LoginStartRequest {
-        username: "TheTachyon",
-    };
+    let p = LoginStartRequest { username: "grape" };
     client.send_packet(p)?;
 
     Ok(())
@@ -135,8 +136,6 @@ fn handle_packet(client: &mut Client, writer: &mut ClientWriter, packet: Packet)
             };
             info!("ping!");
             writer.send_packet(p)?;
-
-            writer.send_packet(ChatRequest { message: "wow" })?;
         }
         Packet::ChatResponse(x) => {
             println!("{}", chat::parse_chat(x.message)?);
@@ -177,13 +176,41 @@ fn read_packet(
     Ok(true)
 }
 
+fn on_stdin_line(writer: &mut ClientWriter, line: String) -> Result<()> {
+    let line = line.trim();
+    writer.send_packet(ChatRequest { message: line })?;
+
+    Ok(())
+}
+
+fn read_from_stdin(sender: Sender<String>, poller: &Poller) -> Result<()> {
+    let mut stdin = stdin().lock();
+    loop {
+        let mut line = String::new();
+        stdin.read_line(&mut line)?;
+        sender.send(line)?;
+
+        poller.notify()?;
+    }
+}
+fn spawn_stdin_thread(poller: Arc<Poller>) -> Receiver<String> {
+    let (sender, receiver) = channel();
+    thread::spawn(move || {
+        if let Err(e) = read_from_stdin(sender, &poller) {
+            warn!("stdin reading died: {}", e);
+        }
+    });
+
+    receiver
+}
+
 pub fn run(addr: SocketAddr) -> Result<()> {
     const SOCKET_KEY: usize = 0;
 
     let mut socket = TcpStream::connect(addr)?;
     socket.set_nonblocking(true)?;
 
-    let poller = Poller::new()?;
+    let poller = Arc::new(Poller::new()?);
     poller.add(&socket, Event::all(SOCKET_KEY))?;
 
     let mut client = Client::new();
@@ -193,7 +220,9 @@ pub fn run(addr: SocketAddr) -> Result<()> {
     let mut events = Vec::new();
     let mut buffer = [0; 4096];
 
+    let receiver = spawn_stdin_thread(poller.clone());
     send_start(&mut writer)?;
+
     loop {
         events.clear();
         poller.wait(&mut events, None)?;
@@ -212,6 +241,10 @@ pub fn run(addr: SocketAddr) -> Result<()> {
                 let wrote = socket.write(&writer.buffer)?;
                 writer.buffer.advance(wrote);
             }
+        }
+
+        while let Ok(line) = receiver.try_recv() {
+            on_stdin_line(&mut writer, line)?;
         }
 
         poller.modify(

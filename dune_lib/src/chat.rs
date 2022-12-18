@@ -28,6 +28,11 @@ const LANG_ENG: &[LangFormat] = &[
         no_of_captures: 1,
     },
     LangFormat {
+        name: "multiplayer.player.left",
+        format: "%s left the game",
+        no_of_captures: 1,
+    },
+    LangFormat {
         name: "block.minecraft.set_spawn",
         format: "Respawn point set",
         no_of_captures: 0,

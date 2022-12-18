@@ -467,16 +467,6 @@ fn main() -> Result<()> {
     #[cfg(windows)]
     let _ = ansi_term::enable_ansi_support();
 
-    // std::thread::spawn(|| {
-    //     let s = &mut String::new();
-    //     let stdin = &mut stdin().lock();
-    //     loop {
-    //         stdin.read_line(s).unwrap();
-    //         println!("{}", s);
-    //         s.clear();
-    //     }
-    // });
-
     let start = Instant::now();
     let result = main_impl();
     println!("execution took {:?}", start.elapsed());

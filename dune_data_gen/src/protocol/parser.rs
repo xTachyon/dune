@@ -186,7 +186,11 @@ fn parse_container<'x>(
         name += &snake_to_pascal(parent_field);
     }
 
-    let t = Ty::Struct(TyStruct { name, fields, failed });
+    let t = Ty::Struct(TyStruct {
+        name,
+        fields,
+        failed,
+    });
     Some(parser.alloc_type(t))
 }
 fn parse_option<'x>(
@@ -321,7 +325,7 @@ fn direction<'x>(
             parser.alloc_type(Ty::Struct(TyStruct {
                 name: name.clone(),
                 fields: Vec::new(),
-                failed: true
+                failed: true,
             }))
         } else {
             match parse_type(parser, &value, &name, None) {
