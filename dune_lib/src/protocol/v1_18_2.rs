@@ -1532,6 +1532,8 @@ pub mod play {
     pub struct AdvancementTabRequest {}
     impl<'p> MD<'p> for AdvancementTabRequest {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<AdvancementTabRequest> {
+            // failed
+
             let result = AdvancementTabRequest {};
             Ok(result)
         }
@@ -1870,6 +1872,8 @@ pub mod play {
     pub struct AdvancementsResponse {}
     impl<'p> MD<'p> for AdvancementsResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<AdvancementsResponse> {
+            // failed
+
             let result = AdvancementsResponse {};
             Ok(result)
         }
@@ -1987,6 +1991,8 @@ pub mod play {
     pub struct BossBarResponse {}
     impl<'p> MD<'p> for BossBarResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<BossBarResponse> {
+            // failed
+
             let result = BossBarResponse {};
             Ok(result)
         }
@@ -2073,6 +2079,8 @@ pub mod play {
     pub struct DeclareCommandsResponse {}
     impl<'p> MD<'p> for DeclareCommandsResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<DeclareCommandsResponse> {
+            // failed
+
             let result = DeclareCommandsResponse {};
             Ok(result)
         }
@@ -2085,6 +2093,8 @@ pub mod play {
     pub struct FacePlayerResponse {}
     impl<'p> MD<'p> for FacePlayerResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<FacePlayerResponse> {
+            // failed
+
             let result = FacePlayerResponse {};
             Ok(result)
         }
@@ -2147,6 +2157,8 @@ pub mod play {
     pub struct MultiBlockChangeResponse {}
     impl<'p> MD<'p> for MultiBlockChangeResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<MultiBlockChangeResponse> {
+            // failed
+
             let result = MultiBlockChangeResponse {};
             Ok(result)
         }
@@ -2570,6 +2582,8 @@ pub mod play {
     pub struct MapChunkResponse {}
     impl<'p> MD<'p> for MapChunkResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<MapChunkResponse> {
+            // failed
+
             let result = MapChunkResponse {};
             Ok(result)
         }
@@ -2613,6 +2627,8 @@ pub mod play {
     pub struct WorldParticlesResponse {}
     impl<'p> MD<'p> for WorldParticlesResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<WorldParticlesResponse> {
+            // failed
+
             let result = WorldParticlesResponse {};
             Ok(result)
         }
@@ -2774,6 +2790,8 @@ pub mod play {
     pub struct MapResponse {}
     impl<'p> MD<'p> for MapResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<MapResponse> {
+            // failed
+
             let result = MapResponse {};
             Ok(result)
         }
@@ -3164,6 +3182,8 @@ pub mod play {
     pub struct PlayerInfoResponse_Data {}
     impl<'p> MD<'p> for PlayerInfoResponse_Data {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<PlayerInfoResponse_Data> {
+            // failed
+
             let result = PlayerInfoResponse_Data {};
             Ok(result)
         }
@@ -3244,6 +3264,8 @@ pub mod play {
     pub struct UnlockRecipesResponse {}
     impl<'p> MD<'p> for UnlockRecipesResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<UnlockRecipesResponse> {
+            // failed
+
             let result = UnlockRecipesResponse {};
             Ok(result)
         }
@@ -3493,6 +3515,8 @@ pub mod play {
     pub struct EntityMetadataResponse {}
     impl<'p> MD<'p> for EntityMetadataResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<EntityMetadataResponse> {
+            // failed
+
             let result = EntityMetadataResponse {};
             Ok(result)
         }
@@ -3559,6 +3583,8 @@ pub mod play {
     pub struct EntityEquipmentResponse {}
     impl<'p> MD<'p> for EntityEquipmentResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<EntityEquipmentResponse> {
+            // failed
+
             let result = EntityEquipmentResponse {};
             Ok(result)
         }
@@ -3625,6 +3651,8 @@ pub mod play {
     pub struct ScoreboardObjectiveResponse {}
     impl<'p> MD<'p> for ScoreboardObjectiveResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<ScoreboardObjectiveResponse> {
+            // failed
+
             let result = ScoreboardObjectiveResponse {};
             Ok(result)
         }
@@ -3662,6 +3690,8 @@ pub mod play {
     pub struct TeamsResponse {}
     impl<'p> MD<'p> for TeamsResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<TeamsResponse> {
+            // failed
+
             let result = TeamsResponse {};
             Ok(result)
         }
@@ -3674,6 +3704,8 @@ pub mod play {
     pub struct ScoreboardScoreResponse {}
     impl<'p> MD<'p> for ScoreboardScoreResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<ScoreboardScoreResponse> {
+            // failed
+
             let result = ScoreboardScoreResponse {};
             Ok(result)
         }
@@ -3761,6 +3793,8 @@ pub mod play {
     pub struct StopSoundResponse {}
     impl<'p> MD<'p> for StopSoundResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<StopSoundResponse> {
+            // failed
+
             let result = StopSoundResponse {};
             Ok(result)
         }
@@ -4041,6 +4075,8 @@ pub mod play {
     pub struct DeclareRecipesResponse_Recipes {}
     impl<'p> MD<'p> for DeclareRecipesResponse_Recipes {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<DeclareRecipesResponse_Recipes> {
+            // failed
+
             let result = DeclareRecipesResponse_Recipes {};
             Ok(result)
         }
@@ -4073,6 +4109,8 @@ pub mod play {
     pub struct TagsResponse_Tags {}
     impl<'p> MD<'p> for TagsResponse_Tags {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<TagsResponse_Tags> {
+            // failed
+
             let result = TagsResponse_Tags {};
             Ok(result)
         }
@@ -4135,6 +4173,8 @@ pub mod play {
     pub struct SculkVibrationSignalResponse {}
     impl<'p> MD<'p> for SculkVibrationSignalResponse {
         fn deserialize(mut _reader: &mut &[u8]) -> Result<SculkVibrationSignalResponse> {
+            // failed
+
             let result = SculkVibrationSignalResponse {};
             Ok(result)
         }

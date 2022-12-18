@@ -1,9 +1,7 @@
-use crate::game::GameMode;
 use crate::nbt::{self};
 use crate::protocol::varint::read_varint;
 use anyhow::Result;
 use byteorder::ReadBytesExt;
-use std::convert::TryFrom;
 use std::io::{self, Read, Result as IoResult, Write};
 
 use super::varint::write_varint;
@@ -198,22 +196,20 @@ impl<'x, T: MD<'x>> MD<'x> for Option<T> {
     }
 }
 
-macro_rules! impl_with_varint {
-    ($enu:ident) => {
-        impl<'x> MD<'x> for $enu {
-            fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
-                let value = read_varint(memory)?;
-                Ok($enu::try_from(value as u8)?)
-            }
-            fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
-                write_varint(writer, *self as u32)?;
-                Ok(())
-            }
-        }
-    };
-}
-
-impl_with_varint!(GameMode);
+// macro_rules! impl_with_varint {
+//     ($enu:ident) => {
+//         impl<'x> MD<'x> for $enu {
+//             fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+//                 let value = read_varint(memory)?;
+//                 Ok($enu::try_from(value as u8)?)
+//             }
+//             fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+//                 write_varint(writer, *self as u32)?;
+//                 Ok(())
+//             }
+//         }
+//     };
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
@@ -233,10 +229,10 @@ pub struct Position {
 
 impl<'x> MD<'x> for Position {
     fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
-        let val: u64 = MD::deserialize(memory)?;
+        let val: i64 = MD::deserialize(memory)?;
         let x = (val >> 38) as i32;
-        let y = (val & 0xFFF) as i32;
-        let z = ((val >> 12) & 0x3FFFFFF) as i32;
+        let y = (val << 52 >> 52) as i32;
+        let z = (val << 26 >> 38) as i32;
 
         Ok(Position { x, y, z })
     }

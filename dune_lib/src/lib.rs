@@ -19,7 +19,6 @@ pub mod chat;
 pub mod client;
 mod data;
 pub mod events;
-mod game;
 pub mod nbt;
 pub mod protocol;
 pub mod record;

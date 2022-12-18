@@ -186,7 +186,7 @@ fn parse_container<'x>(
         name += &snake_to_pascal(parent_field);
     }
 
-    let t = Ty::Struct(TyStruct { name, fields });
+    let t = Ty::Struct(TyStruct { name, fields, failed });
     Some(parser.alloc_type(t))
 }
 fn parse_option<'x>(
@@ -222,11 +222,7 @@ fn parse_array<'x>(
     let t = Ty::Array(TyArray { count_ty, subtype });
     Some(parser.alloc_type(t))
 }
-fn parse_type_simple<'x>(
-    parser: &Parser<'x>,
-    input: &str,
-    struct_name: &str,
-) -> Option<&'x Ty<'x>> {
+fn parse_type_simple<'x>(parser: &Parser<'x>, input: &str) -> Option<&'x Ty<'x>> {
     let r = match input {
         "u8" => parser.ty_u8,
         "u16" => parser.ty_u16,
@@ -251,10 +247,7 @@ fn parse_type_simple<'x>(
         "nbt" => parser.ty_nbt,
         "optionalNbt" => parser.ty_optional_nbt,
 
-        _ => {
-            eprintln!("unknown type `{}` in `{}`", input, struct_name);
-            return None;
-        }
+        _ => return None,
     };
     Some(r)
 }
@@ -265,7 +258,7 @@ fn parse_type<'x>(
     parent_field: Option<&str>,
 ) -> Option<&'x Ty<'x>> {
     if let Some(x) = input.as_str() {
-        return parse_type_simple(parser, x, struct_name);
+        return parse_type_simple(parser, x);
     }
 
     let name = input[0].as_str().unwrap();
@@ -328,6 +321,7 @@ fn direction<'x>(
             parser.alloc_type(Ty::Struct(TyStruct {
                 name: name.clone(),
                 fields: Vec::new(),
+                failed: true
             }))
         } else {
             match parse_type(parser, &value, &name, None) {

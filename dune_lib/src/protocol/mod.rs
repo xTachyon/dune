@@ -11,7 +11,7 @@ pub use v1_18_2::de_packets;
 pub use v1_18_2::Packet;
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[derive(Copy, Clone, Debug)]
 pub enum ConnectionState {
     Handshaking = 0,
     Status = 1,

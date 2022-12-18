@@ -8,6 +8,7 @@ use std::{fs, process::Command};
 struct TyStruct<'x> {
     name: String,
     fields: Vec<(String, &'x Ty<'x>)>,
+    failed: bool,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyOption<'x> {

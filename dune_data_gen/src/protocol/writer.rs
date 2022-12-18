@@ -176,6 +176,9 @@ fn serialize_struct(
         ty_struct.name
     )?;
 
+    if ty_struct.failed {
+        *out += "// failed\n";
+    }
     for (name, ty) in &ty_struct.fields {
         deserialize_one(out, name, ty, 1)?;
     }
