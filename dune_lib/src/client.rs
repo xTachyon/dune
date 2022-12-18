@@ -193,15 +193,17 @@ fn read_from_stdin(sender: Sender<String>, poller: &Poller) -> Result<()> {
         poller.notify()?;
     }
 }
-fn spawn_stdin_thread(poller: Arc<Poller>) -> Receiver<String> {
+fn spawn_stdin_thread(poller: Arc<Poller>) -> Result<Receiver<String>> {
     let (sender, receiver) = channel();
-    thread::spawn(move || {
-        if let Err(e) = read_from_stdin(sender, &poller) {
-            warn!("stdin reading died: {}", e);
-        }
-    });
+    thread::Builder::new()
+        .name("stdin_read".to_string())
+        .spawn(move || {
+            if let Err(e) = read_from_stdin(sender, &poller) {
+                warn!("stdin reading died: {}", e);
+            }
+        })?;
 
-    receiver
+    Ok(receiver)
 }
 
 pub fn run(addr: SocketAddr) -> Result<()> {
@@ -220,7 +222,7 @@ pub fn run(addr: SocketAddr) -> Result<()> {
     let mut events = Vec::new();
     let mut buffer = [0; 4096];
 
-    let receiver = spawn_stdin_thread(poller.clone());
+    let receiver = spawn_stdin_thread(poller.clone())?;
     send_start(&mut writer)?;
 
     loop {
