@@ -5,7 +5,6 @@ use serde_derive::Deserialize;
 
 pub struct AuthDataExt {
     pub data: AuthData,
-    pub name: String,
     pub online: bool,
 }
 
@@ -78,8 +77,8 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
         data: AuthData {
             selected_profile: acc.profile.id.to_string(),
             access_token: acc.ygg.token.to_string(),
+            name: acc.profile.name.to_string(),
         },
-        name: acc.profile.name.to_string(),
         online,
     })
 }

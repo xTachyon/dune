@@ -14,7 +14,7 @@ use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, UseEntityKind};
 use dune_lib::nbt::Tag;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
-use dune_lib::record::record_to_file;
+use dune_lib::record::{record_to_file, AuthData};
 use dune_lib::replay::play;
 use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
 use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
@@ -275,7 +275,7 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
         println!(
             "{}: {} ({})\n{}: {}\n{}: {} ({})\n",
             Green.paint("minecraft profile"),
-            Cyan.paint(&auth_data_ext.name),
+            Cyan.paint(&auth_data_ext.data.name),
             Purple.paint(online_str),
             Green.paint("listening address"),
             Cyan.paint(listen_addr),
@@ -437,8 +437,8 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
     })
 }
 
-fn do_client() -> Result<()> {
-    client::run("127.0.0.1:25565".parse()?)?;
+fn do_client(auth_data: AuthData) -> Result<()> {
+    client::run("127.0.0.1:25566".parse()?, auth_data)?;
 
     Ok(())
 }
@@ -458,7 +458,7 @@ fn main_impl() -> Result<()> {
             play(&option, handler)
         }
         Action::Signs { path } => print_signs(path),
-        Action::Client => do_client(),
+        Action::Client => do_client(auth_data_ext.data),
     }
 }
 

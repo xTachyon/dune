@@ -1,5 +1,5 @@
 use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
-use crate::protocol::v1_18_2::login::EncryptionBeginRequest;
+use crate::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use crate::{protocol, DiskPacket};
 use aes::cipher::NewCipher;
@@ -19,19 +19,84 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 pub struct AuthData {
     pub selected_profile: String,
     pub access_token: String,
+    pub name: String,
 }
 
 struct Proxy {
     state: ConnectionState,
     compression: bool,
     start_done: bool,
-    auth_data: Option<AuthData>,
+    auth_data: AuthData,
     out_file: ZlibEncoder<File>,
 }
 
 struct OnStartResult<'x> {
     skip: bool,
     packet_data: PacketData<'x>,
+}
+
+fn rsa_crypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
+    let public_key = RsaPublicKey::from_public_key_der(key)?;
+    let padding = PaddingScheme::new_pkcs1v15_encrypt();
+
+    let res = public_key.encrypt(&mut rand::thread_rng(), padding, data)?;
+    Ok(res)
+}
+pub(crate) fn crypt_reply(
+    packet: EncryptionBeginResponse,
+    auth_data: &mut AuthData,
+    writer: &mut ClientWriter,
+) -> Result<(Aes128Cfb8, Aes128Cfb8)> {
+    let aes_key: [u8; 16] = rand::random();
+
+    let hash = {
+        let mut sha1 = Sha1::new();
+        sha1.update(packet.server_id);
+        sha1.update(aes_key);
+        sha1.update(packet.public_key);
+        let hash = sha1.finalize();
+
+        num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
+    };
+
+    auth_data.selected_profile.retain(|c| c != '-');
+
+    #[allow(non_snake_case)]
+    #[derive(Serialize)]
+    struct RequestData<'x> {
+        accessToken: &'x str,
+        selectedProfile: &'x str,
+        serverId: &'x str,
+    }
+    let req = RequestData {
+        accessToken: &auth_data.access_token,
+        selectedProfile: &auth_data.selected_profile,
+        serverId: &hash,
+    };
+    let req = serde_json::to_string(&req)?;
+    dbg!(&req);
+    let response = ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
+        .set("Content-Type", "application/json; charset=utf-8")
+        .send_string(&req);
+    // println!("{:?}", response);
+    let response = response?;
+
+    // 204 No Content = Ok
+    if response.status() != 204 {
+        return Err(anyhow::Error::msg("bad mojang auth"));
+    }
+
+    let p = EncryptionBeginRequest {
+        shared_secret: &rsa_crypt(packet.public_key, &aes_key)?,
+        verify_token: &rsa_crypt(packet.public_key, packet.verify_token)?,
+    };
+    writer.send_packet(p)?;
+
+    let result = (
+        Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap(),
+        Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap(),
+    );
+    Ok(result)
 }
 
 impl Proxy {
@@ -41,17 +106,9 @@ impl Proxy {
             state: ConnectionState::Handshaking,
             compression: false,
             start_done: false,
-            auth_data: Some(auth_data),
+            auth_data: auth_data,
             out_file: ZlibEncoder::new(file, Compression::best()),
         })
-    }
-
-    fn rsa_crypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
-        let public_key = RsaPublicKey::from_public_key_der(key)?;
-        let padding = PaddingScheme::new_pkcs1v15_encrypt();
-
-        let res = public_key.encrypt(&mut rand::thread_rng(), padding, data)?;
-        Ok(res)
     }
 
     fn on_start<'p>(
@@ -94,55 +151,9 @@ impl Proxy {
             }
             Packet::EncryptionBeginResponse(packet) => {
                 skip = true;
-                let aes_key: [u8; 16] = rand::random();
-
-                let hash = {
-                    let mut sha1 = Sha1::new();
-                    sha1.update(packet.server_id);
-                    sha1.update(aes_key);
-                    sha1.update(packet.public_key);
-                    let hash = sha1.finalize();
-
-                    num_bigint::BigInt::from_signed_bytes_be(&hash).to_str_radix(16)
-                };
-
-                let mut auth_data = self.auth_data.take().unwrap();
-                auth_data.selected_profile.retain(|c| c != '-');
-
-                #[allow(non_snake_case)]
-                #[derive(Serialize)]
-                struct RequestData {
-                    accessToken: String,
-                    selectedProfile: String,
-                    serverId: String,
-                }
-                let req = RequestData {
-                    accessToken: auth_data.access_token,
-                    selectedProfile: auth_data.selected_profile,
-                    serverId: hash,
-                };
-                let req = serde_json::to_string(&req)?;
-                dbg!(&req);
-                let response =
-                    ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
-                        .set("Content-Type", "application/json; charset=utf-8")
-                        .send_string(&req);
-                // println!("{:?}", response);
-                let response = response?;
-
-                // 204 No Content = Ok
-                if response.status() != 204 {
-                    return Err(anyhow::Error::msg("bad mojang auth"));
-                }
-
-                let p = EncryptionBeginRequest {
-                    shared_secret: &Proxy::rsa_crypt(packet.public_key, &aes_key)?,
-                    verify_token: &Proxy::rsa_crypt(packet.public_key, packet.verify_token)?,
-                };
-                src_writer.send_packet(p)?;
-
-                src_reader.crypt = Some(Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap());
-                src_writer.crypt = Some(Aes128Cfb8::new_from_slices(&aes_key, &aes_key).unwrap());
+                let (c1, c2) = crypt_reply(packet, &mut self.auth_data, src_writer)?;
+                src_reader.crypt = Some(c1);
+                src_writer.crypt = Some(c2);
             }
             _ => {}
         }
@@ -163,7 +174,7 @@ impl Proxy {
         while let Some(result) = self.on_start(src_reader, src_writer, direction)? {
             let packet_data = result.packet_data;
             let data = packet_data.data;
-            let total_size_original = packet_data.total_size_original;
+            let total_size_original = packet_data.total_size;
 
             if !result.skip {
                 let disk_packet = DiskPacket {

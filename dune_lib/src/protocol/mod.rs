@@ -49,7 +49,7 @@ pub struct IndexedNbt<'x> {
 
 pub(crate) struct PacketData<'x> {
     pub id: u32,
-    pub total_size_original: usize,
+    pub total_size: usize,
     pub data: &'x [u8],
 }
 
@@ -64,7 +64,7 @@ pub(crate) fn read_packet_info<'r>(
     let mut reader = buffer;
     let (length, length_size) = read_varint_with_size(&mut reader)?;
 
-    let total_size_original = length as usize + length_size;
+    let total_size = length as usize + length_size;
     if compression {
         let data_length = read_varint(&mut reader)?;
         compression = data_length != 0;
@@ -80,7 +80,7 @@ pub(crate) fn read_packet_info<'r>(
     let id = read_varint(&mut reader)? as u32;
     let result = PacketData {
         id,
-        total_size_original,
+        total_size,
         data: reader,
     };
 

@@ -4,12 +4,13 @@ use crate::protocol::v1_18_2::login::LoginStartRequest;
 use crate::protocol::v1_18_2::play::{ChatRequest, KeepAliveRequest};
 use crate::protocol::varint::{write_varint, write_varint_serialize, VarintSerialized};
 use crate::protocol::{self, ConnectionState, Packet, PacketDirection};
+use crate::record::{crypt_reply, AuthData};
 use crate::{chat, Buffer};
 use aes::cipher::AsyncStreamCipher;
 use anyhow::Result;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use log::{info, warn};
+use log::{warn};
 use polling::{Event, Poller};
 use std::borrow::Borrow;
 use std::io::{stdin, BufRead, Read, Write};
@@ -64,6 +65,8 @@ impl ClientWriter {
         self.tmp2.clear();
         // can we do this with only one tmp? mojang :squint:
 
+        let start_offset = self.buffer.len();
+
         packet.borrow().serialize(&mut self.tmp)?;
 
         let (packet_buffer, data_length) = match self.compression_threshold {
@@ -91,14 +94,24 @@ impl ClientWriter {
         }
         self.buffer.extend_from_slice(packet_buffer);
 
+        if let Some(crypt) = &mut self.crypt {
+            crypt.encrypt(&mut self.buffer[start_offset..]);
+        }
+
         // and you're wondering why minecraft is slow
         Ok(())
     }
 }
 
+#[derive(Default)]
+struct Session {
+    reader: ClientReader,
+    writer: ClientWriter,
+}
+
 struct Client {
-    pub(crate) compression: bool,
-    pub(crate) state: ConnectionState,
+    compression: bool,
+    state: ConnectionState,
 }
 impl Client {
     fn new() -> Client {
@@ -109,43 +122,25 @@ impl Client {
     }
 }
 
-fn send_start(client: &mut ClientWriter) -> Result<()> {
+fn send_start(client: &mut ClientWriter, username: &str) -> Result<()> {
     let p = SetProtocolRequest {
         protocol_version: 758,
         server_host: "localhost",
-        server_port: 25565,
+        server_port: 25566,
         next_state: ConnectionState::Login as i32,
     };
     client.send_packet(p)?;
 
-    let p = LoginStartRequest { username: "grape" };
+    let p = LoginStartRequest { username };
     client.send_packet(p)?;
 
     Ok(())
 }
 
-fn handle_packet(client: &mut Client, writer: &mut ClientWriter, packet: Packet) -> Result<()> {
-    // match packet {
-    //     Packet::MapChunkResponse(_) | Packet::DeclareRecipesResponse(_) | Packet::LoginResponse(_) => {},
-    //     _ => println!("{:?}", packet)
-    // }
+fn handle_packet(_client: &mut Client, _writer: &mut ClientWriter, packet: Packet) -> Result<()> {
     match packet {
-        Packet::KeepAliveResponse(x) => {
-            let p = KeepAliveRequest {
-                keep_alive_id: x.keep_alive_id,
-            };
-            info!("ping!");
-            writer.send_packet(p)?;
-        }
         Packet::ChatResponse(x) => {
             println!("{}", chat::parse_chat(x.message)?);
-        }
-        Packet::SuccessResponse(_) => {
-            client.state = ConnectionState::Play;
-        }
-        Packet::CompressResponse(x) => {
-            client.compression = x.threshold >= 0;
-            writer.compression_threshold = Some(x.threshold.try_into()?);
         }
         _ => {}
     }
@@ -155,14 +150,16 @@ fn handle_packet(client: &mut Client, writer: &mut ClientWriter, packet: Packet)
 
 fn read_packet(
     client: &mut Client,
-    reader: &mut ClientReader,
-    writer: &mut ClientWriter,
+    session: &mut Session,
+    auth_data: &mut AuthData,
 ) -> Result<bool> {
-    let packet_data =
-        match protocol::read_packet_info(&reader.buffer, &mut reader.tmp, client.compression)? {
-            Some(x) => x,
-            None => return Ok(false),
-        };
+    let Some(packet_data) = protocol::read_packet_info(
+        &session.reader.buffer,
+        &mut session.reader.tmp,
+        client.compression,
+    )? else {
+         return Ok(false);
+    };
     let mut data = packet_data.data;
     let packet = protocol::just_deserialize(
         client.state,
@@ -170,8 +167,31 @@ fn read_packet(
         packet_data.id,
         &mut data,
     )?;
-    handle_packet(client, writer, packet)?;
-    reader.buffer.advance(packet_data.total_size_original);
+
+    // println!("{:?}", packet);
+    // system packets
+    match packet {
+        Packet::SuccessResponse(_) => {
+            client.state = ConnectionState::Play;
+        }
+        Packet::CompressResponse(x) => {
+            client.compression = x.threshold >= 0;
+            session.writer.compression_threshold = Some(x.threshold.try_into()?);
+        }
+        Packet::EncryptionBeginResponse(packet) => {
+            let (c1, c2) = crypt_reply(packet, auth_data, &mut session.writer)?;
+            session.reader.crypt = Some(c1);
+            session.writer.crypt = Some(c2);
+        }
+        Packet::KeepAliveResponse(x) => {
+            let p = KeepAliveRequest {
+                keep_alive_id: x.keep_alive_id,
+            };
+            session.writer.send_packet(p)?;
+        }
+        _ => handle_packet(client, &mut session.writer, packet)?,
+    }
+    session.reader.buffer.advance(packet_data.total_size);
 
     Ok(true)
 }
@@ -206,7 +226,7 @@ fn spawn_stdin_thread(poller: Arc<Poller>) -> Result<Receiver<String>> {
     Ok(receiver)
 }
 
-pub fn run(addr: SocketAddr) -> Result<()> {
+pub fn run(addr: SocketAddr, mut auth_data: AuthData) -> Result<()> {
     const SOCKET_KEY: usize = 0;
 
     let mut socket = TcpStream::connect(addr)?;
@@ -216,14 +236,13 @@ pub fn run(addr: SocketAddr) -> Result<()> {
     poller.add(&socket, Event::all(SOCKET_KEY))?;
 
     let mut client = Client::new();
-    let mut reader = ClientReader::default();
-    let mut writer = ClientWriter::default();
+    let mut session = Session::default();
 
     let mut events = Vec::new();
     let mut buffer = [0; 4096];
 
     let receiver = spawn_stdin_thread(poller.clone())?;
-    send_start(&mut writer)?;
+    send_start(&mut session.writer, &auth_data.name)?;
 
     loop {
         events.clear();
@@ -235,18 +254,18 @@ pub fn run(addr: SocketAddr) -> Result<()> {
                 if read == 0 {
                     return Ok(());
                 }
-                reader.buffer.extend_from_slice(&buffer[..read]);
+                session.reader.add(&buffer[..read]);
 
-                while read_packet(&mut client, &mut reader, &mut writer)? {}
+                while read_packet(&mut client, &mut session, &mut auth_data)? {}
             }
             if ev.writable {
-                let wrote = socket.write(&writer.buffer)?;
-                writer.buffer.advance(wrote);
+                let wrote = socket.write(&session.writer.buffer)?;
+                session.writer.buffer.advance(wrote);
             }
         }
 
         while let Ok(line) = receiver.try_recv() {
-            on_stdin_line(&mut writer, line)?;
+            on_stdin_line(&mut session.writer, line)?;
         }
 
         poller.modify(
@@ -254,7 +273,7 @@ pub fn run(addr: SocketAddr) -> Result<()> {
             Event {
                 key: SOCKET_KEY,
                 readable: true,
-                writable: !writer.buffer.is_empty(),
+                writable: !session.writer.buffer.is_empty(),
             },
         )?;
     }
