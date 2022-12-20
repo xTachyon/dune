@@ -2154,17 +2154,53 @@ pub mod play {
         }
     }
     #[derive(Debug)]
-    pub struct MultiBlockChangeResponse {}
-    impl<'p> MD<'p> for MultiBlockChangeResponse {
-        fn deserialize(mut _reader: &mut &[u8]) -> Result<MultiBlockChangeResponse> {
-            // failed
-
-            let result = MultiBlockChangeResponse {};
+    pub struct MultiBlockChangeResponse_ChunkCoordinates {
+        pub x: u32,
+        pub z: u32,
+        pub y: u32,
+    }
+    impl<'p> MD<'p> for MultiBlockChangeResponse_ChunkCoordinates {
+        fn deserialize(
+            mut reader: &mut &[u8],
+        ) -> Result<MultiBlockChangeResponse_ChunkCoordinates> {
+            let value: i64 = MD::deserialize(reader)?;
+            let x: u32 = (value << 42 >> 42) as _;
+            let z: u32 = (value << 20 >> 42) as _;
+            let y: u32 = (value << 0 >> 44) as _;
+            let result = MultiBlockChangeResponse_ChunkCoordinates { x, z, y };
             Ok(result)
         }
-        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
-            write_varint(&mut writer, 0x3f)?;
-            Ok(())
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
+            unimplemented!();
+        }
+    }
+    #[derive(Debug)]
+    pub struct MultiBlockChangeResponse {
+        pub chunk_coordinates: MultiBlockChangeResponse_ChunkCoordinates,
+        pub not_trust_edges: bool,
+        pub records: Vec<i64>,
+    }
+    impl<'p> MD<'p> for MultiBlockChangeResponse {
+        fn deserialize(mut reader: &mut &[u8]) -> Result<MultiBlockChangeResponse> {
+            let chunk_coordinates: MultiBlockChangeResponse_ChunkCoordinates =
+                MultiBlockChangeResponse_ChunkCoordinates::deserialize(reader)?;
+            let not_trust_edges: bool = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut records = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = read_varlong(&mut reader)?;
+                records.push(x);
+            }
+
+            let result = MultiBlockChangeResponse {
+                chunk_coordinates,
+                not_trust_edges,
+                records,
+            };
+            Ok(result)
+        }
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
+            unimplemented!();
         }
     }
     #[derive(Debug)]

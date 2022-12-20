@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
 
-use super::{ConnectionState, Direction, Packet, State, Ty, TyArray, TyOption, TyStruct};
+use super::{ConnectionState, Direction, Packet, State, Ty, TyArray, TyOption, TyStruct, TyBitfield, width_for_bitfields};
 
 #[derive(Debug, Deserialize)]
 struct JsonDirection {
@@ -74,17 +74,17 @@ impl<'x> Parser<'x> {
         let ty_f32 = bump.alloc(Ty::F32);
         let ty_f64 = bump.alloc(Ty::F64);
 
-        let ty_bool = bump.alloc(Ty::BOOL);
-        let ty_varint = bump.alloc(Ty::VARINT);
-        let ty_varlong = bump.alloc(Ty::VARLONG);
-        let ty_string = bump.alloc(Ty::STRING);
-        let ty_buffer = bump.alloc(Ty::BUFFER);
-        let ty_rest_buffer = bump.alloc(Ty::RESTBUFFER);
+        let ty_bool = bump.alloc(Ty::Bool);
+        let ty_varint = bump.alloc(Ty::VarInt);
+        let ty_varlong = bump.alloc(Ty::VarLong);
+        let ty_string = bump.alloc(Ty::String);
+        let ty_buffer = bump.alloc(Ty::Buffer);
+        let ty_rest_buffer = bump.alloc(Ty::RestBuffer);
 
-        let ty_position = bump.alloc(Ty::POSITION);
-        let ty_slot = bump.alloc(Ty::SLOT);
+        let ty_position = bump.alloc(Ty::Position);
+        let ty_slot = bump.alloc(Ty::Slot);
         let ty_nbt = bump.alloc(Ty::NBT);
-        let ty_optional_nbt = bump.alloc(Ty::OPTIONALNBT);
+        let ty_optional_nbt = bump.alloc(Ty::OptionNBT);
 
         Parser {
             bump,
@@ -152,24 +152,41 @@ fn parse_container<'x>(
     input: &Value,
     struct_name: &str,
     parent_field: Option<&str>,
+    is_bitfield: bool,
 ) -> Option<&'x Ty<'x>> {
     let mut fields = Vec::new();
     let mut failed = false;
+    let mut bitfield_range = 0;
 
     for i in input.as_array().unwrap() {
         let name = i["name"].as_str().unwrap();
-        let ty = &i["type"];
-
         let name = name.to_case(Case::Snake);
         let name = match name.as_str() {
             "type" | "match" => name + "_",
             _ => name,
         };
-        let ty = match parse_type(parser, ty, struct_name, Some(&name)) {
-            Some(x) => x,
-            None => {
-                failed = true;
-                break;
+
+        let ty = if is_bitfield {
+            let signed = i["signed"].as_bool().unwrap();
+            let size = i["size"].as_u64().unwrap().try_into().unwrap();
+
+            let ty = TyBitfield {
+                range_begin: bitfield_range,
+                range_end: bitfield_range + size,
+                base_type_size: width_for_bitfields(size),
+                unsigned: !signed,
+            };
+            bitfield_range += size;
+            parser.alloc_type(Ty::Bitfield(ty))
+        } else {
+            let ty = &i["type"];
+
+            match parse_type(parser, ty, struct_name, Some(&name)) {
+                Some(x) => x,
+                None => {
+                    failed = true;
+                    break;
+                }
             }
         };
 
@@ -179,6 +196,15 @@ fn parse_container<'x>(
     if failed {
         fields.clear();
     }
+    let base_type = if bitfield_range == 0 {
+        None
+    } else {
+        let ty = match bitfield_range {
+            64 => parser.ty_i64,
+            _ => unreachable!("unknown type with size={}", bitfield_range)
+        };
+        Some(ty)
+    };
 
     let mut name = struct_name.to_string();
     if let Some(parent_field) = parent_field {
@@ -189,6 +215,7 @@ fn parse_container<'x>(
     let t = Ty::Struct(TyStruct {
         name,
         fields,
+        base_type,
         failed,
     });
     Some(parser.alloc_type(t))
@@ -268,11 +295,11 @@ fn parse_type<'x>(
     let name = input[0].as_str().unwrap();
     let arg1 = &input[1];
     match name {
-        "container" => parse_container(parser, arg1, struct_name, parent_field),
+        "container" => parse_container(parser, arg1, struct_name, parent_field, false),
+        "bitfield" => parse_container(parser, arg1, struct_name, parent_field, true),
         "option" => parse_option(parser, arg1, struct_name, parent_field),
         "buffer" => Some(parse_buffer(parser, input)),
         "array" => parse_array(parser, arg1, struct_name, parent_field),
-        "switch" => None,
         _ => {
             eprintln!("unknown type `{}` in `{}`", name, struct_name);
             None
@@ -325,6 +352,7 @@ fn direction<'x>(
             parser.alloc_type(Ty::Struct(TyStruct {
                 name: name.clone(),
                 fields: Vec::new(),
+                base_type: None,
                 failed: true,
             }))
         } else {

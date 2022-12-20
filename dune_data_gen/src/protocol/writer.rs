@@ -11,12 +11,12 @@ type Result<T> = std::result::Result<T, std::fmt::Error>;
 fn lifetime(ty: &Ty) -> &'static str {
     let b = ty.needs_lifetime()
         && ![
-            Ty::STRING,
-            Ty::BUFFER,
-            Ty::RESTBUFFER,
-            Ty::SLOT,
+            Ty::String,
+            Ty::Buffer,
+            Ty::RestBuffer,
+            Ty::Slot,
             Ty::NBT,
-            Ty::OPTIONALNBT,
+            Ty::OptionNBT,
         ]
         .contains(ty);
     if b {
@@ -38,9 +38,21 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
         _ => ty.get_simple_type().into(),
     }
 }
-fn deserialize_one(out: &mut String, name: &str, ty: &Ty, count: u32) -> Result<()> {
+fn deserialize_one(
+    out: &mut String,
+    name: &str,
+    ty: &Ty,
+    bitfield_base_width: u16,
+    count: u32,
+) -> Result<()> {
     if let Ty::Array(x) = ty {
-        deserialize_one(out, "array_count", x.count_ty, count + 1)?;
+        deserialize_one(
+            out,
+            "array_count",
+            x.count_ty,
+            bitfield_base_width,
+            count + 1,
+        )?;
         write!(
             out,
             "let mut {} = Vec::with_capacity(cautious_size(array_count as usize));
@@ -52,15 +64,23 @@ fn deserialize_one(out: &mut String, name: &str, ty: &Ty, count: u32) -> Result<
         } else {
             format!("x_{}", count)
         };
-        deserialize_one(out, &elem, x.subtype, count + 1)?;
+        deserialize_one(out, &elem, x.subtype, bitfield_base_width, count + 1)?;
         writeln!(out, "{}.push({}); }}", name, elem)?;
         return Ok(());
     }
     write!(out, "let {}: {} = ", name, get_type_name(ty))?;
+    if let Ty::Bitfield(x) = ty {
+        let left_shift = bitfield_base_width - x.range_end;
+        let right_shift = bitfield_base_width - (x.range_end - x.range_begin);
+        write!(out, "(value << {} >> {}) as _;", left_shift, right_shift)?;
+
+        return Ok(());
+    }
+
     match ty {
-        Ty::VARINT => *out += "read_varint(&mut reader)?;",
-        Ty::VARLONG => *out += "read_varlong(&mut reader)?;",
-        Ty::RESTBUFFER => *out += "&reader[..]; *reader = &[];",
+        Ty::VarInt => *out += "read_varint(&mut reader)?;",
+        Ty::VarLong => *out += "read_varlong(&mut reader)?;",
+        Ty::RestBuffer => *out += "&reader[..]; *reader = &[];",
         Ty::Struct(x) => write!(out, "{}::deserialize(reader)?;", x.name)?,
         _ => *out += "MD::deserialize(reader)?;",
     }
@@ -70,9 +90,9 @@ fn deserialize_one(out: &mut String, name: &str, ty: &Ty, count: u32) -> Result<
 }
 fn serialize_one(out: &mut String, name: &str, ty: &Ty) -> Result<()> {
     match ty {
-        Ty::VARINT => write!(out, "write_varint(&mut writer, {} as u32)?;", name)?,
-        Ty::VARLONG => write!(out, "write_varlong(&mut writer, {} as u64)?;", name)?,
-        Ty::RESTBUFFER => write!(out, "writer.write_all({})?;", name)?,
+        Ty::VarInt => write!(out, "write_varint(&mut writer, {} as u32)?;", name)?,
+        Ty::VarLong => write!(out, "write_varlong(&mut writer, {} as u64)?;", name)?,
+        Ty::RestBuffer => write!(out, "writer.write_all({})?;", name)?,
         _ => {
             write!(out, "{}.serialize(&mut writer)?;", name)?;
         }
@@ -179,8 +199,15 @@ fn serialize_struct(
     if ty_struct.failed {
         *out += "// failed\n";
     }
+
+    let bitfield_base_width = if let Some(base_type) = ty_struct.base_type {
+        deserialize_one(out, "value", base_type, 0, 1)?;
+        base_type.width()
+    } else {
+        0
+    };
     for (name, ty) in &ty_struct.fields {
-        deserialize_one(out, name, ty, 1)?;
+        deserialize_one(out, name, ty, bitfield_base_width, 1)?;
     }
 
     write!(out, "\nlet result = {} {{", ty_struct.name)?;
@@ -191,10 +218,11 @@ fn serialize_struct(
 
     *out += "}; Ok(result) }";
 
-    let has_serialization = !ty_struct
-        .fields
-        .iter()
-        .any(|x| matches!(x.1, Ty::Array(_) | Ty::Struct(_)));
+    let has_serialization = bitfield_base_width == 0
+        && !ty_struct
+            .fields
+            .iter()
+            .any(|x| matches!(x.1, Ty::Array(_) | Ty::Struct(_)));
     write!(
         out,
         "fn serialize<W: Write>(&self, mut {}writer: &mut W) -> IoResult<()> {{",
