@@ -161,7 +161,7 @@ fn read_packet(
          return Ok(false);
     };
     let mut data = packet_data.data;
-    let packet = protocol::just_deserialize(
+    let packet = protocol::deserialize(
         client.state,
         PacketDirection::S2C,
         packet_data.id,
@@ -198,7 +198,9 @@ fn read_packet(
 
 fn on_stdin_line(writer: &mut ClientWriter, line: String) -> Result<()> {
     let line = line.trim();
-    writer.send_packet(ChatRequest { message: line })?;
+    if !line.is_empty() {
+        writer.send_packet(ChatRequest { message: line })?;
+    }
 
     Ok(())
 }

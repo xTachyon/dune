@@ -27,7 +27,7 @@ impl TrafficPlayer {
 
     fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
         let mut data = disk_packet.data;
-        let packet = protocol::just_deserialize(
+        let packet = protocol::deserialize(
             self.state,
             disk_packet.direction,
             disk_packet.id,

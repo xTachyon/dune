@@ -56,7 +56,7 @@ pub(crate) struct PacketData<'x> {
 pub(crate) fn read_packet_info<'r>(
     buffer: &'r [u8],
     tmp: &'r mut Vec<u8>,
-    mut compression: bool,
+    compression: bool,
 ) -> Result<Option<PacketData<'r>>> {
     if !has_enough_bytes(buffer) {
         return Ok(None);
@@ -64,19 +64,18 @@ pub(crate) fn read_packet_info<'r>(
     let mut reader = buffer;
     let (length, length_size) = read_varint_with_size(&mut reader)?;
 
-    let total_size = length as usize + length_size;
     if compression {
         let data_length = read_varint(&mut reader)?;
-        compression = data_length != 0;
-        if compression {
+        if data_length != 0 {
             tmp.clear();
-
+            
             let mut decompress = ZlibDecoder::new(&mut reader);
             decompress.read_to_end(tmp)?;
             reader = tmp;
         }
     }
-
+    
+    let total_size = length as usize + length_size;
     let id = read_varint(&mut reader)? as u32;
     let result = PacketData {
         id,
@@ -87,7 +86,7 @@ pub(crate) fn read_packet_info<'r>(
     Ok(Some(result))
 }
 
-pub fn just_deserialize<'r>(
+pub fn deserialize<'r>(
     state: ConnectionState,
     direction: PacketDirection,
     id: u32,

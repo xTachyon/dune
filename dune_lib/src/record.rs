@@ -126,7 +126,7 @@ impl Proxy {
             None => return Ok(None),
         };
         let mut data = packet_data.data;
-        let packet = protocol::just_deserialize(self.state, direction, packet_data.id, &mut data)?;
+        let packet = protocol::deserialize(self.state, direction, packet_data.id, &mut data)?;
 
         println!("{:?}", packet);
         let mut skip = false;
