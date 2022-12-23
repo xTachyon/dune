@@ -14,7 +14,7 @@ use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, UseEntityKind};
 use dune_lib::nbt::Tag;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
-use dune_lib::record::{record_to_file, AuthData};
+use dune_lib::record::record_to_file;
 use dune_lib::replay::play;
 use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
 use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
@@ -42,8 +42,8 @@ struct Args {
 enum Action {
     Record { option: Option<String> },
     Replay { option: String },
+    Client { option: Option<String> },
     Signs { path: String },
-    Client,
 }
 struct EventHandler {
     player_name: String,
@@ -439,8 +439,16 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
     })
 }
 
-fn do_client(auth_data: AuthData) -> Result<()> {
-    client::run("127.0.0.1:25566".parse()?, auth_data)?;
+fn do_client(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) -> Result<()> {
+    let server = match server {
+        Some(name) => match config.servers.iter().find(|x| x.name == name) {
+            Some(x) => x,
+            None => bail!("unknown server {}", name),
+        },
+        None => &config.servers[config.default_server],
+    };
+
+    client::run(auth_data_ext.data, (server.addr, server.port))?;
 
     Ok(())
 }
@@ -459,8 +467,8 @@ fn main_impl() -> Result<()> {
             let handler = Box::new(EventHandler::new());
             play(&option, handler)
         }
+        Action::Client { option } => do_client(config, auth_data_ext, option),
         Action::Signs { path } => print_signs(path),
-        Action::Client => do_client(auth_data_ext.data),
     }
 }
 

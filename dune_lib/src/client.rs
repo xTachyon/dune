@@ -14,7 +14,7 @@ use log::warn;
 use polling::{Event, Poller};
 use std::borrow::Borrow;
 use std::io::{stdin, BufRead, Read, Write};
-use std::net::{SocketAddr, TcpStream};
+use std::net::TcpStream;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
@@ -122,11 +122,12 @@ impl Client {
     }
 }
 
-fn send_start(client: &mut ClientWriter, username: &str) -> Result<()> {
+fn send_start(client: &mut ClientWriter, username: &str, server_host: (&str, u16)) -> Result<()> {
+    let (addr, port) = server_host;
     let p = SetProtocolRequest {
         protocol_version: 758,
-        server_host: "localhost",
-        server_port: 25566,
+        server_host: addr,
+        server_port: port,
         next_state: ConnectionState::Login as i32,
     };
     client.send_packet(p)?;
@@ -228,10 +229,10 @@ fn spawn_stdin_thread(poller: Arc<Poller>) -> Result<Receiver<String>> {
     Ok(receiver)
 }
 
-pub fn run(addr: SocketAddr, mut auth_data: AuthData) -> Result<()> {
+pub fn run(mut auth_data: AuthData, server_host: (&str, u16)) -> Result<()> {
     const SOCKET_KEY: usize = 0;
 
-    let mut socket = TcpStream::connect(addr)?;
+    let mut socket = TcpStream::connect(server_host)?;
     socket.set_nonblocking(true)?;
 
     let poller = Arc::new(Poller::new()?);
@@ -244,7 +245,7 @@ pub fn run(addr: SocketAddr, mut auth_data: AuthData) -> Result<()> {
     let mut buffer = [0; 4096];
 
     let receiver = spawn_stdin_thread(poller.clone())?;
-    send_start(&mut session.writer, &auth_data.name)?;
+    send_start(&mut session.writer, &auth_data.name, server_host)?;
 
     loop {
         events.clear();
