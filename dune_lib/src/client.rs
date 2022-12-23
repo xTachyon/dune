@@ -10,7 +10,7 @@ use aes::cipher::AsyncStreamCipher;
 use anyhow::Result;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use log::{warn};
+use log::warn;
 use polling::{Event, Poller};
 use std::borrow::Borrow;
 use std::io::{stdin, BufRead, Read, Write};

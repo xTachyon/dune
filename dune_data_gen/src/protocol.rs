@@ -102,7 +102,10 @@ impl<'x> Ty<'x> {
                 let base_type = match (size, x.unsigned) {
                     (32, false) => Ty::U32,
                     (64, false) => Ty::U64,
-                    _ => unreachable!("unknown bitfield with size={},unsigned={}", size, x.unsigned)
+                    _ => unreachable!(
+                        "unknown bitfield with size={},unsigned={}",
+                        size, x.unsigned
+                    ),
                 };
                 base_type.get_simple_type()
             }
@@ -113,7 +116,7 @@ impl<'x> Ty<'x> {
         use Ty::*;
         match self {
             I64 => 64,
-            _ => unreachable!("unknown type {:?}", self)
+            _ => unreachable!("unknown type {:?}", self),
         }
     }
 }
@@ -123,7 +126,7 @@ fn width_for_bitfields(size: u16) -> u16 {
         9..=16 => 16,
         17..=32 => 32,
         33..=64 => 64,
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 

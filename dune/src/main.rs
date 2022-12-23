@@ -29,7 +29,6 @@ use std::fs::{self, File};
 use std::intrinsics::unlikely;
 use std::io::BufWriter;
 use std::io::Write;
-use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Instant;
 
 ///Tool for replaying saves with game input
@@ -273,7 +272,7 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
             "offline"
         };
         println!(
-            "{}: {} ({})\n{}: {}\n{}: {} ({})\n",
+            "{}: {} ({})\n{}: {}\n{}: {} ({}:{})\n",
             Green.paint("minecraft profile"),
             Cyan.paint(&auth_data_ext.data.name),
             Purple.paint(online_str),
@@ -281,7 +280,8 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
             Cyan.paint(listen_addr),
             Green.paint("server           "),
             Cyan.paint(server.name),
-            Purple.paint(server.address.to_string())
+            Purple.paint(server.addr),
+            Purple.paint(server.port.to_string()),
         );
 
         let packet_file = format!(
@@ -293,8 +293,8 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
 
         record_to_file(
             listen_addr,
-            server.address,
             auth_data_ext.data.clone(),
+            (server.addr, server.port),
             &packet_file,
         )?;
 
@@ -394,7 +394,8 @@ struct ConfigJson<'x> {
 struct ConfigServer<'x> {
     name: &'x str,
     profile: &'x str,
-    address: SocketAddr,
+    addr: &'x str,
+    port: u16,
 }
 
 struct Config<'x> {
@@ -407,12 +408,12 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
     let mut default_server_index = None;
 
     for (index, s) in input.servers.into_iter().enumerate() {
-        let addr = if s.address.contains(':') {
-            s.address.to_string()
+        let (addr, port) = if let Some((addr, port)) = s.address.split_once(':') {
+            let port = port.parse()?;
+            (addr, port)
         } else {
-            format!("{}:25565", s.address)
+            (s.address, 25565)
         };
-        let addr = addr.to_socket_addrs()?.into_iter().next().unwrap();
 
         if s.name == input.default_server {
             default_server_index = Some(index);
@@ -424,7 +425,8 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
         servers.push(ConfigServer {
             name: s.name,
             profile: s.profile,
-            address: addr,
+            addr,
+            port,
         });
     }
     let default_server = match default_server_index {

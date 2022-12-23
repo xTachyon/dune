@@ -68,13 +68,13 @@ pub(crate) fn read_packet_info<'r>(
         let data_length = read_varint(&mut reader)?;
         if data_length != 0 {
             tmp.clear();
-            
+
             let mut decompress = ZlibDecoder::new(&mut reader);
             decompress.read_to_end(tmp)?;
             reader = tmp;
         }
     }
-    
+
     let total_size = length as usize + length_size;
     let id = read_varint(&mut reader)? as u32;
     let result = PacketData {

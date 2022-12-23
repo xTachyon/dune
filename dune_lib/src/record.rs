@@ -1,4 +1,5 @@
 use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
+use crate::protocol::v1_18_2::handshaking::SetProtocolRequest;
 use crate::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
 use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use crate::{protocol, DiskPacket};
@@ -13,7 +14,7 @@ use serde_derive::Serialize;
 use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 
 #[derive(Clone)]
 pub struct AuthData {
@@ -22,11 +23,12 @@ pub struct AuthData {
     pub name: String,
 }
 
-struct Proxy {
+struct Proxy<'x> {
     state: ConnectionState,
     compression: bool,
     start_done: bool,
     auth_data: AuthData,
+    server_host: (&'x str, u16),
     out_file: ZlibEncoder<File>,
 }
 
@@ -99,14 +101,15 @@ pub(crate) fn crypt_reply(
     Ok(result)
 }
 
-impl Proxy {
-    fn new(auth_data: AuthData, out_path: &str) -> Result<Proxy> {
+impl<'x> Proxy<'x> {
+    fn new(auth_data: AuthData, server_host: (&'x str, u16), out_path: &str) -> Result<Proxy<'x>> {
         let file = File::create(out_path)?;
         Ok(Proxy {
             state: ConnectionState::Handshaking,
             compression: false,
             start_done: false,
-            auth_data: auth_data,
+            auth_data,
+            server_host,
             out_file: ZlibEncoder::new(file, Compression::best()),
         })
     }
@@ -115,6 +118,7 @@ impl Proxy {
         &mut self,
         src_reader: &'p mut ClientReader,
         src_writer: &mut ClientWriter,
+        dest_writer: &mut ClientWriter,
         direction: PacketDirection,
     ) -> Result<Option<OnStartResult<'p>>> {
         let packet_data = match protocol::read_packet_info(
@@ -131,16 +135,28 @@ impl Proxy {
         println!("{:?}", packet);
         let mut skip = false;
         match packet {
-            Packet::SetProtocolRequest(x) => match x.next_state {
-                1 => {
-                    self.start_done = true;
-                    self.state = ConnectionState::Status;
+            Packet::SetProtocolRequest(x) => {
+                match x.next_state {
+                    1 => {
+                        self.start_done = true;
+                        self.state = ConnectionState::Status;
+                    }
+                    2 => {
+                        self.state = ConnectionState::Login;
+                    }
+                    _ => unimplemented!(),
                 }
-                2 => {
-                    self.state = ConnectionState::Login;
-                }
-                _ => unimplemented!(),
-            },
+                skip = true;
+                let (addr, port) = self.server_host;
+                let p = SetProtocolRequest {
+                    protocol_version: x.protocol_version,
+                    server_host: addr,
+                    server_port: port,
+                    next_state: x.next_state,
+                };
+                dest_writer.send_packet(p)?;
+            }
+
             // ---------------------------------------------------
             Packet::SuccessResponse(_) => {
                 self.start_done = true;
@@ -165,13 +181,13 @@ impl Proxy {
         &mut self,
         src_reader: &mut ClientReader,
         src_writer: &mut ClientWriter,
-        dest: &mut ClientWriter,
+        dest_writer: &mut ClientWriter,
         buf: &[u8],
         direction: PacketDirection,
     ) -> Result<()> {
         src_reader.add(buf);
 
-        while let Some(result) = self.on_start(src_reader, src_writer, direction)? {
+        while let Some(result) = self.on_start(src_reader, src_writer, dest_writer, direction)? {
             let packet_data = result.packet_data;
             let data = packet_data.data;
             let total_size_original = packet_data.total_size;
@@ -185,7 +201,7 @@ impl Proxy {
                 disk_packet.write(&mut self.out_file)?;
 
                 let bytes = &src_reader.buffer[..total_size_original];
-                dest.add(bytes);
+                dest_writer.add(bytes);
             }
             src_reader.buffer.advance(total_size_original);
         }
@@ -217,6 +233,7 @@ fn run(
     mut client_socket: TcpStream,
     mut server_socket: TcpStream,
     auth_data: AuthData,
+    server_host: (&str, u16),
     out_path: &str,
 ) -> Result<()> {
     const CLIENT_KEY: usize = 0;
@@ -227,7 +244,7 @@ fn run(
     let mut server_reader = ClientReader::default();
     let mut server_writer = ClientWriter::default();
 
-    let mut proxy = Proxy::new(auth_data, out_path)?;
+    let mut proxy = Proxy::new(auth_data, server_host, out_path)?;
 
     let poller = Poller::new()?;
 
@@ -295,8 +312,8 @@ fn run(
 
 pub fn record_to_file(
     listen_addr: &str,
-    server_address: SocketAddr,
     auth_data: AuthData,
+    server_host: (&str, u16),
     out_path: &str,
 ) -> Result<()> {
     let (client, client_addr) = {
@@ -307,10 +324,10 @@ pub fn record_to_file(
     };
     println!("got a connection from {}", client_addr);
 
-    let server = TcpStream::connect(server_address)?;
+    let server = TcpStream::connect(server_host)?;
     println!("connected to server");
 
-    let res = run(client, server, auth_data, out_path);
+    let res = run(client, server, auth_data, server_host, out_path);
     println!("{:?}", res);
     Ok(())
 }

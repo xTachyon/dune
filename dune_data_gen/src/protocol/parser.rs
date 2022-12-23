@@ -10,7 +10,10 @@ use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
 
-use super::{ConnectionState, Direction, Packet, State, Ty, TyArray, TyOption, TyStruct, TyBitfield, width_for_bitfields};
+use super::{
+    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
+    TyOption, TyStruct,
+};
 
 #[derive(Debug, Deserialize)]
 struct JsonDirection {
@@ -201,7 +204,7 @@ fn parse_container<'x>(
     } else {
         let ty = match bitfield_range {
             64 => parser.ty_i64,
-            _ => unreachable!("unknown type with size={}", bitfield_range)
+            _ => unreachable!("unknown type with size={}", bitfield_range),
         };
         Some(ty)
     };

@@ -37,7 +37,7 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
         cfg_if! {
             if #[cfg(target_os = "windows")] {
                 use std::env;
-                
+
                 format!("{}/{}/accounts.json", env::var("appdata")?, path)
             } else if #[cfg(target_os = "linux")] {
                 use std::env;
