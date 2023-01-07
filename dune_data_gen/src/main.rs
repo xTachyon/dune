@@ -126,6 +126,18 @@ fn process_items(versions: &HashMap<&str, Version>) {
     }
 
     *out += "} impl Item {";
+    *out += r#"pub fn from_str_id(id: &str) -> anyhow::Result<Self> {
+        use Item::*;
+        const MINECRAFT: &str = "minecraft:";
+        let id = match id.strip_prefix(MINECRAFT) {
+            Some(x) => x,
+            None => anyhow::bail!("unknown item id: {}", id),
+        };
+        let result = match id {"#;
+    for item in items.iter() {
+        write!(out, r#""{}" => {},"#, item.name, title_case(&item.name)).unwrap();
+    }
+    *out += r#"_ => anyhow::bail!("unknown item id: {}", id) }; Ok(result)}"#;
 
     for (v, map) in items_by_version {
         write!(
@@ -220,9 +232,7 @@ impl Enchantment {
 
 fn main() {
     let versions: HashMap<&str, Version> = [(V1_18_2, new(V1_18_2))].into_iter().collect();
-    if false {
-        process_items(&versions);
-        process_enchants(&versions);
-    }
+    process_items(&versions);
+    process_enchants(&versions);
     protocol::run(&versions[V1_18_2].protocol_path);
 }

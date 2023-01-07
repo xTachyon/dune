@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::nbt::Tag;
+use crate::Item;
 use crate::{chat::parse_chat, events::PositionInt, nbt, HashMapExt};
 use anyhow::Result;
 use bumpalo::collections::Vec as BVec;
@@ -17,10 +18,20 @@ pub struct BrewingStand {
     pub fuel: i8,
     pub brew_time: i16,
 }
+#[derive(Debug)]
+
+pub struct ItemSlot {
+    pub item: Item,
+    pub count: u8,
+}
+pub struct Chest {
+    pub items: Vec<ItemSlot>,
+}
 
 pub enum BlockEntityKind {
     Sign(Sign),
     BrewingStand(BrewingStand),
+    Chest(Chest),
     Bed,
     Bell,
 }
@@ -57,6 +68,21 @@ pub fn read_block_entity(id: &str, mut nbt: HashMap<&str, Tag>) -> Result<Option
             let brew_time = nbt.remove_err("BrewTime")?.short()?;
 
             BlockEntityKind::BrewingStand(BrewingStand { fuel, brew_time })
+        }
+        "minecraft:chest" => {
+            let items_in = nbt.remove_err("Items")?.list()?;
+            let mut items = Vec::with_capacity(items_in.len());
+            for i in items_in {
+                let mut i = i.compound()?;
+
+                let id = i.remove_err("id")?.string()?;
+                let item = Item::from_str_id(id)?;
+                let count = i.remove_err("Count")?.byte()?.try_into()?;
+
+                items.push(ItemSlot { item, count });
+            }
+
+            BlockEntityKind::Chest(Chest { items })
         }
         "minecraft:bed" => BlockEntityKind::Bed,
         "minecraft:bell" => BlockEntityKind::Bell,
