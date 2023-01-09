@@ -404,6 +404,7 @@ dependencies = [
  "cfb8",
  "cipher 0.4.3",
  "flate2",
+ "lazy_static",
  "log",
  "num-bigint",
  "num_enum",

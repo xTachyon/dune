@@ -120,30 +120,29 @@ fn process_items(versions: &HashMap<&str, Version>) {
     fs::write(JSON_PATH, out).unwrap();
 
     let out = &mut String::with_capacity(4096);
-    *out += "#[derive(Debug)] pub enum Item {";
+    *out += "use std::collections::HashMap;
+    use Item::*;
+    
+    #[derive(Debug, Clone, Copy)] pub enum Item {";
     for (index, item) in items.iter().enumerate() {
         write!(out, "{} = {},", title_case(&item.name), index).unwrap();
     }
 
-    *out += "} impl Item {";
+    *out += "}
+    impl Item {";
     *out += r#"pub fn from_str_id(id: &str) -> anyhow::Result<Self> {
-        use Item::*;
         const MINECRAFT: &str = "minecraft:";
         let id = match id.strip_prefix(MINECRAFT) {
             Some(x) => x,
             None => anyhow::bail!("unknown item id: {}", id),
         };
-        let result = match id {"#;
-    for item in items.iter() {
-        write!(out, r#""{}" => {},"#, item.name, title_case(&item.name)).unwrap();
-    }
-    *out += r#"_ => anyhow::bail!("unknown item id: {}", id) }; Ok(result)}"#;
+        ITEMS.get(id).copied().ok_or_else(|| anyhow::anyhow!("unknown item id: {}", id))
+    }"#;
 
     for (v, map) in items_by_version {
         write!(
             out,
             "pub fn from_{}(id: u16) -> anyhow::Result<Self> {{
-                use Item::*;
                 let result = match id {{",
             v.replace('.', "_")
         )
@@ -165,6 +164,16 @@ fn process_items(versions: &HashMap<&str, Version>) {
         .unwrap();
     }
     *out += "}";
+
+    writeln!(out, "const DATA: [(&str, Item); {}] = [", items.len()).unwrap();
+    for item in items.iter() {
+        write!(out, r#"("{}", {}),"#, item.name, title_case(&item.name)).unwrap();
+    }
+    *out += "];
+    lazy_static::lazy_static! {
+        // Faster than a match, somehow.
+        static ref ITEMS: HashMap<&'static str, Item> = HashMap::from(DATA);
+    }";
 
     write_file_and_fmt(ITEMS_RS_PATH, out);
 }
