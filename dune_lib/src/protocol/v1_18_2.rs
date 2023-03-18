@@ -14,6 +14,7 @@ use crate::protocol::varint::read_varint;
 use crate::protocol::varint::read_varlong;
 use crate::protocol::varint::write_varint;
 use crate::protocol::varint::write_varlong;
+use crate::protocol::ChunkBlockEntity;
 use crate::protocol::ConnectionState;
 use crate::protocol::IndexedNbt;
 use crate::protocol::IndexedOptionNbt;
@@ -2615,17 +2616,89 @@ pub mod play {
         }
     }
     #[derive(Debug)]
-    pub struct MapChunkResponse {}
-    impl<'p> MD<'p> for MapChunkResponse {
-        fn deserialize(mut _reader: &mut &[u8]) -> Result<MapChunkResponse> {
-            // failed
+    pub struct MapChunkResponse<'p> {
+        pub x: i32,
+        pub z: i32,
+        pub heightmaps: IndexedNbt<'p>,
+        pub chunk_data: &'p [u8],
+        pub block_entities: Vec<ChunkBlockEntity<'p>>,
+        pub trust_edges: bool,
+        pub sky_light_mask: Vec<i64>,
+        pub block_light_mask: Vec<i64>,
+        pub empty_sky_light_mask: Vec<i64>,
+        pub empty_block_light_mask: Vec<i64>,
+        pub sky_light: Vec<&'p [u8]>,
+        pub block_light: Vec<&'p [u8]>,
+    }
+    impl<'p> MD<'p> for MapChunkResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<MapChunkResponse<'p>> {
+            let x: i32 = MD::deserialize(reader)?;
+            let z: i32 = MD::deserialize(reader)?;
+            let heightmaps: IndexedNbt<'p> = MD::deserialize(reader)?;
+            let chunk_data: &'p [u8] = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut block_entities = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: ChunkBlockEntity = MD::deserialize(reader)?;
+                block_entities.push(x);
+            }
+            let trust_edges: bool = MD::deserialize(reader)?;
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                sky_light_mask.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut block_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                block_light_mask.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut empty_sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                empty_sky_light_mask.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut empty_block_light_mask =
+                Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: i64 = MD::deserialize(reader)?;
+                empty_block_light_mask.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut sky_light = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: &'p [u8] = MD::deserialize(reader)?;
+                sky_light.push(x);
+            }
+            let array_count: i32 = read_varint(&mut reader)?;
+            let mut block_light = Vec::with_capacity(cautious_size(array_count as usize));
+            for _ in 0..array_count {
+                let x: &'p [u8] = MD::deserialize(reader)?;
+                block_light.push(x);
+            }
 
-            let result = MapChunkResponse {};
+            let result = MapChunkResponse {
+                x,
+                z,
+                heightmaps,
+                chunk_data,
+                block_entities,
+                trust_edges,
+                sky_light_mask,
+                block_light_mask,
+                empty_sky_light_mask,
+                empty_block_light_mask,
+                sky_light,
+                block_light,
+            };
             Ok(result)
         }
-        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
-            write_varint(&mut writer, 0x22)?;
-            Ok(())
+        fn serialize<W: Write>(&self, mut _writer: &mut W) -> IoResult<()> {
+            unimplemented!();
         }
     }
     #[derive(Debug)]
@@ -2674,7 +2747,7 @@ pub mod play {
         }
     }
     #[derive(Debug)]
-    pub struct UpdateLightResponse {
+    pub struct UpdateLightResponse<'p> {
         pub chunk_x: i32,
         pub chunk_z: i32,
         pub trust_edges: bool,
@@ -2682,11 +2755,11 @@ pub mod play {
         pub block_light_mask: Vec<i64>,
         pub empty_sky_light_mask: Vec<i64>,
         pub empty_block_light_mask: Vec<i64>,
-        pub sky_light: Vec<Vec<u8>>,
-        pub block_light: Vec<Vec<u8>>,
+        pub sky_light: Vec<&'p [u8]>,
+        pub block_light: Vec<&'p [u8]>,
     }
-    impl<'p> MD<'p> for UpdateLightResponse {
-        fn deserialize(mut reader: &mut &[u8]) -> Result<UpdateLightResponse> {
+    impl<'p> MD<'p> for UpdateLightResponse<'p> {
+        fn deserialize(mut reader: &mut &'p [u8]) -> Result<UpdateLightResponse<'p>> {
             let chunk_x: i32 = read_varint(&mut reader)?;
             let chunk_z: i32 = read_varint(&mut reader)?;
             let trust_edges: bool = MD::deserialize(reader)?;
@@ -2718,23 +2791,13 @@ pub mod play {
             let array_count: i32 = read_varint(&mut reader)?;
             let mut sky_light = Vec::with_capacity(cautious_size(array_count as usize));
             for _ in 0..array_count {
-                let array_count: i32 = read_varint(&mut reader)?;
-                let mut x = Vec::with_capacity(cautious_size(array_count as usize));
-                for _ in 0..array_count {
-                    let x_2: u8 = MD::deserialize(reader)?;
-                    x.push(x_2);
-                }
+                let x: &'p [u8] = MD::deserialize(reader)?;
                 sky_light.push(x);
             }
             let array_count: i32 = read_varint(&mut reader)?;
             let mut block_light = Vec::with_capacity(cautious_size(array_count as usize));
             for _ in 0..array_count {
-                let array_count: i32 = read_varint(&mut reader)?;
-                let mut x = Vec::with_capacity(cautious_size(array_count as usize));
-                for _ in 0..array_count {
-                    let x_2: u8 = MD::deserialize(reader)?;
-                    x.push(x_2);
-                }
+                let x: &'p [u8] = MD::deserialize(reader)?;
                 block_light.push(x);
             }
 
@@ -4593,10 +4656,10 @@ pub enum Packet<'p> {
     GameStateChangeResponse(play::GameStateChangeResponse),
     OpenHorseWindowResponse(play::OpenHorseWindowResponse),
     KeepAliveResponse(play::KeepAliveResponse),
-    MapChunkResponse(play::MapChunkResponse),
+    MapChunkResponse(play::MapChunkResponse<'p>),
     WorldEventResponse(play::WorldEventResponse),
     WorldParticlesResponse(play::WorldParticlesResponse),
-    UpdateLightResponse(play::UpdateLightResponse),
+    UpdateLightResponse(play::UpdateLightResponse<'p>),
     LoginResponse(play::LoginResponse<'p>),
     MapResponse(play::MapResponse),
     TradeListResponse(play::TradeListResponse<'p>),

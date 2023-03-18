@@ -53,6 +53,16 @@ pub(crate) struct PacketData<'x> {
     pub data: &'x [u8],
 }
 
+#[derive(Debug)]
+#[allow(dead_code)] // TODO: remove?
+pub struct ChunkBlockEntity<'x> {
+    x: u8,
+    z: u8,
+    y: i16,
+    type_: i32,
+    nbt_data: IndexedOptionNbt<'x>,
+}
+
 pub(crate) fn read_packet_info<'r>(
     buffer: &'r [u8],
     tmp: &'r mut Vec<u8>,

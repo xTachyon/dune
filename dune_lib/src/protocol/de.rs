@@ -5,7 +5,7 @@ use byteorder::ReadBytesExt;
 use std::io::{self, Read, Result as IoResult, Write};
 
 use super::varint::write_varint;
-use super::{IndexedNbt, IndexedOptionNbt, InventorySlot, InventorySlotData};
+use super::{ChunkBlockEntity, IndexedNbt, IndexedOptionNbt, InventorySlot, InventorySlotData};
 
 pub(crate) trait MemoryExt<'x> {
     fn read_mem(&mut self, size: usize) -> IoResult<&'x [u8]>;
@@ -244,4 +244,26 @@ impl<'x> MD<'x> for Position {
 pub(super) fn cautious_size(size: usize) -> usize {
     const LIMIT: usize = 4096;
     size.min(LIMIT)
+}
+
+impl<'x> MD<'x> for ChunkBlockEntity<'x> {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let xz = u8::deserialize(memory)?;
+        let x = xz & 0b1111;
+        let z = xz >> 4;
+        let y = i16::deserialize(memory)?;
+        let type_ = read_varint(memory)?;
+        let nbt_data = IndexedOptionNbt::deserialize(memory)?;
+
+        Ok(ChunkBlockEntity {
+            x,
+            z,
+            y,
+            type_,
+            nbt_data,
+        })
+    }
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
+    }
 }

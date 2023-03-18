@@ -62,6 +62,7 @@ struct Parser<'x> {
     ty_slot: &'x Ty<'x>,
     ty_nbt: &'x Ty<'x>,
     ty_optional_nbt: &'x Ty<'x>,
+    ty_chunk_block_entity: &'x Ty<'x>,
 }
 impl<'x> Parser<'x> {
     fn new(bump: &Bump) -> Parser {
@@ -88,6 +89,7 @@ impl<'x> Parser<'x> {
         let ty_slot = bump.alloc(Ty::Slot);
         let ty_nbt = bump.alloc(Ty::NBT);
         let ty_optional_nbt = bump.alloc(Ty::OptionNBT);
+        let ty_chunk_block_entity = bump.alloc(Ty::ChunkBlockEntity);
 
         Parser {
             bump,
@@ -116,6 +118,7 @@ impl<'x> Parser<'x> {
             ty_slot,
             ty_nbt,
             ty_optional_nbt,
+            ty_chunk_block_entity,
         }
     }
 
@@ -253,10 +256,20 @@ fn parse_array<'x>(
     let subtype = &input["type"];
     let subtype = parse_type(parser, subtype, struct_name, parent_field)?;
 
-    let t = Ty::Array(TyArray { count_ty, subtype });
-    Some(parser.alloc_type(t))
+    let t = if *count_ty == Ty::VarInt && *subtype == Ty::U8 {
+        parser.ty_buffer
+    } else {
+        let t = Ty::Array(TyArray { count_ty, subtype });
+        parser.alloc_type(t)
+    };
+
+    Some(t)
 }
-fn parse_type_simple<'x>(parser: &Parser<'x>, input: &str) -> Option<&'x Ty<'x>> {
+fn parse_type_simple<'x>(
+    parser: &Parser<'x>,
+    input: &str,
+    struct_name: &str,
+) -> Option<&'x Ty<'x>> {
     let r = match input {
         "u8" => parser.ty_u8,
         "u16" => parser.ty_u16,
@@ -280,8 +293,12 @@ fn parse_type_simple<'x>(parser: &Parser<'x>, input: &str) -> Option<&'x Ty<'x>>
         "slot" => parser.ty_slot,
         "nbt" => parser.ty_nbt,
         "optionalNbt" => parser.ty_optional_nbt,
+        "chunkBlockEntity" => parser.ty_chunk_block_entity,
 
-        _ => return None,
+        _ => {
+            eprintln!("unknown type `{}` in `{}`", input, struct_name);
+            return None;
+        }
     };
     Some(r)
 }
@@ -292,7 +309,7 @@ fn parse_type<'x>(
     parent_field: Option<&str>,
 ) -> Option<&'x Ty<'x>> {
     if let Some(x) = input.as_str() {
-        return parse_type_simple(parser, x);
+        return parse_type_simple(parser, x, struct_name);
     }
 
     let name = input[0].as_str().unwrap();

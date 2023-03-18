@@ -53,6 +53,7 @@ enum Ty<'x> {
     Slot,
     NBT,
     OptionNBT,
+    ChunkBlockEntity,
 
     Struct(TyStruct<'x>),
     Option(TyOption<'x>),
@@ -64,7 +65,7 @@ impl<'x> Ty<'x> {
     fn needs_lifetime(&self) -> bool {
         use Ty::*;
         match self {
-            String | Buffer | RestBuffer | Slot | NBT | OptionNBT => true,
+            String | Buffer | RestBuffer | Slot | NBT | OptionNBT | ChunkBlockEntity => true,
             Struct(x) => x.fields.iter().map(|x| x.1).any(Ty::needs_lifetime),
             Option(x) => x.subtype.needs_lifetime(),
             Array(x) => x.subtype.needs_lifetime(),
@@ -97,6 +98,7 @@ impl<'x> Ty<'x> {
             Slot => "InventorySlot<'p>",
             NBT => "IndexedNbt<'p>",
             OptionNBT => "IndexedOptionNbt<'p>",
+            ChunkBlockEntity => "ChunkBlockEntity",
             Bitfield(x) => {
                 let size = width_for_bitfields(x.range_end - x.range_begin);
                 let base_type = match (size, x.unsigned) {

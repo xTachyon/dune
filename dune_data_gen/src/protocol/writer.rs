@@ -316,6 +316,7 @@ use crate::protocol::IndexedNbt;
 use crate::protocol::IndexedOptionNbt;
 use crate::protocol::InventorySlot;
 use crate::protocol::PacketDirection;
+use crate::protocol::ChunkBlockEntity;
 use anyhow::{anyhow, Result};
 use std::io::{Result as IoResult, Write};
     ";
