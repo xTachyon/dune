@@ -7,6 +7,7 @@
 #![allow(unused_variables)]
 // fix
 
+use super::de::MemoryExt;
 use crate::protocol::de::cautious_size;
 use crate::protocol::de::Position;
 use crate::protocol::de::MD;
@@ -20,8 +21,10 @@ use crate::protocol::IndexedNbt;
 use crate::protocol::IndexedOptionNbt;
 use crate::protocol::InventorySlot;
 use crate::protocol::PacketDirection;
+use crate::protocol::UnalignedSliceI64;
 use anyhow::{anyhow, Result};
 use std::io::{Result as IoResult, Write};
+use std::mem::size_of;
 
 pub mod handshaking {
     use super::*;
@@ -2623,10 +2626,10 @@ pub mod play {
         pub chunk_data: &'p [u8],
         pub block_entities: Vec<ChunkBlockEntity<'p>>,
         pub trust_edges: bool,
-        pub sky_light_mask: Vec<i64>,
-        pub block_light_mask: Vec<i64>,
-        pub empty_sky_light_mask: Vec<i64>,
-        pub empty_block_light_mask: Vec<i64>,
+        pub sky_light_mask: UnalignedSliceI64<'p>,
+        pub block_light_mask: UnalignedSliceI64<'p>,
+        pub empty_sky_light_mask: UnalignedSliceI64<'p>,
+        pub empty_block_light_mask: UnalignedSliceI64<'p>,
         pub sky_light: Vec<&'p [u8]>,
         pub block_light: Vec<&'p [u8]>,
     }
@@ -2644,30 +2647,17 @@ pub mod play {
             }
             let trust_edges: bool = MD::deserialize(reader)?;
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                sky_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let sky_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut block_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                block_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let block_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut empty_sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                empty_sky_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let empty_sky_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut empty_block_light_mask =
-                Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                empty_block_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let empty_block_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
             let mut sky_light = Vec::with_capacity(cautious_size(array_count as usize));
             for _ in 0..array_count {
@@ -2751,10 +2741,10 @@ pub mod play {
         pub chunk_x: i32,
         pub chunk_z: i32,
         pub trust_edges: bool,
-        pub sky_light_mask: Vec<i64>,
-        pub block_light_mask: Vec<i64>,
-        pub empty_sky_light_mask: Vec<i64>,
-        pub empty_block_light_mask: Vec<i64>,
+        pub sky_light_mask: UnalignedSliceI64<'p>,
+        pub block_light_mask: UnalignedSliceI64<'p>,
+        pub empty_sky_light_mask: UnalignedSliceI64<'p>,
+        pub empty_block_light_mask: UnalignedSliceI64<'p>,
         pub sky_light: Vec<&'p [u8]>,
         pub block_light: Vec<&'p [u8]>,
     }
@@ -2764,30 +2754,17 @@ pub mod play {
             let chunk_z: i32 = read_varint(&mut reader)?;
             let trust_edges: bool = MD::deserialize(reader)?;
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                sky_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let sky_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut block_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                block_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let block_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut empty_sky_light_mask = Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                empty_sky_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let empty_sky_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
-            let mut empty_block_light_mask =
-                Vec::with_capacity(cautious_size(array_count as usize));
-            for _ in 0..array_count {
-                let x: i64 = MD::deserialize(reader)?;
-                empty_block_light_mask.push(x);
-            }
+            let mem = reader.read_mem(array_count as usize * size_of::<i64>())?;
+            let empty_block_light_mask = UnalignedSliceI64::new(mem);
             let array_count: i32 = read_varint(&mut reader)?;
             let mut sky_light = Vec::with_capacity(cautious_size(array_count as usize));
             for _ in 0..array_count {

@@ -33,7 +33,18 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
             lifetime(x.subtype)
         )
         .into(),
-        Ty::Array(x) => format!("Vec<{}{}>", get_type_name(x.subtype), lifetime(x.subtype)).into(),
+        Ty::Array(x) => {
+            if x.subtype.is_rs_builtin() {
+                // should've made a type with this..
+                format!(
+                    "UnalignedSlice{}<'p>",
+                    x.subtype.get_simple_type().to_uppercase()
+                )
+                .into()
+            } else {
+                format!("Vec<{}{}>", get_type_name(x.subtype), lifetime(x.subtype)).into()
+            }
+        }
         Ty::Struct(x) => x.name.as_str().into(),
         _ => ty.get_simple_type().into(),
     }
@@ -53,6 +64,18 @@ fn deserialize_one(
             bitfield_base_width,
             count + 1,
         )?;
+        if x.subtype.is_rs_builtin() {
+            write!(
+                out,
+                "let mem = reader.read_mem(array_count as usize * size_of::<{}>())?;
+                let {} = UnalignedSlice{}::new(mem);",
+                x.subtype.get_simple_type(),
+                name,
+                x.subtype.get_simple_type().to_uppercase(),
+            )?;
+            return Ok(());
+        }
+
         write!(
             out,
             "let mut {} = Vec::with_capacity(cautious_size(array_count as usize));
@@ -317,8 +340,11 @@ use crate::protocol::IndexedOptionNbt;
 use crate::protocol::InventorySlot;
 use crate::protocol::PacketDirection;
 use crate::protocol::ChunkBlockEntity;
+use crate::protocol::UnalignedSliceI64;
+use super::de::MemoryExt;
 use anyhow::{anyhow, Result};
 use std::io::{Result as IoResult, Write};
+use std::mem::size_of;
     ";
     for i in states.iter() {
         state(&mut out, i)?;

@@ -6,7 +6,9 @@ use crate::protocol::varint::{read_varint, read_varint_with_size};
 use anyhow::Result;
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
+use std::fmt::Debug;
 use std::io::Read;
+use std::mem::size_of;
 pub use v1_18_2::de_packets;
 pub use v1_18_2::Packet;
 
@@ -62,6 +64,66 @@ pub struct ChunkBlockEntity<'x> {
     type_: i32,
     nbt_data: IndexedOptionNbt<'x>,
 }
+
+macro_rules! impl_unaligned_slice_be {
+    ($name:ident, $name_it:ident, $t:ty) => {
+        #[derive(Copy, Clone)]
+        pub struct $name<'x> {
+            inner: &'x [[u8; $name::ITEM_SIZE]],
+        }
+        impl<'x> $name<'x> {
+            const ITEM_SIZE: usize = size_of::<$t>();
+
+            fn new(buffer: &'x [u8]) -> Self {
+                Self {
+                    inner: bytemuck::try_cast_slice(buffer)
+                        .expect("unaligned slice should be passed a correct sized buffer"),
+                }
+            }
+        }
+        impl<'x> IntoIterator for $name<'x> {
+            type Item = $t;
+            type IntoIter = $name_it<'x>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                $name_it { slice: self }
+            }
+        }
+
+        pub struct $name_it<'x> {
+            slice: $name<'x>,
+        }
+        impl<'x> Iterator for $name_it<'x> {
+            type Item = $t;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                match self.slice.inner {
+                    [] => None,
+                    [first, rest @ ..] => {
+                        self.slice.inner = rest;
+                        Some(<$t>::from_be_bytes(*first))
+                    }
+                }
+            }
+        }
+        impl<'x> Debug for $name<'x> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("[")?;
+                let mut first = true;
+                for i in *self {
+                    if first {
+                        first = false;
+                    } else {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{}", i)?;
+                }
+                f.write_str("]")
+            }
+        }
+    };
+}
+impl_unaligned_slice_be!(UnalignedSliceI64, UnalignedSliceI64Iterator, i64);
 
 pub(crate) fn read_packet_info<'r>(
     buffer: &'r [u8],

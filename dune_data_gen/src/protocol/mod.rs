@@ -114,6 +114,13 @@ impl<'x> Ty<'x> {
             _ => unreachable!("{:?}", self),
         }
     }
+    fn is_rs_builtin(&self) -> bool {
+        use Ty::*;
+        match self {
+            Bool | U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | F32 | F64 => true,
+            _ => false,
+        }
+    }
     fn width(&self) -> u16 {
         use Ty::*;
         match self {
