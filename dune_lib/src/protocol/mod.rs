@@ -108,17 +108,7 @@ macro_rules! impl_unaligned_slice_be {
         }
         impl<'x> Debug for $name<'x> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("[")?;
-                let mut first = true;
-                for i in *self {
-                    if first {
-                        first = false;
-                    } else {
-                        f.write_str(", ")?;
-                    }
-                    write!(f, "{}", i)?;
-                }
-                f.write_str("]")
+                write!(f, "[{} values x {} bytes]", self.inner.len(), size_of::<$t>())
             }
         }
     };
