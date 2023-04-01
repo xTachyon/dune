@@ -12,5 +12,7 @@ panic = "abort"
 [profile.release]
 debug = true
 panic = "abort"
-# lto = true
 
+[profile.release-lto]
+inherits = "release"
+lto = true
