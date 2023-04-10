@@ -7,7 +7,7 @@ use dune_lib::world::{
 };
 use std::{
     ffi::OsStr,
-    fs::{self, File},
+    fs::{self, DirEntry, File},
     io::BufWriter,
     path::Path,
     time::Instant,
@@ -98,17 +98,36 @@ fn print_region(
     Ok(())
 }
 
-fn parse_file_path(path: &PathBuf) -> (i32, i32) {
-    let mut it = path.file_name().unwrap_or_default().to_str().unwrap_or_default().split(".");
+fn parse_file_path((path, _): &(PathBuf, u64)) -> (i32, i32) {
+    let mut it = path
+        .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default()
+        .split(".");
     it.next();
-    let x = it.next().unwrap_or_default().parse::<i32>().unwrap_or_default();
-    let z = it.next().unwrap_or_default().parse::<i32>().unwrap_or_default();
+    let x = it
+        .next()
+        .unwrap_or_default()
+        .parse::<i32>()
+        .unwrap_or(i32::MIN);
+    let z = it
+        .next()
+        .unwrap_or_default()
+        .parse::<i32>()
+        .unwrap_or(i32::MIN);
     (x, z)
 }
-fn get_paths(path: String) -> Result<Vec<PathBuf>> {
+fn get_paths(path: String) -> Result<Vec<(PathBuf, u64)>> {
     let mut files = Vec::new();
+    let get = |i| -> Result<_> {
+        let i: DirEntry = i?;
+        let i = i.path();
+        let size = i.metadata()?.len();
+        Ok((i, size))
+    };
     for i in fs::read_dir(path)? {
-        let i = match i {
+        let i = match get(i) {
             Ok(x) => x,
             Err(e) => {
                 eprintln!("can't read path: {}", e);
@@ -116,7 +135,7 @@ fn get_paths(path: String) -> Result<Vec<PathBuf>> {
             }
         };
 
-        files.push(i.path());
+        files.push(i);
     }
     files.sort_by_cached_key(parse_file_path);
     Ok(files)
@@ -135,7 +154,7 @@ pub fn print(path: String) -> Result<()> {
 
     let files = get_paths(path)?;
     let files_count = files.len();
-    for (index, path) in files.into_iter().enumerate() {
+    for (index, (path, file_size)) in files.into_iter().enumerate() {
         let time = Instant::now();
         if path.extension() != Some(OsStr::new("mca")) {
             continue;
@@ -148,13 +167,14 @@ pub fn print(path: String) -> Result<()> {
         }
 
         println!(
-            "{:>4}/{} --- {:<20} --- {:>4} signs --- {:?}",
+            "{:>4}/{} --- {:<20} --- {:>4} signs --- {:>10} --- {:?}",
             index + 1,
             files_count,
             path.file_name()
                 .unwrap_or(path.as_os_str())
                 .to_string_lossy(),
             context.signs_count,
+            humansize::format_size(file_size, humansize::BINARY),
             time.elapsed(),
         );
 

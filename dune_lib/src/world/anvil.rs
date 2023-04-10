@@ -33,7 +33,7 @@ impl Region {
         let mut file = BufReader::with_capacity(128 * 1024, File::open(path)?);
 
         let file_size: usize = file.get_ref().metadata()?.len().try_into()?;
-        if file_size == 0 || file_size % SECTOR_SIZE != 0 {
+        if file_size < SECTOR_SIZE * 2 || file_size % SECTOR_SIZE != 0 {
             bail!(
                 "invalid file size: {}, for file {}",
                 file_size,
