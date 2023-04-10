@@ -1,6 +1,7 @@
 #![feature(core_intrinsics)]
 
 mod launchers;
+mod signs;
 
 use ansi_term::Color::{Cyan, Green, Purple};
 use anyhow::anyhow;
@@ -16,8 +17,6 @@ use dune_lib::nbt::Tag;
 use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
 use dune_lib::replay::play;
-use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
-use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
 use dune_lib::{client, nbt, Enchantment, Item};
 use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
@@ -25,10 +24,8 @@ use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
-use std::fs::{self, File};
+use std::fs::{self};
 use std::intrinsics::unlikely;
-use std::io::BufWriter;
-use std::io::Write;
 use std::time::Instant;
 
 ///Tool for replaying saves with game input
@@ -302,87 +299,6 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
     }
 }
 
-fn print_signs_impl(
-    chunk: Chunk,
-    max: &mut usize,
-    signs_count: &mut usize,
-    out: &mut BufWriter<File>,
-) -> Result<()> {
-    const DASHES80: &str =
-        "--------------------------------------------------------------------------------";
-
-    for i in chunk.block_entities {
-        match i.kind {
-            BlockEntityKind::Sign(sign) => {
-                if sign.text.iter().all(String::is_empty) {
-                    continue;
-                }
-                *max = sign.text.iter().map(String::len).max().unwrap_or(*max);
-
-                writeln!(
-                    out,
-                    "{},{},{}\n{:^80}\n{:^80}\n{:^80}\n{:^80}\n{}\n",
-                    i.position.x,
-                    i.position.y,
-                    i.position.z,
-                    sign.text[0],
-                    sign.text[1],
-                    sign.text[2],
-                    sign.text[3],
-                    DASHES80
-                )?;
-                *signs_count += 1;
-            }
-            BlockEntityKind::Chest(chest) => {
-                println!("{:?}", chest.items)
-            }
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-fn print_signs(path: String) -> Result<()> {
-    let mut tmp = Vec::new();
-    let bump = &mut Bump::with_capacity(128 * 1024); // 128kb based on experimentation
-
-    let mut max = 0;
-    let files: Vec<_> = fs::read_dir(path)?.collect();
-    let mut out = BufWriter::with_capacity(64 * 1024, File::create("out.txt")?);
-    let files_count = files.len();
-    for (index, file) in files.into_iter().enumerate() {
-        let time = Instant::now();
-        let file = file?;
-
-        let p = file.path();
-        let mut region = Region::load(&p, false)?;
-        let mut signs_count = 0;
-        for i in 0..CHUNKS_PER_REGION {
-            let data = region.get_chunk(&mut tmp, i)?;
-            if data.is_empty() {
-                continue;
-            }
-
-            let chunk = read_chunk(data, bump)?;
-            print_signs_impl(chunk, &mut max, &mut signs_count, &mut out)?;
-        }
-
-        println!(
-            "{:<15} => {:>4}/{}, {:>4} signs, {:?}",
-            p.file_name().unwrap_or(p.as_os_str()).to_string_lossy(),
-            index + 1,
-            files_count,
-            signs_count,
-            time.elapsed(),
-        );
-
-        bump.reset();
-    }
-    println!("max={}", max);
-
-    Ok(())
-}
-
 #[derive(Deserialize)]
 struct ConfigJsonServer<'x> {
     name: &'x str,
@@ -474,7 +390,7 @@ fn main_impl() -> Result<()> {
             play(&option, handler)
         }
         Action::Client { option } => do_client(config, auth_data_ext, option),
-        Action::Signs { path } => print_signs(path),
+        Action::Signs { path } => signs::print(path),
     }
 }
 

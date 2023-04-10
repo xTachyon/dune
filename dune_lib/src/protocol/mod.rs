@@ -108,7 +108,12 @@ macro_rules! impl_unaligned_slice_be {
         }
         impl<'x> Debug for $name<'x> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "[{} values x {} bytes]", self.inner.len(), size_of::<$t>())
+                write!(
+                    f,
+                    "[{} values x {} bytes]",
+                    self.inner.len(),
+                    size_of::<$t>()
+                )
             }
         }
     };

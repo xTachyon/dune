@@ -6,7 +6,6 @@ use crate::{chat::parse_chat, events::PositionInt, nbt, HashMapExt};
 use anyhow::Result;
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
-use log::warn;
 
 // https://minecraft.fandom.com/wiki/Chunk_format
 // Why is Fandom so annoying??
@@ -45,7 +44,11 @@ pub struct Chunk {
     pub block_entities: Vec<BlockEntity>,
 }
 
-pub fn read_block_entity(id: &str, mut nbt: HashMap<&str, Tag>) -> Result<Option<BlockEntityKind>> {
+pub fn read_block_entity(
+    id: &str,
+    mut nbt: HashMap<&str, Tag>,
+    bump: &Bump,
+) -> Result<Option<BlockEntityKind>> {
     let r = match id {
         "minecraft:sign" => {
             let mut get_text = |key: &str| -> Result<String> {
@@ -70,7 +73,10 @@ pub fn read_block_entity(id: &str, mut nbt: HashMap<&str, Tag>) -> Result<Option
             BlockEntityKind::BrewingStand(BrewingStand { fuel, brew_time })
         }
         "minecraft:chest" => {
-            let items_in = nbt.remove_err("Items")?.list()?;
+            let items_in = match nbt.remove("Items") {
+                Some(x) => x.list()?,
+                None => BVec::new_in(bump),
+            };
             let mut items = Vec::with_capacity(items_in.len());
             for i in items_in {
                 let mut i = i.compound()?;
@@ -87,7 +93,7 @@ pub fn read_block_entity(id: &str, mut nbt: HashMap<&str, Tag>) -> Result<Option
         "minecraft:bed" => BlockEntityKind::Bed,
         "minecraft:bell" => BlockEntityKind::Bell,
         _ => {
-            warn!("unknown block entity `{}`", id);
+            // warn!("unknown block entity `{}`", id);
             return Ok(None);
         }
     };
@@ -98,8 +104,9 @@ pub fn read_chunk(buf: &[u8], bump: &Bump) -> Result<Chunk> {
     let root = nbt::read(buf, bump)?;
     let mut root = root.tag.compound()?;
     let version = root.remove_err("DataVersion")?.int()?;
-    let block_entities_nbt = if version >= 2975 {
-        // 2975 - 1.18.2
+
+    let block_entities_nbt = if version >= 2860 {
+        // 2860 - 1.18
         // no clue when the format changed actually
         root.remove_err("block_entities")?.list()?
     } else {
@@ -119,7 +126,7 @@ pub fn read_chunk(buf: &[u8], bump: &Bump) -> Result<Chunk> {
         let y = i.remove_err("y")?.int()?;
         let z = i.remove_err("z")?.int()?;
 
-        let kind = match read_block_entity(id, i)? {
+        let kind = match read_block_entity(id, i, bump)? {
             Some(x) => x,
             None => continue,
         };

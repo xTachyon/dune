@@ -78,18 +78,18 @@ pub trait HashMapExt<K, V> {
     fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq + fmt::Debug;
+        Q: Hash + Eq + fmt::Display;
 }
 impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
     fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq + fmt::Debug,
+        Q: Hash + Eq + fmt::Display,
     {
         let key = key.borrow();
         match self.remove(key) {
             Some(x) => Ok(x),
-            None => bail!("unknown key `{:?}`", key),
+            None => bail!("unknown key `{}`", key),
         }
     }
 }

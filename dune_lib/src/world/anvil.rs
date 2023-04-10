@@ -22,15 +22,28 @@ pub struct Region {
 
 impl Region {
     pub fn load(path: &Path, sectors_map: bool) -> Result<Region> {
-        let mut file = BufReader::with_capacity(1024 * 1024, File::open(path)?);
-        let mut header = [0; SECTOR_SIZE];
-        file.read_exact(&mut header)?;
+        let extension = path.extension().unwrap_or_default();
+        if extension != "mca" {
+            bail!(
+                "invalid file extension: {:?}, for file {}",
+                extension,
+                path.display()
+            );
+        }
+        let mut file = BufReader::with_capacity(128 * 1024, File::open(path)?);
 
         let file_size: usize = file.get_ref().metadata()?.len().try_into()?;
-        if file_size % SECTOR_SIZE != 0 {
-            bail!("invalid file size: {}", file_size);
+        if file_size == 0 || file_size % SECTOR_SIZE != 0 {
+            bail!(
+                "invalid file size: {}, for file {}",
+                file_size,
+                path.display()
+            );
         }
         let number_of_sectors = file_size / SECTOR_SIZE;
+
+        let mut header = [0; SECTOR_SIZE];
+        file.read_exact(&mut header)?;
 
         let mut region = Region {
             file,
@@ -122,3 +135,6 @@ impl Region {
         Ok(decoder.finish()?)
     }
 }
+
+// Upgrade chunks:
+// java -jar .\server.jar --nogui --forceUpgrade
