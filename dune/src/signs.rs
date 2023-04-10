@@ -98,6 +98,13 @@ fn print_region(
     Ok(())
 }
 
+fn parse_file_path(path: &PathBuf) -> (i32, i32) {
+    let mut it = path.file_name().unwrap_or_default().to_str().unwrap_or_default().split(".");
+    it.next();
+    let x = it.next().unwrap_or_default().parse::<i32>().unwrap_or_default();
+    let z = it.next().unwrap_or_default().parse::<i32>().unwrap_or_default();
+    (x, z)
+}
 fn get_paths(path: String) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for i in fs::read_dir(path)? {
@@ -111,7 +118,7 @@ fn get_paths(path: String) -> Result<Vec<PathBuf>> {
 
         files.push(i.path());
     }
-    files.sort();
+    files.sort_by_cached_key(parse_file_path);
     Ok(files)
 }
 
