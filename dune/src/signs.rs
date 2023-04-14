@@ -54,9 +54,12 @@ fn do_print(context: &mut SignsPrinter, chunk: Chunk) -> Result<()> {
                 context.signs_count += 1;
                 context.total_signs_count += 1;
             }
-            // BlockEntityKind::Chest(chest) => {
-            //     println!("{:?}", chest.items)
-            // }
+            BlockEntityKind::Storage(chest) => {
+                if chest.items.is_empty() {
+                    continue;
+                }
+                println!("{:?}", chest.items);
+            }
             _ => {}
         }
     }
@@ -106,16 +109,8 @@ fn parse_file_path((path, _): &(PathBuf, u64)) -> (i32, i32) {
         .unwrap_or_default()
         .split(".");
     it.next();
-    let x = it
-        .next()
-        .unwrap_or_default()
-        .parse::<i32>()
-        .unwrap_or(i32::MIN);
-    let z = it
-        .next()
-        .unwrap_or_default()
-        .parse::<i32>()
-        .unwrap_or(i32::MIN);
+    let x = it.next().unwrap_or_default().parse().unwrap_or(i32::MIN);
+    let z = it.next().unwrap_or_default().parse().unwrap_or(i32::MIN);
     (x, z)
 }
 fn get_paths(path: String) -> Result<Vec<(PathBuf, u64)>> {
@@ -126,6 +121,7 @@ fn get_paths(path: String) -> Result<Vec<(PathBuf, u64)>> {
         let size = i.metadata()?.len();
         Ok((i, size))
     };
+    let mut zero_size_files = 0;
     for i in fs::read_dir(path)? {
         let i = match get(i) {
             Ok(x) => x,
@@ -134,10 +130,19 @@ fn get_paths(path: String) -> Result<Vec<(PathBuf, u64)>> {
                 continue;
             }
         };
+        if i.1 == 0 {
+            zero_size_files += 1;
+            continue;
+        }
 
         files.push(i);
     }
     files.sort_by_cached_key(parse_file_path);
+
+    if zero_size_files > 0 {
+        println!("ignoring {} zero size files", zero_size_files);
+    }
+
     Ok(files)
 }
 

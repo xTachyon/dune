@@ -123,7 +123,7 @@ fn process_items(versions: &HashMap<&str, Version>) {
     *out += "use std::collections::HashMap;
     use Item::*;
     
-    #[derive(Debug, Clone, Copy)] pub enum Item {";
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub enum Item {";
     for (index, item) in items.iter().enumerate() {
         write!(out, "{} = {},", title_case(&item.name), index).unwrap();
     }

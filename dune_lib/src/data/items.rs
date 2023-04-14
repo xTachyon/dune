@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use Item::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Item {
     Air = 0,
     Stone = 1,
