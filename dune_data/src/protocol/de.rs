@@ -1,4 +1,3 @@
-// use crate::nbt::{self};
 use crate::protocol::varint::read_varint;
 use anyhow::Result;
 use dune_common::nbt;

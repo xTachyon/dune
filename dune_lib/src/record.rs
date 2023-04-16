@@ -312,7 +312,7 @@ fn run(
 }
 
 pub fn record_to_file(
-    listen_addr: &str,
+    listen_addr: (&str, u16),
     auth_data: AuthData,
     server_host: (&str, u16),
     out_path: &str,

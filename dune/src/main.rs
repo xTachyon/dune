@@ -23,6 +23,7 @@ use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 use std::fs::{self};
+use std::io::ErrorKind;
 use std::time::Instant;
 
 ///Tool for replaying saves with game input
@@ -258,25 +259,29 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
         None => &config.servers[config.default_server],
     };
     loop {
-        let listen_addr = "0.0.0.0:25565";
-
         let online_str = if auth_data_ext.online {
             "online"
         } else {
             "offline"
         };
         println!(
-            "{}: {} ({})\n{}: {}\n{}: {} ({}:{})\n",
-            Green.paint("minecraft profile"),
+            "{}: {} ({})\n{}: {}:{}\n{}: {} ({}:{})\n",
+            Green.paint("profile"),
             Cyan.paint(&auth_data_ext.data.name),
             Purple.paint(online_str),
-            Green.paint("listening address"),
-            Cyan.paint(listen_addr),
-            Green.paint("server           "),
+            Green.paint("listen "),
+            Cyan.paint(config.listen_addr.0),
+            Cyan.paint(config.listen_addr.1.to_string()),
+            Green.paint("server "),
             Cyan.paint(server.name),
-            Purple.paint(server.addr),
-            Purple.paint(server.port.to_string()),
+            Purple.paint(server.addr.0),
+            Purple.paint(server.addr.1.to_string()),
         );
+        match fs::create_dir("saves") {
+            Ok(_) => {}
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => {}
+            r @ Err(_) => r?,
+        }
 
         let packet_file = format!(
             "saves/{}_{}.dune",
@@ -286,9 +291,9 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
         fs::write("saves/last.txt", &packet_file)?;
 
         record_to_file(
-            listen_addr,
+            config.listen_addr,
             auth_data_ext.data.clone(),
-            (server.addr, server.port),
+            server.addr,
             &packet_file,
         )?;
 
@@ -305,7 +310,8 @@ struct ConfigJsonServer<'x> {
 
 #[derive(Deserialize)]
 struct ConfigJson<'x> {
-    default_server: &'x str,
+    default_server: Option<&'x str>,
+    listen_addr: Option<&'x str>,
     #[serde(borrow)]
     servers: Vec<ConfigJsonServer<'x>>,
 }
@@ -313,28 +319,33 @@ struct ConfigJson<'x> {
 struct ConfigServer<'x> {
     name: &'x str,
     profile: &'x str,
-    addr: &'x str,
-    port: u16,
+    addr: (&'x str, u16),
 }
 
 struct Config<'x> {
     servers: Vec<ConfigServer<'x>>,
     default_server: usize,
+    listen_addr: (&'x str, u16),
 }
 
+fn parse_addr(input: &str) -> Result<(&str, u16)> {
+    let r = match input.rsplit_once(':') {
+        Some((addr, port)) => {
+            let port = port.parse()?;
+            (addr, port)
+        }
+        None => (input, 25565),
+    };
+    Ok(r)
+}
 fn parse_config(input: ConfigJson) -> Result<Config> {
     let mut servers: Vec<ConfigServer> = Vec::new();
     let mut default_server_index = None;
 
     for (index, s) in input.servers.into_iter().enumerate() {
-        let (addr, port) = if let Some((addr, port)) = s.address.split_once(':') {
-            let port = port.parse()?;
-            (addr, port)
-        } else {
-            (s.address, 25565)
-        };
+        let addr = parse_addr(s.address)?;
 
-        if s.name == input.default_server {
+        if Some(s.name) == input.default_server {
             default_server_index = Some(index);
         }
 
@@ -345,16 +356,21 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
             name: s.name,
             profile: s.profile,
             addr,
-            port,
         });
     }
     let default_server = match default_server_index {
         Some(x) => x,
+        None if servers.len() == 1 => 0,
         None => bail!("default server was not set"),
+    };
+    let listen_addr = match input.listen_addr {
+        None => ("0.0.0.0", 25565),
+        Some(x) => parse_addr(x)?,
     };
     Ok(Config {
         servers,
         default_server,
+        listen_addr,
     })
 }
 
@@ -367,7 +383,7 @@ fn do_client(config: Config, auth_data_ext: AuthDataExt, server: Option<String>)
         None => &config.servers[config.default_server],
     };
 
-    client::run(auth_data_ext.data, (server.addr, server.port))?;
+    client::run(auth_data_ext.data, server.addr)?;
 
     Ok(())
 }
