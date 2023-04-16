@@ -2,6 +2,8 @@
 members = [
   "dune",
   "dune_lib",
+  "dune_common",
+  "dune_data",
   "dune_data_gen"
 ]
 default-members = ["dune"]

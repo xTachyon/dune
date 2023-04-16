@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::nbt::Tag;
 use crate::Item;
-use crate::{chat::parse_chat, events::PositionInt, nbt, HashMapExt};
+use crate::{chat::parse_chat, events::PositionInt, HashMapExt};
 use anyhow::Result;
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
+use dune_common::nbt::{self, Tag};
 
 // https://minecraft.fandom.com/wiki/Chunk_format
 // Why is Fandom so annoying??

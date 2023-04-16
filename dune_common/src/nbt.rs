@@ -1,3 +1,4 @@
+use crate::ReadSkip;
 use anyhow::{anyhow, Result};
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
@@ -6,8 +7,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Write};
 use std::io::Read;
 use std::str;
-
-use crate::ReadSkip;
 
 #[derive(Debug)]
 pub enum Tag<'n> {
@@ -265,7 +264,7 @@ fn skip_start<R: ReadSkip>(reader: &mut R, tag: u8) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn skip_option<R: ReadSkip>(mut reader: R) -> Result<bool> {
+pub fn skip_option<R: ReadSkip>(mut reader: R) -> Result<bool> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     let r = if tag == 0 {
@@ -277,7 +276,7 @@ pub(crate) fn skip_option<R: ReadSkip>(mut reader: R) -> Result<bool> {
     Ok(r)
 }
 
-pub(crate) fn skip<R: ReadSkip>(mut reader: R) -> Result<()> {
+pub fn skip<R: ReadSkip>(mut reader: R) -> Result<()> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     skip_start(reader, tag)

@@ -1,6 +1,6 @@
-pub(crate) mod de;
-pub(crate) mod v1_18_2;
-pub(crate) mod varint;
+pub mod de;
+pub mod v1_18_2;
+pub mod varint;
 
 use crate::protocol::varint::{read_varint, read_varint_with_size};
 use anyhow::Result;
@@ -49,7 +49,7 @@ pub struct IndexedNbt<'x> {
     pub nbt: &'x [u8],
 }
 
-pub(crate) struct PacketData<'x> {
+pub struct PacketData<'x> {
     pub id: u32,
     pub total_size: usize,
     pub data: &'x [u8],
@@ -120,7 +120,7 @@ macro_rules! impl_unaligned_slice_be {
 }
 impl_unaligned_slice_be!(UnalignedSliceI64, UnalignedSliceI64Iterator, i64);
 
-pub(crate) fn read_packet_info<'r>(
+pub fn read_packet_info<'r>(
     buffer: &'r [u8],
     tmp: &'r mut Vec<u8>,
     compression: bool,

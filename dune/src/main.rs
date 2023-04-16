@@ -1,5 +1,3 @@
-#![feature(core_intrinsics)]
-
 mod launchers;
 mod signs;
 
@@ -11,13 +9,13 @@ use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use chrono::Local;
 use clap::Parser;
+use dune_common::nbt::{self, Tag};
+use dune_data::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, UseEntityKind};
-use dune_lib::nbt::Tag;
-use dune_lib::protocol::{InventorySlot, InventorySlotData};
 use dune_lib::record::record_to_file;
 use dune_lib::replay::play;
-use dune_lib::{client, nbt, Enchantment, Item};
+use dune_lib::{client, Enchantment, Item};
 use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
@@ -25,7 +23,6 @@ use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 use std::fs::{self};
-use std::intrinsics::unlikely;
 use std::time::Instant;
 
 ///Tool for replaying saves with game input
@@ -92,7 +89,7 @@ fn get_item_opt(item: Option<InventorySlot>) -> Option<InventorySlotData> {
     item?.data
 }
 fn check_map_empty(map: HashMap<&str, Tag>) {
-    if unlikely(!map.is_empty()) {
+    if !map.is_empty() {
         warn!("item nbt map not empty after deserializing: {:?}", map);
     }
 }

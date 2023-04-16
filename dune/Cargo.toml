@@ -5,6 +5,10 @@ authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2021"
 
 [dependencies]
+dune_lib = { path = "../dune_lib" }
+dune_common = { path = "../dune_common"}
+dune_data = { path = "../dune_data" }
+
 anyhow = "1"
 ansi_term = "0.12.1"
 bumpalo = { version = "3", features = ["collections"] }
@@ -19,7 +23,6 @@ serde_derive = "1"
 log = "0.4"
 simple_logger = { version = "2", features = ["colors", "stderr"], default-features = false}
 
-dune_lib = { path = "../dune_lib" }
 clap = { version = "4", features = ["derive"] }
 
 [build-dependencies]

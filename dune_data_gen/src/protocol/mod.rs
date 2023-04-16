@@ -199,7 +199,7 @@ pub(super) fn run(path: &str) {
     let states = parser::parse(path, &bump);
     let out = writer::write(states).unwrap();
 
-    let path = "dune_lib/src/protocol/v1_18_2.rs";
+    let path = "dune_data/src/protocol/v1_18_2.rs";
     fs::write(path, out).unwrap();
 
     Command::new("rustfmt").arg(path).spawn().unwrap();

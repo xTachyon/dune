@@ -1,13 +1,13 @@
-use crate::nbt::{self};
+// use crate::nbt::{self};
 use crate::protocol::varint::read_varint;
 use anyhow::Result;
-use byteorder::ReadBytesExt;
+use dune_common::nbt;
 use std::io::{self, Read, Result as IoResult, Write};
 
 use super::varint::write_varint;
 use super::{ChunkBlockEntity, IndexedNbt, IndexedOptionNbt, InventorySlot, InventorySlotData};
 
-pub(crate) trait MemoryExt<'x> {
+pub trait MemoryExt<'x> {
     fn read_mem(&mut self, size: usize) -> IoResult<&'x [u8]>;
 }
 impl<'x> MemoryExt<'x> for &'x [u8] {
@@ -24,7 +24,7 @@ impl<'x> MemoryExt<'x> for &'x [u8] {
     }
 }
 
-pub(crate) trait MD<'x> {
+pub trait MD<'x> {
     fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()>;
     fn deserialize(memory: &mut &'x [u8]) -> Result<Self>
     where
@@ -77,10 +77,15 @@ impl<'x> MD<'x> for &'x [u8] {
     }
 }
 
+pub(super) fn read_u8<R: Read>(mut reader: R) -> Result<u8> {
+    let mut arr = [0; 1];
+    reader.read_exact(&mut arr)?;
+    Ok(arr[0])
+}
+
 impl<'x> MD<'x> for u8 {
     fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
-        let value = memory.read_u8()?;
-        Ok(value)
+        read_u8(memory)
     }
     fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
         writer.write_all(&[*self])?;
@@ -90,8 +95,8 @@ impl<'x> MD<'x> for u8 {
 
 impl<'x> MD<'x> for i8 {
     fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
-        let value = memory.read_i8()?;
-        Ok(value)
+        let value = read_u8(memory)?;
+        Ok(value as i8)
     }
     fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
         writer.write_all(&[*self as u8])?;

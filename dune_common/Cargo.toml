@@ -1,0 +1,9 @@
+[package]
+name = "dune_common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+byteorder = "1"
+bumpalo = { version = "3", features = ["collections"] }

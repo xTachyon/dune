@@ -5,6 +5,9 @@ authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2021"
 
 [dependencies]
+dune_common = { path = "../dune_common"}
+dune_data = { path = "../dune_data" }
+
 anyhow = "1"
 bumpalo = { version = "3", features = ["collections"] }
 byteorder = "1"

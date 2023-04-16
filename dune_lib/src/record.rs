@@ -1,10 +1,11 @@
 use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
-use crate::protocol::v1_18_2::handshaking::SetProtocolRequest;
-use crate::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
-use crate::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
-use crate::{protocol, DiskPacket};
+use crate::DiskPacket;
 use aes::cipher::NewCipher;
 use anyhow::Result;
+use dune_data::protocol;
+use dune_data::protocol::v1_18_2::handshaking::SetProtocolRequest;
+use dune_data::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
+use dune_data::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use polling::{Event, Poller};

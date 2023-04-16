@@ -1,12 +1,12 @@
+use super::de::read_u8;
 use anyhow::Result;
-use byteorder::ReadBytesExt;
 use std::io::{Read, Result as IoResult, Write};
 
 pub(crate) fn read_varint_with_size<R: Read>(reader: &mut R) -> Result<(i32, usize)> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
-        let read = reader.read_u8()?;
+        let read = read_u8(&mut *reader)?;
         let value = read & 0b01111111;
         result |= (value as u32) << (7 * bytes_read as u32);
         bytes_read += 1;
@@ -31,7 +31,7 @@ pub(crate) fn read_varlong<R: Read>(reader: &mut R) -> Result<i64> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
-        let read = reader.read_u8()?;
+        let read = read_u8(&mut *reader)?;
         let value = read & 0b01111111;
         result |= (value as u64) << (7 * bytes_read as u64);
         bytes_read += 1;
@@ -48,12 +48,12 @@ pub(crate) fn read_varlong<R: Read>(reader: &mut R) -> Result<i64> {
 }
 
 #[derive(Default)]
-pub(crate) struct VarintSerialized {
-    pub(crate) buffer: [u8; 5],
-    pub(crate) size: usize,
+pub struct VarintSerialized {
+    pub buffer: [u8; 5],
+    pub size: usize,
 }
 
-pub(crate) fn write_varint_serialize(mut value: u32) -> VarintSerialized {
+pub fn write_varint_serialize(mut value: u32) -> VarintSerialized {
     let mut buffer = [0; 5];
     let mut size = 0;
     loop {
@@ -73,7 +73,7 @@ pub(crate) fn write_varint_serialize(mut value: u32) -> VarintSerialized {
     VarintSerialized { buffer, size }
 }
 
-pub(crate) fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<u32> {
+pub fn write_varint<W: Write>(mut writer: W, mut value: u32) -> IoResult<u32> {
     let mut count = 0;
     loop {
         let mut temp = (value & 0b01111111) as u8;

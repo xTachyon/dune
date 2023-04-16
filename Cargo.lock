@@ -377,6 +377,8 @@ dependencies = [
  "cfg-if",
  "chrono",
  "clap",
+ "dune_common",
+ "dune_data",
  "dune_lib",
  "humansize",
  "log",
@@ -386,6 +388,27 @@ dependencies = [
  "simple_logger",
  "users",
  "winres",
+]
+
+[[package]]
+name = "dune_common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bumpalo",
+ "byteorder",
+]
+
+[[package]]
+name = "dune_data"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "dune_common",
+ "flate2",
+ "lazy_static",
+ "num_enum",
 ]
 
 [[package]]
@@ -412,6 +435,8 @@ dependencies = [
  "byteorder",
  "cfb8",
  "cipher 0.4.3",
+ "dune_common",
+ "dune_data",
  "flate2",
  "lazy_static",
  "log",

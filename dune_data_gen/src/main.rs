@@ -79,8 +79,6 @@ fn title_case(input: &str) -> String {
     res
 }
 
-const V1_18_2: &str = "1.18.2";
-
 fn process_items(versions: &HashMap<&str, Version>) {
     #[derive(Debug, Deserialize)]
     struct InItemsJson<'x> {
@@ -90,8 +88,8 @@ fn process_items(versions: &HashMap<&str, Version>) {
         id: u16,
     }
 
-    const JSON_PATH: &str = "dune_lib/src/data/items.json";
-    const ITEMS_RS_PATH: &str = "dune_lib/src/data/items.rs";
+    const JSON_PATH: &str = "dune_data/src/items.json";
+    const ITEMS_RS_PATH: &str = "dune_data/src/items.rs";
 
     let original_items_data = fs::read(JSON_PATH).unwrap();
     let mut items: Vec<OutItemsJson> = serde_json::from_slice(&original_items_data).unwrap();
@@ -185,8 +183,8 @@ fn process_enchants(versions: &HashMap<&str, Version>) {
         id: u16,
     }
 
-    const JSON_PATH: &str = "dune_lib/src/data/enchantments.json";
-    const RS_PATH: &str = "dune_lib/src/data/enchantments.rs";
+    const JSON_PATH: &str = "dune_data/src/enchantments.json";
+    const RS_PATH: &str = "dune_data/src/enchantments.rs";
 
     let original_items_data = fs::read(JSON_PATH).unwrap();
     let mut enchants: Vec<EnchJson> = serde_json::from_slice(&original_items_data).unwrap();
@@ -240,6 +238,15 @@ impl Enchantment {
 }
 
 fn main() {
+    const V1_18_2: &str = "1.18.2";
+
+    Command::new("git")
+        .args(["submodule", "update", "--init"])
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+
     let versions: HashMap<&str, Version> = [(V1_18_2, new(V1_18_2))].into_iter().collect();
     process_items(&versions);
     process_enchants(&versions);

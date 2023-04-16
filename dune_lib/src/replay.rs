@@ -1,7 +1,8 @@
 use crate::events::{EventSubscriber, Position, UseEntity};
-use crate::protocol::{ConnectionState, Packet};
-use crate::{protocol, Buffer, DiskPacket};
+use crate::{Buffer, DiskPacket};
 use anyhow::Result;
+use dune_data::protocol;
+use dune_data::protocol::{ConnectionState, Packet};
 use flate2::read::ZlibDecoder;
 use log::warn;
 use std::fs::File;
