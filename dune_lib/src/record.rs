@@ -1,13 +1,14 @@
 use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
 use crate::DiskPacket;
 use aes::cipher::NewCipher;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use dune_data::protocol;
 use dune_data::protocol::v1_18_2::handshaking::SetProtocolRequest;
 use dune_data::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
 use dune_data::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use log::warn;
 use polling::{Event, Poller};
 use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
@@ -24,12 +25,16 @@ pub struct AuthData {
     pub name: String,
 }
 
+type DeserializeFn =
+    for<'r> fn(ConnectionState, PacketDirection, u32, &mut &'r [u8]) -> Result<Packet<'r>>;
+
 struct Proxy<'x> {
     state: ConnectionState,
     compression: bool,
     start_done: bool,
     auth_data: AuthData,
     server_host: (&'x str, u16),
+    deserialize: DeserializeFn,
     out_file: ZlibEncoder<File>,
 }
 
@@ -102,6 +107,14 @@ pub(crate) fn crypt_reply(
     Ok(result)
 }
 
+fn get_deserializer(version: i32) -> Option<DeserializeFn> {
+    let r = match version {
+        758 => protocol::v1_18_2::de_packets,
+        _ => return None,
+    };
+    Some(r)
+}
+
 impl<'x> Proxy<'x> {
     fn new(auth_data: AuthData, server_host: (&'x str, u16), out_path: &str) -> Result<Proxy<'x>> {
         let file = File::create(out_path)?;
@@ -111,6 +124,7 @@ impl<'x> Proxy<'x> {
             start_done: false,
             auth_data,
             server_host,
+            deserialize: protocol::deserialize,
             out_file: ZlibEncoder::new(file, Compression::best()),
         })
     }
@@ -131,10 +145,16 @@ impl<'x> Proxy<'x> {
             None => return Ok(None),
         };
         let mut data = packet_data.data;
-        let packet = protocol::deserialize(self.state, direction, packet_data.id, &mut data)?;
+        let mut skip = false;
+        let packet = match (self.deserialize)(self.state, direction, packet_data.id, &mut data) {
+            Ok(x) => x,
+            Err(e) => {
+                warn!("{}", e);
+                return Ok(Some(OnStartResult { skip, packet_data }));
+            }
+        };
 
         println!("{:?}", packet);
-        let mut skip = false;
         match packet {
             Packet::SetProtocolRequest(x) => {
                 match x.next_state {
@@ -145,8 +165,12 @@ impl<'x> Proxy<'x> {
                     2 => {
                         self.state = ConnectionState::Login;
                     }
-                    _ => unimplemented!(),
+                    _ => {
+                        return Err(anyhow!("unknown next state: {}", x.next_state));
+                    }
                 }
+                self.deserialize = get_deserializer(x.protocol_version).unwrap();
+
                 skip = true;
                 let (addr, port) = self.server_host;
                 let p = SetProtocolRequest {

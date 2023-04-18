@@ -251,12 +251,12 @@ pub(super) fn cautious_size(size: usize) -> usize {
 }
 
 impl<'x> MD<'x> for ChunkBlockEntity<'x> {
-    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+    fn deserialize(mut memory: &mut &'x [u8]) -> Result<Self> {
         let xz = u8::deserialize(memory)?;
         let x = xz & 0b1111;
         let z = xz >> 4;
         let y = i16::deserialize(memory)?;
-        let type_ = read_varint(memory)?;
+        let type_ = read_varint(&mut memory)?;
         let nbt_data = IndexedOptionNbt::deserialize(memory)?;
 
         Ok(ChunkBlockEntity {

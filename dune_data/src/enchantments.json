@@ -150,5 +150,9 @@
   {
     "name": "vanishing_curse",
     "id": 37
+  },
+  {
+    "name": "swift_sneak",
+    "id": 38
   }
 ]

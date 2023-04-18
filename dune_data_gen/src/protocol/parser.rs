@@ -10,6 +10,8 @@ use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
 
+use crate::protocol::{TyBuffer, TyBufferCountKind};
+
 use super::{
     width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
     TyOption, TyStruct,
@@ -55,7 +57,7 @@ struct Parser<'x> {
     ty_varint: &'x Ty<'x>,
     ty_varlong: &'x Ty<'x>,
     ty_string: &'x Ty<'x>,
-    ty_buffer: &'x Ty<'x>,
+    ty_buffer_with_varint: &'x Ty<'x>,
     ty_rest_buffer: &'x Ty<'x>,
 
     ty_position: &'x Ty<'x>,
@@ -82,8 +84,10 @@ impl<'x> Parser<'x> {
         let ty_varint = bump.alloc(Ty::VarInt);
         let ty_varlong = bump.alloc(Ty::VarLong);
         let ty_string = bump.alloc(Ty::String);
-        let ty_buffer = bump.alloc(Ty::Buffer);
         let ty_rest_buffer = bump.alloc(Ty::RestBuffer);
+        let ty_buffer_with_varint = bump.alloc(Ty::Buffer(TyBuffer {
+            kind: TyBufferCountKind::Varint,
+        }));
 
         let ty_position = bump.alloc(Ty::Position);
         let ty_slot = bump.alloc(Ty::Slot);
@@ -111,7 +115,7 @@ impl<'x> Parser<'x> {
             ty_varint,
             ty_varlong,
             ty_string,
-            ty_buffer,
+            ty_buffer_with_varint,
             ty_rest_buffer,
 
             ty_position,
@@ -238,11 +242,20 @@ fn parse_option<'x>(
 }
 fn parse_buffer<'x>(parser: &Parser<'x>, input: &Value) -> &'x Ty<'x> {
     let arg1 = &input[1];
-    let input = &arg1["countType"];
-    assert_eq!(input.as_str().unwrap(), "varint");
-    // buffer right now assumes that the count is always varint
+    dbg!(arg1);
 
-    parser.ty_buffer
+    let kind = if let Value::String(x) = &arg1["countType"] {
+        assert_eq!(x, "varint");
+        TyBufferCountKind::Varint
+    } else if let Value::Number(x) = &arg1["count"] {
+        let count = x.as_u64().unwrap().try_into().unwrap();
+        TyBufferCountKind::Fixed(count)
+    } else {
+        panic!("unknown buffer kind");
+    };
+
+    let t = Ty::Buffer(TyBuffer { kind });
+    parser.alloc_type(t)
 }
 fn parse_array<'x>(
     parser: &Parser<'x>,
@@ -257,7 +270,7 @@ fn parse_array<'x>(
     let subtype = parse_type(parser, subtype, struct_name, parent_field)?;
 
     let t = if *count_ty == Ty::VarInt && *subtype == Ty::U8 {
-        parser.ty_buffer
+        parser.ty_buffer_with_varint
     } else {
         let t = Ty::Array(TyArray { count_ty, subtype });
         parser.alloc_type(t)

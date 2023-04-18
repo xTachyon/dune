@@ -2,6 +2,7 @@ use super::Direction;
 use super::Packet;
 use super::State;
 use super::Ty;
+use super::TyBufferCountKind;
 use super::TyStruct;
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -10,15 +11,10 @@ type Result<T> = std::result::Result<T, std::fmt::Error>;
 
 fn lifetime(ty: &Ty) -> &'static str {
     let b = ty.needs_lifetime()
-        && ![
-            Ty::String,
-            Ty::Buffer,
-            Ty::RestBuffer,
-            Ty::Slot,
-            Ty::NBT,
-            Ty::OptionNBT,
-        ]
-        .contains(ty);
+        && !matches!(
+            ty,
+            Ty::String | Ty::Buffer(_) | Ty::RestBuffer | Ty::Slot | Ty::NBT | Ty::OptionNBT
+        );
     if b {
         "<'p>"
     } else {
@@ -64,6 +60,9 @@ fn deserialize_one(
             bitfield_base_width,
             count + 1,
         )?;
+        if let TyBufferCountKind::Fixed(count) = x.count_ty {
+            
+        }
         if x.subtype.is_rs_builtin() {
             write!(
                 out,
@@ -321,6 +320,7 @@ pub(super) fn write(states: [State; 4]) -> Result<String> {
 #![allow(unused_mut)]
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(clippy::needless_borrow)]
 // fix
 #![allow(unreachable_code)]
@@ -341,6 +341,7 @@ use crate::protocol::InventorySlot;
 use crate::protocol::PacketDirection;
 use crate::protocol::ChunkBlockEntity;
 use crate::protocol::UnalignedSliceI64;
+use crate::protocol::UnalignedSliceU128;
 use super::de::MemoryExt;
 use anyhow::{anyhow, Result};
 use std::io::{Result as IoResult, Write};

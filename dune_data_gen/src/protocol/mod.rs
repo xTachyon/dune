@@ -12,6 +12,15 @@ struct TyBitfield {
     unsigned: bool,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+enum TyBufferCountKind {
+    Fixed(u16),
+    Varint,
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+struct TyBuffer {
+    kind: TyBufferCountKind,
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyStruct<'x> {
     name: String,
     fields: Vec<(String, &'x Ty<'x>)>,
@@ -47,7 +56,7 @@ enum Ty<'x> {
     VarInt,
     VarLong,
     String,
-    Buffer,
+    Buffer(TyBuffer),
     RestBuffer,
     Position,
     Slot,
@@ -65,10 +74,10 @@ impl<'x> Ty<'x> {
     fn needs_lifetime(&self) -> bool {
         use Ty::*;
         match self {
-            String | Buffer | RestBuffer | Slot | NBT | OptionNBT | ChunkBlockEntity => true,
+            String | Buffer(_) | RestBuffer | Slot | NBT | OptionNBT | ChunkBlockEntity => true,
             Struct(x) => x.fields.iter().map(|x| x.1).any(Ty::needs_lifetime),
             Option(x) => x.subtype.needs_lifetime(),
-            Array(x) => x.subtype.needs_lifetime(),
+            Array(x) => x.subtype.needs_lifetime() || x.subtype.is_rs_builtin(),
             _ => false,
         }
     }
@@ -93,7 +102,7 @@ impl<'x> Ty<'x> {
             VarInt => "i32",
             VarLong => "i64",
             String => "&'p str",
-            Buffer | RestBuffer => "&'p [u8]",
+            Buffer(_) | RestBuffer => "&'p [u8]",
             Position => "Position",
             Slot => "InventorySlot<'p>",
             NBT => "IndexedNbt<'p>",
@@ -194,13 +203,13 @@ struct State<'x> {
     pub s2c: Direction<'x>,
 }
 
-pub(super) fn run(path: &str) {
+pub(super) fn run(version: &str, path: &str) {
     let bump = Bump::new();
     let states = parser::parse(path, &bump);
     let out = writer::write(states).unwrap();
 
-    let path = "dune_data/src/protocol/v1_18_2.rs";
-    fs::write(path, out).unwrap();
+    let path = format!("dune_data/src/protocol/v{}.rs", version.replace('.', "_"));
+    fs::write(&path, out).unwrap();
 
     Command::new("rustfmt").arg(path).spawn().unwrap();
 }

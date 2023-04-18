@@ -238,7 +238,7 @@ impl Enchantment {
 }
 
 fn main() {
-    const V1_18_2: &str = "1.18.2";
+    const VERSIONS: &[&str] = &["1.18.2", "1.19.3"];
 
     Command::new("git")
         .args(["submodule", "update", "--init"])
@@ -247,8 +247,12 @@ fn main() {
         .wait()
         .unwrap();
 
-    let versions: HashMap<&str, Version> = [(V1_18_2, new(V1_18_2))].into_iter().collect();
+    let versions: HashMap<&str, Version> = VERSIONS.into_iter().map(|&x| (x, new(x))).collect();
+
     process_items(&versions);
     process_enchants(&versions);
-    protocol::run(&versions[V1_18_2].protocol_path);
+
+    for v in VERSIONS {
+        protocol::run(v, &versions[v].protocol_path);
+    }
 }

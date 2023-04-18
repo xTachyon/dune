@@ -38,6 +38,7 @@ pub enum Enchantment {
     Piercing = 35,
     Mending = 36,
     VanishingCurse = 37,
+    SwiftSneak = 38,
 }
 impl Enchantment {
     pub fn from(input: &str) -> anyhow::Result<Self> {
@@ -87,6 +88,7 @@ impl Enchantment {
             "piercing" => Piercing,
             "mending" => Mending,
             "vanishing_curse" => VanishingCurse,
+            "swift_sneak" => SwiftSneak,
             _ => anyhow::bail!("unknown enchantment: {}", input),
         };
         Ok(result)

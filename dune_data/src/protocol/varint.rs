@@ -1,19 +1,21 @@
 use super::de::read_u8;
+use anyhow::anyhow;
 use anyhow::Result;
 use std::io::{Read, Result as IoResult, Write};
 
-pub(crate) fn read_varint_with_size<R: Read>(reader: &mut R) -> Result<(i32, usize)> {
+pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
-        let read = read_u8(&mut *reader)?;
+        let read = read_u8(&mut reader)?;
+        if bytes_read == 5 {
+            return Err(anyhow!("varint can't be bigger than 5 bytes"));
+        }
+
         let value = read & 0b01111111;
         result |= (value as u32) << (7 * bytes_read as u32);
         bytes_read += 1;
 
-        if bytes_read > 5 {
-            return Err(anyhow::anyhow!("varint can't be bigger than 5 bytes"));
-        }
         if read & 0b1000_0000 == 0 {
             break;
         }
@@ -22,23 +24,24 @@ pub(crate) fn read_varint_with_size<R: Read>(reader: &mut R) -> Result<(i32, usi
     Ok((result as i32, bytes_read))
 }
 
-pub(crate) fn read_varint<R: Read>(reader: &mut R) -> Result<i32> {
+pub(crate) fn read_varint<R: Read>(reader: R) -> Result<i32> {
     let (value, _) = read_varint_with_size(reader)?;
     Ok(value)
 }
 
-pub(crate) fn read_varlong<R: Read>(reader: &mut R) -> Result<i64> {
+pub(crate) fn read_varlong<R: Read>(mut reader: R) -> Result<i64> {
     let mut result = 0;
     let mut bytes_read = 0usize;
     loop {
-        let read = read_u8(&mut *reader)?;
+        let read = read_u8(&mut reader)?;
+        if bytes_read == 10 {
+            return Err(anyhow!("varlong can't be bigger than 10 bytes"));
+        }
+
         let value = read & 0b01111111;
         result |= (value as u64) << (7 * bytes_read as u64);
         bytes_read += 1;
 
-        if bytes_read > 10 {
-            return Err(anyhow::anyhow!("varlong can't be bigger than 10 bytes"));
-        }
         if read & 0b1000_0000 == 0 {
             break;
         }

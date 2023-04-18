@@ -1,5 +1,6 @@
 pub mod de;
 pub mod v1_18_2;
+pub mod v1_19_3;
 pub mod varint;
 
 use crate::protocol::varint::{read_varint, read_varint_with_size};
@@ -119,6 +120,7 @@ macro_rules! impl_unaligned_slice_be {
     };
 }
 impl_unaligned_slice_be!(UnalignedSliceI64, UnalignedSliceI64Iterator, i64);
+impl_unaligned_slice_be!(UnalignedSliceU128, UnalignedSliceU128Iterator, u128);
 
 pub fn read_packet_info<'r>(
     buffer: &'r [u8],

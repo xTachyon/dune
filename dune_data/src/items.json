@@ -5503,5 +5503,430 @@
     "name": "pointed_dripstone",
     "display_name": "Pointed Dripstone",
     "id": 1099
+  },
+  {
+    "name": "mud",
+    "display_name": "Mud",
+    "id": 1101
+  },
+  {
+    "name": "mangrove_planks",
+    "display_name": "Mangrove Planks",
+    "id": 1102
+  },
+  {
+    "name": "bamboo_planks",
+    "display_name": "Bamboo Planks",
+    "id": 1103
+  },
+  {
+    "name": "bamboo_mosaic",
+    "display_name": "Bamboo Mosaic",
+    "id": 1104
+  },
+  {
+    "name": "mangrove_propagule",
+    "display_name": "Mangrove Propagule",
+    "id": 1105
+  },
+  {
+    "name": "mangrove_log",
+    "display_name": "Mangrove Log",
+    "id": 1106
+  },
+  {
+    "name": "mangrove_roots",
+    "display_name": "Mangrove Roots",
+    "id": 1107
+  },
+  {
+    "name": "muddy_mangrove_roots",
+    "display_name": "Muddy Mangrove Roots",
+    "id": 1108
+  },
+  {
+    "name": "bamboo_block",
+    "display_name": "Block of Bamboo",
+    "id": 1109
+  },
+  {
+    "name": "stripped_mangrove_log",
+    "display_name": "Stripped Mangrove Log",
+    "id": 1110
+  },
+  {
+    "name": "stripped_mangrove_wood",
+    "display_name": "Stripped Mangrove Wood",
+    "id": 1111
+  },
+  {
+    "name": "stripped_bamboo_block",
+    "display_name": "Block of Stripped Bamboo",
+    "id": 1112
+  },
+  {
+    "name": "mangrove_wood",
+    "display_name": "Mangrove Wood",
+    "id": 1113
+  },
+  {
+    "name": "mangrove_leaves",
+    "display_name": "Mangrove Leaves",
+    "id": 1114
+  },
+  {
+    "name": "mangrove_slab",
+    "display_name": "Mangrove Slab",
+    "id": 1115
+  },
+  {
+    "name": "bamboo_slab",
+    "display_name": "Bamboo Slab",
+    "id": 1116
+  },
+  {
+    "name": "bamboo_mosaic_slab",
+    "display_name": "Bamboo Mosaic Slab",
+    "id": 1117
+  },
+  {
+    "name": "mud_brick_slab",
+    "display_name": "Mud Brick Slab",
+    "id": 1118
+  },
+  {
+    "name": "chiseled_bookshelf",
+    "display_name": "Chiseled Bookshelf",
+    "id": 1119
+  },
+  {
+    "name": "mangrove_fence",
+    "display_name": "Mangrove Fence",
+    "id": 1120
+  },
+  {
+    "name": "bamboo_fence",
+    "display_name": "Bamboo Fence",
+    "id": 1121
+  },
+  {
+    "name": "packed_mud",
+    "display_name": "Packed Mud",
+    "id": 1122
+  },
+  {
+    "name": "mud_bricks",
+    "display_name": "Mud Bricks",
+    "id": 1123
+  },
+  {
+    "name": "reinforced_deepslate",
+    "display_name": "Reinforced Deepslate",
+    "id": 1124
+  },
+  {
+    "name": "mud_brick_stairs",
+    "display_name": "Mud Brick Stairs",
+    "id": 1125
+  },
+  {
+    "name": "sculk",
+    "display_name": "Sculk",
+    "id": 1126
+  },
+  {
+    "name": "sculk_vein",
+    "display_name": "Sculk Vein",
+    "id": 1127
+  },
+  {
+    "name": "sculk_catalyst",
+    "display_name": "Sculk Catalyst",
+    "id": 1128
+  },
+  {
+    "name": "sculk_shrieker",
+    "display_name": "Sculk Shrieker",
+    "id": 1129
+  },
+  {
+    "name": "mangrove_stairs",
+    "display_name": "Mangrove Stairs",
+    "id": 1130
+  },
+  {
+    "name": "bamboo_stairs",
+    "display_name": "Bamboo Stairs",
+    "id": 1131
+  },
+  {
+    "name": "bamboo_mosaic_stairs",
+    "display_name": "Bamboo Mosaic Stairs",
+    "id": 1132
+  },
+  {
+    "name": "mud_brick_wall",
+    "display_name": "Mud Brick Wall",
+    "id": 1133
+  },
+  {
+    "name": "mangrove_button",
+    "display_name": "Mangrove Button",
+    "id": 1134
+  },
+  {
+    "name": "bamboo_button",
+    "display_name": "Bamboo Button",
+    "id": 1135
+  },
+  {
+    "name": "mangrove_pressure_plate",
+    "display_name": "Mangrove Pressure Plate",
+    "id": 1136
+  },
+  {
+    "name": "bamboo_pressure_plate",
+    "display_name": "Bamboo Pressure Plate",
+    "id": 1137
+  },
+  {
+    "name": "mangrove_door",
+    "display_name": "Mangrove Door",
+    "id": 1138
+  },
+  {
+    "name": "bamboo_door",
+    "display_name": "Bamboo Door",
+    "id": 1139
+  },
+  {
+    "name": "mangrove_trapdoor",
+    "display_name": "Mangrove Trapdoor",
+    "id": 1140
+  },
+  {
+    "name": "bamboo_trapdoor",
+    "display_name": "Bamboo Trapdoor",
+    "id": 1141
+  },
+  {
+    "name": "mangrove_fence_gate",
+    "display_name": "Mangrove Fence Gate",
+    "id": 1142
+  },
+  {
+    "name": "bamboo_fence_gate",
+    "display_name": "Bamboo Fence Gate",
+    "id": 1143
+  },
+  {
+    "name": "oak_chest_boat",
+    "display_name": "Oak Boat with Chest",
+    "id": 1144
+  },
+  {
+    "name": "spruce_chest_boat",
+    "display_name": "Spruce Boat with Chest",
+    "id": 1145
+  },
+  {
+    "name": "birch_chest_boat",
+    "display_name": "Birch Boat with Chest",
+    "id": 1146
+  },
+  {
+    "name": "jungle_chest_boat",
+    "display_name": "Jungle Boat with Chest",
+    "id": 1147
+  },
+  {
+    "name": "acacia_chest_boat",
+    "display_name": "Acacia Boat with Chest",
+    "id": 1148
+  },
+  {
+    "name": "dark_oak_chest_boat",
+    "display_name": "Dark Oak Boat with Chest",
+    "id": 1149
+  },
+  {
+    "name": "mangrove_boat",
+    "display_name": "Mangrove Boat",
+    "id": 1150
+  },
+  {
+    "name": "mangrove_chest_boat",
+    "display_name": "Mangrove Boat with Chest",
+    "id": 1151
+  },
+  {
+    "name": "bamboo_raft",
+    "display_name": "Bamboo Raft",
+    "id": 1152
+  },
+  {
+    "name": "bamboo_chest_raft",
+    "display_name": "Bamboo Raft with Chest",
+    "id": 1153
+  },
+  {
+    "name": "mangrove_sign",
+    "display_name": "Mangrove Sign",
+    "id": 1154
+  },
+  {
+    "name": "bamboo_sign",
+    "display_name": "Bamboo Sign",
+    "id": 1155
+  },
+  {
+    "name": "oak_hanging_sign",
+    "display_name": "Oak Hanging Sign",
+    "id": 1156
+  },
+  {
+    "name": "spruce_hanging_sign",
+    "display_name": "Spruce Hanging Sign",
+    "id": 1157
+  },
+  {
+    "name": "birch_hanging_sign",
+    "display_name": "Birch Hanging Sign",
+    "id": 1158
+  },
+  {
+    "name": "jungle_hanging_sign",
+    "display_name": "Jungle Hanging Sign",
+    "id": 1159
+  },
+  {
+    "name": "acacia_hanging_sign",
+    "display_name": "Acacia Hanging Sign",
+    "id": 1160
+  },
+  {
+    "name": "dark_oak_hanging_sign",
+    "display_name": "Dark Oak Hanging Sign",
+    "id": 1161
+  },
+  {
+    "name": "mangrove_hanging_sign",
+    "display_name": "Mangrove Hanging Sign",
+    "id": 1162
+  },
+  {
+    "name": "bamboo_hanging_sign",
+    "display_name": "Bamboo Hanging Sign",
+    "id": 1163
+  },
+  {
+    "name": "crimson_hanging_sign",
+    "display_name": "Crimson Hanging Sign",
+    "id": 1164
+  },
+  {
+    "name": "warped_hanging_sign",
+    "display_name": "Warped Hanging Sign",
+    "id": 1165
+  },
+  {
+    "name": "tadpole_bucket",
+    "display_name": "Bucket of Tadpole",
+    "id": 1166
+  },
+  {
+    "name": "recovery_compass",
+    "display_name": "Recovery Compass",
+    "id": 1167
+  },
+  {
+    "name": "allay_spawn_egg",
+    "display_name": "Allay Spawn Egg",
+    "id": 1168
+  },
+  {
+    "name": "camel_spawn_egg",
+    "display_name": "Camel Spawn Egg",
+    "id": 1169
+  },
+  {
+    "name": "ender_dragon_spawn_egg",
+    "display_name": "Ender Dragon Spawn Egg",
+    "id": 1170
+  },
+  {
+    "name": "frog_spawn_egg",
+    "display_name": "Frog Spawn Egg",
+    "id": 1171
+  },
+  {
+    "name": "iron_golem_spawn_egg",
+    "display_name": "Iron Golem Spawn Egg",
+    "id": 1172
+  },
+  {
+    "name": "snow_golem_spawn_egg",
+    "display_name": "Snow Golem Spawn Egg",
+    "id": 1173
+  },
+  {
+    "name": "tadpole_spawn_egg",
+    "display_name": "Tadpole Spawn Egg",
+    "id": 1174
+  },
+  {
+    "name": "warden_spawn_egg",
+    "display_name": "Warden Spawn Egg",
+    "id": 1175
+  },
+  {
+    "name": "wither_spawn_egg",
+    "display_name": "Wither Spawn Egg",
+    "id": 1176
+  },
+  {
+    "name": "piglin_head",
+    "display_name": "Piglin Head",
+    "id": 1177
+  },
+  {
+    "name": "music_disc_5",
+    "display_name": "Music Disc",
+    "id": 1178
+  },
+  {
+    "name": "disc_fragment_5",
+    "display_name": "Disc Fragment",
+    "id": 1179
+  },
+  {
+    "name": "goat_horn",
+    "display_name": "Goat Horn",
+    "id": 1180
+  },
+  {
+    "name": "ochre_froglight",
+    "display_name": "Ochre Froglight",
+    "id": 1181
+  },
+  {
+    "name": "verdant_froglight",
+    "display_name": "Verdant Froglight",
+    "id": 1182
+  },
+  {
+    "name": "pearlescent_froglight",
+    "display_name": "Pearlescent Froglight",
+    "id": 1183
+  },
+  {
+    "name": "frogspawn",
+    "display_name": "Frogspawn",
+    "id": 1184
+  },
+  {
+    "name": "echo_shard",
+    "display_name": "Echo Shard",
+    "id": 1185
   }
 ]
