@@ -290,12 +290,14 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
         );
         fs::write("saves/last.txt", &packet_file)?;
 
-        record_to_file(
+        if let Err(e) = record_to_file(
             config.listen_addr,
             auth_data_ext.data.clone(),
             server.addr,
             &packet_file,
-        )?;
+        ) {
+            eprintln!("{:?}", e);
+        }
 
         println!("saved to {}", packet_file);
     }

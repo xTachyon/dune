@@ -14,6 +14,7 @@ use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::{Digest, Sha1};
+use std::fmt::Write as FmtWrite;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -32,6 +33,7 @@ enum Packet<'x> {
     Login(Login<'x>),
     V1_18_2(protocol::v1_18_2::Packet<'x>),
     V1_19_3(protocol::v1_19_3::Packet<'x>),
+    PlayUnknown(&'x [u8]),
 }
 
 type DeserializeFn =
@@ -46,6 +48,7 @@ struct Proxy<'x> {
     server_host: (&'x str, u16),
     deserialize: DeserializeFn,
     out_file: ZlibEncoder<File>,
+    tmp_string: String,
 }
 
 struct OnStartResult<'x> {
@@ -92,7 +95,7 @@ pub(crate) fn crypt_reply(
         serverId: &hash,
     };
     let req = serde_json::to_string(&req)?;
-    dbg!(&req);
+    // dbg!(&req);
     let response = ureq::post("https://sessionserver.mojang.com/session/minecraft/join")
         .set("Content-Type", "application/json; charset=utf-8")
         .send_string(&req);
@@ -117,7 +120,7 @@ pub(crate) fn crypt_reply(
     Ok(result)
 }
 
-fn get_deserializer(state: ConnectionState, version: i32) -> Option<DeserializeFn> {
+fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> DeserializeFn {
     fn handshaking_wrapper<'r>(
         state: ConnectionState,
         direction: PacketDirection,
@@ -136,10 +139,20 @@ fn get_deserializer(state: ConnectionState, version: i32) -> Option<DeserializeF
     ) -> Result<Packet<'r>> {
         Ok(Packet::Login(login(state, direction, id, reader)?))
     }
+    fn ignore<'r>(
+        _state: ConnectionState,
+        _direction: PacketDirection,
+        _id: u32,
+        reader: &mut &'r [u8],
+    ) -> Result<Packet<'r>> {
+        let b = *reader;
+        *reader = &[];
+        Ok(Packet::PlayUnknown(b))
+    }
 
     match state {
-        ConnectionState::Handshaking => return Some(handshaking_wrapper),
-        ConnectionState::Login => return Some(login_wrapper),
+        ConnectionState::Handshaking => return handshaking_wrapper,
+        ConnectionState::Login => return login_wrapper,
         ConnectionState::Status => {}
         ConnectionState::Play => {}
     }
@@ -158,12 +171,20 @@ fn get_deserializer(state: ConnectionState, version: i32) -> Option<DeserializeF
         }};
     }
 
-    let r = match version {
+    if ignore_play {
+        return ignore;
+    }
+
+    match version {
         758 => d!(v1_18_2, V1_18_2),
         761 => d!(v1_19_3, V1_19_3),
-        _ => return None,
-    };
-    Some(r)
+        _ => {
+            return {
+                warn!("unknown protocol version: {}", version);
+                ignore
+            }
+        }
+    }
 }
 
 impl<'x> Proxy<'x> {
@@ -176,9 +197,28 @@ impl<'x> Proxy<'x> {
             start_done: false,
             auth_data,
             server_host,
-            deserialize: get_deserializer(ConnectionState::Handshaking, 758).unwrap(),
+            deserialize: get_deserializer(ConnectionState::Handshaking, 0, false),
             out_file: ZlibEncoder::new(file, Compression::best()),
+            tmp_string: String::new(),
         })
+    }
+
+    fn println_packet(&mut self, p: &Packet) {
+        if true {
+            return;
+        }
+
+        let tmp = &mut self.tmp_string;
+        tmp.clear();
+        writeln!(tmp, "{:?}", p).unwrap();
+
+        let out = if tmp.len() > 256 {
+            let index = tmp.find('{').unwrap_or(256);
+            &tmp[..index]
+        } else {
+            tmp
+        };
+        print!("{}", out);
     }
 
     fn on_start<'p>(
@@ -206,7 +246,7 @@ impl<'x> Proxy<'x> {
             }
         };
 
-        println!("{:?}", packet);
+        self.println_packet(&packet);
         match packet {
             Packet::Handshaking(p) => {
                 let x = match p {
@@ -224,7 +264,7 @@ impl<'x> Proxy<'x> {
                         return Err(anyhow!("unknown next state: {}", x.next_state));
                     }
                 }
-                self.deserialize = get_deserializer(self.state, x.protocol_version).unwrap();
+                self.deserialize = get_deserializer(self.state, x.protocol_version, false);
 
                 skip = true;
                 self.protocol_version = x.protocol_version;
@@ -243,7 +283,7 @@ impl<'x> Proxy<'x> {
                 Login::SuccessResponse(_) => {
                     self.start_done = true;
                     self.state = ConnectionState::Play;
-                    self.deserialize = get_deserializer(self.state, self.protocol_version).unwrap();
+                    self.deserialize = get_deserializer(self.state, self.protocol_version, true);
                 }
                 Login::CompressResponse(x) => {
                     self.compression = x.threshold >= 0;

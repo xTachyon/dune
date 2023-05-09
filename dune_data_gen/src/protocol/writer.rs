@@ -42,12 +42,10 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
             }
         }
         Ty::Struct(x) => x.name.as_str().into(),
-        Ty::Buffer(x) => {
-            match x.kind {
-                TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
-                TyBufferCountKind::Varint => "&'p [u8]".into(),
-            }
-        }
+        Ty::Buffer(x) => match x.kind {
+            TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
+            TyBufferCountKind::Varint => "&'p [u8]".into(),
+        },
         _ => ty.get_simple_type().into(),
     }
 }
