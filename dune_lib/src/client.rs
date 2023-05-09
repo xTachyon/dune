@@ -7,7 +7,7 @@ use dune_data::protocol::v1_18_2::handshaking::SetProtocolRequest;
 use dune_data::protocol::v1_18_2::login::LoginStartRequest;
 use dune_data::protocol::v1_18_2::play::{ChatRequest, KeepAliveRequest};
 use dune_data::protocol::varint::{write_varint, write_varint_serialize, VarintSerialized};
-use dune_data::protocol::{self, ConnectionState, Packet, PacketDirection};
+use dune_data::protocol::{self, ConnectionState, PacketDirection};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use log::warn;
@@ -18,6 +18,7 @@ use std::net::TcpStream;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
+use dune_data::protocol::v1_18_2::Packet;
 
 pub(crate) type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 
@@ -162,7 +163,7 @@ fn read_packet(
          return Ok(false);
     };
     let mut data = packet_data.data;
-    let packet = protocol::deserialize(
+    let packet = protocol::v1_18_2::deserialize(
         client.state,
         PacketDirection::S2C,
         packet_data.id,

@@ -407,14 +407,14 @@ pub mod play {
     #[derive(Debug)]
     pub struct ChatCommandRequest_ArgumentSignatures<'p> {
         pub argument_name: &'p str,
-        pub signature: &'p [u8],
+        pub signature: &'p [u8; 256],
     }
     impl<'p> MD<'p> for ChatCommandRequest_ArgumentSignatures<'p> {
         fn deserialize(
             mut reader: &mut &'p [u8],
         ) -> Result<ChatCommandRequest_ArgumentSignatures<'p>> {
             let argument_name: &'p str = MD::deserialize(reader)?;
-            let signature: &'p [u8] = MD::deserialize(reader)?;
+            let signature: &'p [u8; 256] = MD::deserialize(reader)?;
 
             let result = ChatCommandRequest_ArgumentSignatures {
                 argument_name,
@@ -435,7 +435,7 @@ pub mod play {
         pub salt: i64,
         pub argument_signatures: Vec<ChatCommandRequest_ArgumentSignatures<'p>>,
         pub message_count: i32,
-        pub acknowledged: &'p [u8],
+        pub acknowledged: &'p [u8; 3],
     }
     impl<'p> MD<'p> for ChatCommandRequest<'p> {
         fn deserialize(mut reader: &mut &'p [u8]) -> Result<ChatCommandRequest<'p>> {
@@ -450,7 +450,7 @@ pub mod play {
                 argument_signatures.push(x);
             }
             let message_count: i32 = read_varint(&mut reader)?;
-            let acknowledged: &'p [u8] = MD::deserialize(reader)?;
+            let acknowledged: &'p [u8; 3] = MD::deserialize(reader)?;
 
             let result = ChatCommandRequest {
                 command,
@@ -471,18 +471,18 @@ pub mod play {
         pub message: &'p str,
         pub timestamp: i64,
         pub salt: i64,
-        pub signature: Option<&'p [u8]>,
+        pub signature: Option<&'p [u8; 256]>,
         pub offset: i32,
-        pub acknowledged: &'p [u8],
+        pub acknowledged: &'p [u8; 3],
     }
     impl<'p> MD<'p> for ChatMessageRequest<'p> {
         fn deserialize(mut reader: &mut &'p [u8]) -> Result<ChatMessageRequest<'p>> {
             let message: &'p str = MD::deserialize(reader)?;
             let timestamp: i64 = MD::deserialize(reader)?;
             let salt: i64 = MD::deserialize(reader)?;
-            let signature: Option<&'p [u8]> = MD::deserialize(reader)?;
+            let signature: Option<&'p [u8; 256]> = MD::deserialize(reader)?;
             let offset: i32 = read_varint(&mut reader)?;
-            let acknowledged: &'p [u8] = MD::deserialize(reader)?;
+            let acknowledged: &'p [u8; 3] = MD::deserialize(reader)?;
 
             let result = ChatMessageRequest {
                 message,
@@ -4934,7 +4934,7 @@ pub enum Packet<'p> {
     SimulationDistanceResponse(play::SimulationDistanceResponse),
 }
 
-pub fn de_packets<'r>(
+pub fn deserialize<'r>(
     state: ConnectionState,
     direction: PacketDirection,
     id: u32,

@@ -102,7 +102,7 @@ impl<'x> Ty<'x> {
             VarInt => "i32",
             VarLong => "i64",
             String => "&'p str",
-            Buffer(_) | RestBuffer => "&'p [u8]",
+            RestBuffer => "&'p [u8]",
             Position => "Position",
             Slot => "InventorySlot<'p>",
             NBT => "IndexedNbt<'p>",

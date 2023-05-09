@@ -2,10 +2,10 @@ use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
 use crate::DiskPacket;
 use aes::cipher::NewCipher;
 use anyhow::{anyhow, Result};
-use dune_data::protocol;
 use dune_data::protocol::v1_18_2::handshaking::SetProtocolRequest;
 use dune_data::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
-use dune_data::protocol::{ConnectionState, Packet, PacketData, PacketDirection};
+use dune_data::protocol::{self, handshaking, login, Handshaking, Login};
+use dune_data::protocol::{ConnectionState, PacketData, PacketDirection};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use log::warn;
@@ -25,11 +25,21 @@ pub struct AuthData {
     pub name: String,
 }
 
+#[derive(Debug)]
+enum Packet<'x> {
+    Handshaking(Handshaking<'x>),
+    // Status,
+    Login(Login<'x>),
+    V1_18_2(protocol::v1_18_2::Packet<'x>),
+    V1_19_3(protocol::v1_19_3::Packet<'x>),
+}
+
 type DeserializeFn =
     for<'r> fn(ConnectionState, PacketDirection, u32, &mut &'r [u8]) -> Result<Packet<'r>>;
 
 struct Proxy<'x> {
     state: ConnectionState,
+    protocol_version: i32,
     compression: bool,
     start_done: bool,
     auth_data: AuthData,
@@ -107,9 +117,50 @@ pub(crate) fn crypt_reply(
     Ok(result)
 }
 
-fn get_deserializer(version: i32) -> Option<DeserializeFn> {
+fn get_deserializer(state: ConnectionState, version: i32) -> Option<DeserializeFn> {
+    fn handshaking_wrapper<'r>(
+        state: ConnectionState,
+        direction: PacketDirection,
+        id: u32,
+        reader: &mut &'r [u8],
+    ) -> Result<Packet<'r>> {
+        Ok(Packet::Handshaking(handshaking(
+            state, direction, id, reader,
+        )?))
+    }
+    fn login_wrapper<'r>(
+        state: ConnectionState,
+        direction: PacketDirection,
+        id: u32,
+        reader: &mut &'r [u8],
+    ) -> Result<Packet<'r>> {
+        Ok(Packet::Login(login(state, direction, id, reader)?))
+    }
+
+    match state {
+        ConnectionState::Handshaking => return Some(handshaking_wrapper),
+        ConnectionState::Login => return Some(login_wrapper),
+        ConnectionState::Status => {}
+        ConnectionState::Play => {}
+    }
+    macro_rules! d {
+        ($module:ident, $variant:ident) => {{
+            fn $module<'r>(
+                state: ConnectionState,
+                direction: PacketDirection,
+                id: u32,
+                reader: &mut &'r [u8],
+            ) -> Result<Packet<'r>> {
+                let ret = protocol::$module::deserialize(state, direction, id, reader)?;
+                Ok(Packet::$variant(ret))
+            }
+            $module
+        }};
+    }
+
     let r = match version {
-        758 => protocol::v1_18_2::de_packets,
+        758 => d!(v1_18_2, V1_18_2),
+        761 => d!(v1_19_3, V1_19_3),
         _ => return None,
     };
     Some(r)
@@ -120,11 +171,12 @@ impl<'x> Proxy<'x> {
         let file = File::create(out_path)?;
         Ok(Proxy {
             state: ConnectionState::Handshaking,
+            protocol_version: i32::MAX,
             compression: false,
             start_done: false,
             auth_data,
             server_host,
-            deserialize: protocol::deserialize,
+            deserialize: get_deserializer(ConnectionState::Handshaking, 758).unwrap(),
             out_file: ZlibEncoder::new(file, Compression::best()),
         })
     }
@@ -156,7 +208,10 @@ impl<'x> Proxy<'x> {
 
         println!("{:?}", packet);
         match packet {
-            Packet::SetProtocolRequest(x) => {
+            Packet::Handshaking(p) => {
+                let x = match p {
+                    Handshaking::SetProtocolRequest(p) => p,
+                };
                 match x.next_state {
                     1 => {
                         self.start_done = true;
@@ -169,9 +224,10 @@ impl<'x> Proxy<'x> {
                         return Err(anyhow!("unknown next state: {}", x.next_state));
                     }
                 }
-                self.deserialize = get_deserializer(x.protocol_version).unwrap();
+                self.deserialize = get_deserializer(self.state, x.protocol_version).unwrap();
 
                 skip = true;
+                self.protocol_version = x.protocol_version;
                 let (addr, port) = self.server_host;
                 let p = SetProtocolRequest {
                     protocol_version: x.protocol_version,
@@ -183,19 +239,23 @@ impl<'x> Proxy<'x> {
             }
 
             // ---------------------------------------------------
-            Packet::SuccessResponse(_) => {
-                self.start_done = true;
-                self.state = ConnectionState::Play;
-            }
-            Packet::CompressResponse(x) => {
-                self.compression = x.threshold >= 0;
-            }
-            Packet::EncryptionBeginResponse(packet) => {
-                skip = true;
-                let (c1, c2) = crypt_reply(packet, &mut self.auth_data, src_writer)?;
-                src_reader.crypt = Some(c1);
-                src_writer.crypt = Some(c2);
-            }
+            Packet::Login(x) => match x {
+                Login::SuccessResponse(_) => {
+                    self.start_done = true;
+                    self.state = ConnectionState::Play;
+                    self.deserialize = get_deserializer(self.state, self.protocol_version).unwrap();
+                }
+                Login::CompressResponse(x) => {
+                    self.compression = x.threshold >= 0;
+                }
+                Login::EncryptionBeginResponse(packet) => {
+                    skip = true;
+                    let (c1, c2) = crypt_reply(packet, &mut self.auth_data, src_writer)?;
+                    src_reader.crypt = Some(c1);
+                    src_writer.crypt = Some(c2);
+                }
+                _ => {}
+            },
             _ => {}
         }
 

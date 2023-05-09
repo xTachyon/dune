@@ -52,6 +52,17 @@ macro_rules! impl_for_numbers {
 
 impl_for_numbers!(u16 u32 u64 u128 i16 i32 i64 f32 f64);
 
+impl<'x, const SIZE: usize> MD<'x> for &'x [u8; SIZE] {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
+        let slice = memory.read_mem(SIZE)?;
+        let ret = slice.try_into().expect("the slice should always have SIZE elements");
+        Ok(ret)
+    }
+    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+        writer.write_all(self.as_slice())
+    }
+}
+
 impl<'x> MD<'x> for &'x str {
     fn deserialize(memory: &mut &'x [u8]) -> Result<Self> {
         let slice: &[u8] = MD::deserialize(memory)?;

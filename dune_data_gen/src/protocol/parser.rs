@@ -242,7 +242,6 @@ fn parse_option<'x>(
 }
 fn parse_buffer<'x>(parser: &Parser<'x>, input: &Value) -> &'x Ty<'x> {
     let arg1 = &input[1];
-    dbg!(arg1);
 
     let kind = if let Value::String(x) = &arg1["countType"] {
         assert_eq!(x, "varint");

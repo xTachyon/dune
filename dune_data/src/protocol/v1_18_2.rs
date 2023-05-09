@@ -4706,7 +4706,7 @@ pub enum Packet<'p> {
     SimulationDistanceResponse(play::SimulationDistanceResponse),
 }
 
-pub fn de_packets<'r>(
+pub fn deserialize<'r>(
     state: ConnectionState,
     direction: PacketDirection,
     id: u32,

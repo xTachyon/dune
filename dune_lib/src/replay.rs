@@ -2,11 +2,12 @@ use crate::events::{EventSubscriber, Position, UseEntity};
 use crate::{Buffer, DiskPacket};
 use anyhow::Result;
 use dune_data::protocol;
-use dune_data::protocol::{ConnectionState, Packet};
+use dune_data::protocol::{ConnectionState};
 use flate2::read::ZlibDecoder;
 use log::warn;
 use std::fs::File;
 use std::io::Read;
+use dune_data::protocol::v1_18_2::Packet;
 
 struct TrafficPlayer {
     reader: ZlibDecoder<File>,
@@ -29,7 +30,7 @@ impl TrafficPlayer {
     fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
         let mut data = disk_packet.data;
         let packet =
-            protocol::deserialize(self.state, disk_packet.direction, disk_packet.id, &mut data)?;
+            protocol::v1_18_2::deserialize(self.state, disk_packet.direction, disk_packet.id, &mut data)?;
 
         // println!("{:?}", packet);
         match packet {

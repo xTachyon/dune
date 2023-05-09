@@ -42,6 +42,12 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
             }
         }
         Ty::Struct(x) => x.name.as_str().into(),
+        Ty::Buffer(x) => {
+            match x.kind {
+                TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
+                TyBufferCountKind::Varint => "&'p [u8]".into(),
+            }
+        }
         _ => ty.get_simple_type().into(),
     }
 }
@@ -60,9 +66,6 @@ fn deserialize_one(
             bitfield_base_width,
             count + 1,
         )?;
-        if let TyBufferCountKind::Fixed(count) = x.count_ty {
-            
-        }
         if x.subtype.is_rs_builtin() {
             write!(
                 out,
@@ -368,7 +371,7 @@ use std::mem::size_of;
     out += "
 }
             
-pub fn de_packets<'r>(state: ConnectionState, direction: PacketDirection, id: u32, reader: &mut &'r[u8]) -> Result<Packet<'r>> {
+pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: u32, reader: &mut &'r[u8]) -> Result<Packet<'r>> {
     use PacketDirection as D;
     use ConnectionState as S;
     

@@ -3,15 +3,15 @@ pub mod v1_18_2;
 pub mod v1_19_3;
 pub mod varint;
 
+use crate::protocol::de::MD;
 use crate::protocol::varint::{read_varint, read_varint_with_size};
+use anyhow::anyhow;
 use anyhow::Result;
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
 use std::fmt::Debug;
 use std::io::Read;
 use std::mem::size_of;
-pub use v1_18_2::de_packets;
-pub use v1_18_2::Packet;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -155,20 +155,95 @@ pub fn read_packet_info<'r>(
     Ok(Some(result))
 }
 
-pub fn deserialize<'r>(
-    state: ConnectionState,
-    direction: PacketDirection,
-    id: u32,
-    reader: &mut &'r [u8],
-) -> Result<Packet<'r>> {
-    let packet = de_packets(state, direction, id, reader)?;
-    Ok(packet)
-}
-
 fn has_enough_bytes(bytes: &[u8]) -> bool {
     let mut tmp = bytes;
     match read_varint_with_size(&mut tmp) {
         Ok((value, size)) => size + value as usize <= bytes.len(),
         Err(_) => false,
     }
+}
+
+#[derive(Debug)]
+pub enum Handshaking<'x> {
+    SetProtocolRequest(v1_18_2::handshaking::SetProtocolRequest<'x>),
+}
+pub fn handshaking<'r>(
+    state: ConnectionState,
+    direction: PacketDirection,
+    id: u32,
+    reader: &mut &'r [u8],
+) -> Result<Handshaking<'r>> {
+    use ConnectionState as S;
+    use PacketDirection as D;
+
+    let packet = match (state, direction, id) {
+        (S::Handshaking, D::C2S, 0x0) => {
+            let p = MD::deserialize(reader)?;
+            Handshaking::SetProtocolRequest(p)
+        }
+        _ => {
+            return Err(anyhow!("unknown packet id={}", id));
+        }
+    };
+    Ok(packet)
+}
+
+#[derive(Debug)]
+pub enum Login<'x> {
+    LoginStartRequest(v1_18_2::login::LoginStartRequest<'x>),
+    EncryptionBeginRequest(v1_18_2::login::EncryptionBeginRequest<'x>),
+    LoginPluginResponse(v1_18_2::login::LoginPluginResponse<'x>),
+    DisconnectResponse(v1_18_2::login::DisconnectResponse<'x>),
+    EncryptionBeginResponse(v1_18_2::login::EncryptionBeginResponse<'x>),
+    SuccessResponse(v1_18_2::login::SuccessResponse<'x>),
+    CompressResponse(v1_18_2::login::CompressResponse),
+    LoginPluginRequest(v1_18_2::login::LoginPluginRequest<'x>),
+}
+pub fn login<'r>(
+    state: ConnectionState,
+    direction: PacketDirection,
+    id: u32,
+    reader: &mut &'r [u8],
+) -> Result<Login<'r>> {
+    use ConnectionState as S;
+    use PacketDirection as D;
+
+    let packet = match (state, direction, id) {
+        (S::Login, D::C2S, 0x0) => {
+            let p = MD::deserialize(reader)?;
+            Login::LoginStartRequest(p)
+        }
+        (S::Login, D::C2S, 0x1) => {
+            let p = MD::deserialize(reader)?;
+            Login::EncryptionBeginRequest(p)
+        }
+        (S::Login, D::C2S, 0x2) => {
+            let p = MD::deserialize(reader)?;
+            Login::LoginPluginResponse(p)
+        }
+        (S::Login, D::S2C, 0x0) => {
+            let p = MD::deserialize(reader)?;
+            Login::DisconnectResponse(p)
+        }
+        (S::Login, D::S2C, 0x1) => {
+            let p = MD::deserialize(reader)?;
+            Login::EncryptionBeginResponse(p)
+        }
+        (S::Login, D::S2C, 0x2) => {
+            let p = MD::deserialize(reader)?;
+            Login::SuccessResponse(p)
+        }
+        (S::Login, D::S2C, 0x3) => {
+            let p = MD::deserialize(reader)?;
+            Login::CompressResponse(p)
+        }
+        (S::Login, D::S2C, 0x4) => {
+            let p = MD::deserialize(reader)?;
+            Login::LoginPluginRequest(p)
+        }
+        _ => {
+            return Err(anyhow!("unknown packet id={}", id));
+        }
+    };
+    Ok(packet)
 }
