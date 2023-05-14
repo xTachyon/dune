@@ -400,8 +400,11 @@ fn main_impl() -> Result<()> {
 
     match arguments.action {
         Action::Record { option } => record(config, auth_data_ext, option),
-        Action::Replay { option } => {
+        Action::Replay { mut option } => {
             let handler = Box::new(EventHandler::new());
+            if option == "last" {
+                option = fs::read_to_string("saves/last.txt")?
+            }
             play(&option, handler)
         }
         Action::Client { option } => do_client(config, auth_data_ext, option),

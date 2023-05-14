@@ -14,7 +14,8 @@ panic = "abort"
 [profile.release]
 debug = true
 panic = "abort"
+lto = "thin"
 
-[profile.release-lto]
+[profile.release-lto-fat]
 inherits = "release"
-lto = true
+lto = "fat"
