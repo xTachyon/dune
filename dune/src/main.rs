@@ -249,7 +249,9 @@ impl EventSubscriber for EventHandler {
     }
 }
 // /summon minecraft:villager ~ ~ ~ {VillagerData:{type:"minecraft:plains",profession:"minecraft:mason",level:2}}
-
+fn to_str_tuple(x: &(String, u16)) -> (&str, u16) {
+    (&x.0, x.1)
+}
 fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) -> Result<()> {
     let server = match server {
         Some(name) => match config.servers.iter().find(|x| x.name == name) {
@@ -270,11 +272,11 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
             Cyan.paint(&auth_data_ext.data.name),
             Purple.paint(online_str),
             Green.paint("listen "),
-            Cyan.paint(config.listen_addr.0),
+            Cyan.paint(&config.listen_addr.0),
             Cyan.paint(config.listen_addr.1.to_string()),
             Green.paint("server "),
-            Cyan.paint(server.name),
-            Purple.paint(server.addr.0),
+            Cyan.paint(&server.name),
+            Purple.paint(&server.addr.0),
             Purple.paint(server.addr.1.to_string()),
         );
         match fs::create_dir("saves") {
@@ -291,9 +293,9 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
         fs::write("saves/last.txt", &packet_file)?;
 
         if let Err(e) = record_to_file(
-            config.listen_addr,
+            to_str_tuple(&config.listen_addr),
             auth_data_ext.data.clone(),
-            server.addr,
+            to_str_tuple(&server.addr),
             &packet_file,
         ) {
             eprintln!("{:?}", e);
@@ -304,58 +306,59 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
 }
 
 #[derive(Deserialize)]
-struct ConfigJsonServer<'x> {
-    name: &'x str,
-    profile: &'x str,
-    address: &'x str,
+#[serde(deny_unknown_fields)]
+struct ConfigServerToml {
+    profile: String,
+    address: String,
 }
-
 #[derive(Deserialize)]
-struct ConfigJson<'x> {
-    default_server: Option<&'x str>,
-    listen_addr: Option<&'x str>,
-    #[serde(borrow)]
-    servers: Vec<ConfigJsonServer<'x>>,
+#[serde(deny_unknown_fields)]
+struct ConfigToml {
+    default_server: Option<String>,
+    listen_addr: Option<String>,
+    listen_port: Option<u16>,
+    servers: HashMap<String, ConfigServerToml>,
 }
 
-struct ConfigServer<'x> {
-    name: &'x str,
-    profile: &'x str,
-    addr: (&'x str, u16),
+struct ConfigServer {
+    name: String,
+    profile: String,
+    addr: (String, u16),
 }
 
-struct Config<'x> {
-    servers: Vec<ConfigServer<'x>>,
+struct Config {
+    servers: Vec<ConfigServer>,
     default_server: usize,
-    listen_addr: (&'x str, u16),
+    listen_addr: (String, u16),
 }
 
-fn parse_addr(input: &str) -> Result<(&str, u16)> {
+fn parse_addr(mut input: String) -> Result<(String, u16)> {
     let r = match input.rsplit_once(':') {
         Some((addr, port)) => {
             let port = port.parse()?;
-            (addr, port)
+            input.truncate(addr.len());
+            (input, port)
         }
         None => (input, 25565),
     };
     Ok(r)
 }
-fn parse_config(input: ConfigJson) -> Result<Config> {
+fn parse_config(input: ConfigToml) -> Result<Config> {
     let mut servers: Vec<ConfigServer> = Vec::new();
     let mut default_server_index = None;
 
-    for (index, s) in input.servers.into_iter().enumerate() {
+    for (index, (name, s)) in input.servers.into_iter().enumerate() {
         let addr = parse_addr(s.address)?;
 
-        if Some(s.name) == input.default_server {
+        if Some(name.as_str()) == input.default_server.as_deref() {
             default_server_index = Some(index);
         }
 
-        if servers.iter().any(|x| x.name == s.name) {
-            bail!("duplicated server name: {}", s.name);
+        if servers.iter().any(|x| x.name == name) {
+            bail!("duplicated server name: {}", name);
         }
         servers.push(ConfigServer {
-            name: s.name,
+            name: name,
             profile: s.profile,
             addr,
         });
@@ -366,7 +369,10 @@ fn parse_config(input: ConfigJson) -> Result<Config> {
         None => bail!("default server was not set"),
     };
     let listen_addr = match input.listen_addr {
-        None => ("0.0.0.0", 25565),
+        None => {
+            let port = input.listen_port.unwrap_or(25565);
+            ("0.0.0.0".to_string(), port)
+        }
         Some(x) => parse_addr(x)?,
     };
     Ok(Config {
@@ -385,7 +391,7 @@ fn do_client(config: Config, auth_data_ext: AuthDataExt, server: Option<String>)
         None => &config.servers[config.default_server],
     };
 
-    client::run(auth_data_ext.data, server.addr)?;
+    client::run(auth_data_ext.data, to_str_tuple(&server.addr))?;
 
     Ok(())
 }
@@ -393,10 +399,10 @@ fn do_client(config: Config, auth_data_ext: AuthDataExt, server: Option<String>)
 fn main_impl() -> Result<()> {
     let arguments = Args::parse();
 
-    let config_text = fs::read_to_string("config.json")?;
-    let config_json = serde_json::from_str(&config_text)?;
-    let config = parse_config(config_json)?;
-    let auth_data_ext = get_access_token(config.servers[config.default_server].profile)?;
+    let config_text = fs::read_to_string("dune.toml")?;
+    let config_toml = toml::from_str(&config_text)?;
+    let config = parse_config(config_toml)?;
+    let auth_data_ext = get_access_token(&config.servers[config.default_server].profile)?;
 
     match arguments.action {
         Action::Record { option } => record(config, auth_data_ext, option),
