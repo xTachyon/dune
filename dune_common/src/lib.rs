@@ -12,13 +12,17 @@ impl<R: ReadSkip> ReadSkip for &mut R {
         (**self).skip_all(size)
     }
 }
+#[cold]
+fn unexpected_eof() -> IoResult<()> {
+    Err(io::Error::new(
+        io::ErrorKind::UnexpectedEof,
+        "failed to fill whole buffer",
+    ))
+}
 impl ReadSkip for &[u8] {
     fn skip_all(&mut self, size: usize) -> IoResult<()> {
         if size > self.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "failed to fill whole buffer",
-            ));
+            return unexpected_eof();
         }
         *self = &self[size..];
         Ok(())
