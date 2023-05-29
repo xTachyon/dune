@@ -17,9 +17,9 @@ use std::{io::Write, path::PathBuf};
 struct SignsPrinter {
     out: BufWriter<File>,
     max: usize,
-    signs_count: usize,
-    total_signs_count: usize,
-    errors_count: usize,
+    signs_count: u32,
+    total_signs_count: u32,
+    errors_count: u32,
 }
 
 fn do_print(context: &mut SignsPrinter, chunk: Chunk) -> Result<()> {

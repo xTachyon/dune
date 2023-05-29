@@ -223,7 +223,7 @@ impl EventSubscriber for EventHandler {
             let in1 = get_item(bump, Some(i.input_item_1))?;
             print_item(out, "in1", in1)?;
 
-            let in2 = get_item(bump, i.input_item_2)?;
+            let in2 = get_item(bump, Some(i.input_item_2))?;
             print_item(out, "in2", in2)?;
 
             let out_item = get_item(bump, Some(i.output_item))?;
