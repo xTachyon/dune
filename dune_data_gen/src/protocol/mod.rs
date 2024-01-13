@@ -165,35 +165,20 @@ enum ConnectionState {
 }
 impl ConnectionState {
     fn name(&self, title: bool) -> &'static str {
+        use ConnectionState::*;
+
         match self {
-            ConnectionState::Handshaking => {
-                if title {
-                    "Handshaking"
-                } else {
-                    "handshaking"
-                }
-            }
-            ConnectionState::Status => {
-                if title {
-                    "Status"
-                } else {
-                    "status"
-                }
-            }
-            ConnectionState::Login => {
-                if title {
-                    "Login"
-                } else {
-                    "login"
-                }
-            }
-            ConnectionState::Play => {
-                if title {
-                    "Play"
-                } else {
-                    "play"
-                }
-            }
+            Handshaking if title => "Handshaking",
+            Handshaking => "handshaking",
+
+            Status if title => "Status",
+            Status => "status",
+
+            Login if title => "Login",
+            Login => "login",
+
+            Play if title => "Play",
+            Play => "play",
         }
     }
 }
