@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1"
-byteorder = "1"
-bumpalo = { version = "3", features = ["collections"] }
+anyhow.workspace = true
+byteorder.workspace = true
+bumpalo.workspace = true

@@ -5,30 +5,30 @@ authors = ["Damian Andrei <andreidaamian@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-dune_common = { path = "../dune_common"}
-dune_data = { path = "../dune_data" }
+dune_common.workspace = true
+dune_data.workspace = true
 
-anyhow = "1"
-bumpalo = { version = "3", features = ["collections"] }
-byteorder = "1"
-flate2 = { version = "1", features = ["zlib-ng"], default-features = false }
-num_enum = "0.5.7"
-polling = "2"
-rand = "0.8.5"
-ureq = "2"
-num-bigint = "0.4.3"
-log = "0.4"
-bitvec = "1"
-slice-ring-buffer = "0.3.2"
-lazy_static = "1"
-bytemuck = "1"
+anyhow.workspace = true
+bumpalo.workspace = true
+byteorder.workspace = true
+flate2.workspace = true
+num_enum.workspace = true
+polling.workspace = true
+rand.workspace = true
+ureq.workspace = true
+num-bigint.workspace = true
+log.workspace = true
+bitvec.workspace = true
+slice-ring-buffer.workspace = true
+lazy_static.workspace = true
+bytemuck.workspace = true
 
-serde = "1"
-serde_json = "1"
-serde_derive = "1"
+serde.workspace = true
+serde_json.workspace = true
+serde_derive.workspace = true
 
-aes = "0.7.2"
-cfb8 = "0.7.1"
-cipher = "0.4.3"
-rsa = "0.6.1"
-sha1 = "0.10.5"
+aes.workspace = true
+cfb8.workspace = true
+cipher.workspace = true
+rsa.workspace = true
+sha1.workspace = true

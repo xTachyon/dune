@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bumpalo = { version = "3", features = ["collections"] }
-indexmap ={ version = "1.9.2", features = ["serde"] }
-convert_case = "0.6.0"
+bumpalo.workspace = true
+indexmap.workspace = true
+convert_case.workspace = true
 
-serde = "1.0"
-serde_json = "1.0"
-serde_derive = "1.0"
+serde.workspace = true
+serde_json.workspace = true
+serde_derive.workspace = true

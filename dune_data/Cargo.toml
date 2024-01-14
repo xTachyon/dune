@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-dune_common = { path = "../dune_common"}
+dune_common.workspace = true
 
-anyhow = "1"
-bytemuck = "1"
-num_enum = "0.5.7"
-lazy_static = "1"
-flate2 = { version = "1", features = ["zlib-ng"], default-features = false }
+anyhow.workspace = true
+bytemuck.workspace = true
+num_enum.workspace = true
+lazy_static.workspace = true
+flate2.workspace = true
