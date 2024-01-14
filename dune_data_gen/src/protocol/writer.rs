@@ -378,7 +378,7 @@ pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: u
 
     for state in states {
         for (direction, direction_string) in [(state.c2s, "C2S"), (state.s2c, "S2C")] {
-            let mut packets: Vec<Packet> = direction.packets.into_iter().collect();
+            let mut packets: Vec<Packet> = direction.packets;
             packets.sort_unstable_by_key(|x| x.id);
 
             for packet in packets {

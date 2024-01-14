@@ -9,5 +9,4 @@ dune_common.workspace = true
 anyhow.workspace = true
 bytemuck.workspace = true
 num_enum.workspace = true
-lazy_static.workspace = true
 flate2.workspace = true

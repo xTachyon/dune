@@ -134,7 +134,7 @@ fn process_items(versions: &HashMap<&str, Version>) {
             Some(x) => x,
             None => anyhow::bail!("unknown item id: {}", id),
         };
-        ITEMS.get(id).copied().ok_or_else(|| anyhow::anyhow!("unknown item id: {}", id))
+        items().get(id).copied().ok_or_else(|| anyhow::anyhow!("unknown item id: {}", id))
     }"#;
 
     for (v, map) in items_by_version {
@@ -168,10 +168,14 @@ fn process_items(versions: &HashMap<&str, Version>) {
         write!(out, r#"("{}", {}),"#, item.name, title_case(&item.name)).unwrap();
     }
     *out += "];
-    lazy_static::lazy_static! {
+    fn items() -> &'static HashMap<&'static str, Item> {
         // Faster than a match, somehow.
-        static ref ITEMS: HashMap<&'static str, Item> = HashMap::from(DATA);
-    }";
+
+        use std::sync::OnceLock;
+        static ITEMS: OnceLock<HashMap<&'static str, Item>> = OnceLock::new();
+        ITEMS.get_or_init(|| HashMap::from(DATA))
+    }
+    ";
 
     write_file_and_fmt(ITEMS_RS_PATH, out);
 }
