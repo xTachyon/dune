@@ -60,8 +60,8 @@ enum Ty<'x> {
     RestBuffer,
     Position,
     Slot,
-    NBT,
-    OptionNBT,
+    Nbt,
+    OptionNbt,
     ChunkBlockEntity,
 
     Struct(TyStruct<'x>),
@@ -74,7 +74,7 @@ impl<'x> Ty<'x> {
     fn needs_lifetime(&self) -> bool {
         use Ty::*;
         match self {
-            String | Buffer(_) | RestBuffer | Slot | NBT | OptionNBT | ChunkBlockEntity => true,
+            String | Buffer(_) | RestBuffer | Slot | Nbt | OptionNbt | ChunkBlockEntity => true,
             Struct(x) => x.fields.iter().map(|x| x.1).any(Ty::needs_lifetime),
             Option(x) => x.subtype.needs_lifetime(),
             Array(x) => x.subtype.needs_lifetime() || x.subtype.is_rs_builtin(),
@@ -105,8 +105,8 @@ impl<'x> Ty<'x> {
             RestBuffer => "&'p [u8]",
             Position => "Position",
             Slot => "InventorySlot<'p>",
-            NBT => "IndexedNbt<'p>",
-            OptionNBT => "IndexedOptionNbt<'p>",
+            Nbt => "IndexedNbt<'p>",
+            OptionNbt => "IndexedOptionNbt<'p>",
             ChunkBlockEntity => "ChunkBlockEntity",
             Bitfield(x) => {
                 let size = width_for_bitfields(x.range_end - x.range_begin);
@@ -125,10 +125,10 @@ impl<'x> Ty<'x> {
     }
     fn is_rs_builtin(&self) -> bool {
         use Ty::*;
-        match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | F32 | F64 => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Bool | U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | F32 | F64
+        )
     }
     fn width(&self) -> u16 {
         use Ty::*;

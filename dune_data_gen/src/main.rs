@@ -251,7 +251,7 @@ fn main() {
         .wait()
         .unwrap();
 
-    let versions: HashMap<&str, Version> = VERSIONS.into_iter().map(|&x| (x, new(x))).collect();
+    let versions: HashMap<&str, Version> = VERSIONS.iter().map(|&x| (x, new(x))).collect();
 
     process_items(&versions);
     process_enchants(&versions);

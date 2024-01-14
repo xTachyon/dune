@@ -50,7 +50,7 @@ simple_logger = { version = "4", features = ["colors", "stderr"], default-featur
 
 clap = { version = "4", features = ["derive"] }
 
-winresource = {version = "0.1.17", default-features = false }
+winresource = { version = "0.1.17", default-features = false }
 # -------------------------------------------------------------------------------------------------
 
 [profile.dev]

@@ -358,7 +358,7 @@ fn parse_config(input: ConfigToml) -> Result<Config> {
             bail!("duplicated server name: {}", name);
         }
         servers.push(ConfigServer {
-            name: name,
+            name,
             profile: s.profile,
             addr,
         });

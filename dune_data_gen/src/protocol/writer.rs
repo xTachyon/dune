@@ -13,7 +13,7 @@ fn lifetime(ty: &Ty) -> &'static str {
     let b = ty.needs_lifetime()
         && !matches!(
             ty,
-            Ty::String | Ty::Buffer(_) | Ty::RestBuffer | Ty::Slot | Ty::NBT | Ty::OptionNBT
+            Ty::String | Ty::Buffer(_) | Ty::RestBuffer | Ty::Slot | Ty::Nbt | Ty::OptionNbt
         );
     if b {
         "<'p>"
@@ -323,6 +323,8 @@ pub(super) fn write(states: [State; 4]) -> Result<String> {
 #![allow(non_camel_case_types)]
 #![allow(unused_imports)]
 #![allow(clippy::needless_borrow)]
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(clippy::identity_op)]
 // fix
 #![allow(unreachable_code)]
 #![allow(unused_variables)]

@@ -88,7 +88,7 @@ fn print_region(
     bump: &Bump,
     path: &Path,
 ) -> Result<()> {
-    let mut region = Region::load(&path, false)?;
+    let mut region = Region::load(path, false)?;
     context.signs_count = 0;
     for i in 0..CHUNKS_PER_REGION {
         if let Err(e) = print_chunk(context, &mut region, tmp, bump, i) {
@@ -107,7 +107,7 @@ fn parse_file_path((path, _): &(PathBuf, u64)) -> (i32, i32) {
         .unwrap_or_default()
         .to_str()
         .unwrap_or_default()
-        .split(".");
+        .split('.');
     it.next();
     let x = it.next().unwrap_or_default().parse().unwrap_or(i32::MIN);
     let z = it.next().unwrap_or_default().parse().unwrap_or(i32::MIN);

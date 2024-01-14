@@ -179,10 +179,8 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
         758 => d!(v1_18_2, V1_18_2),
         761 => d!(v1_19_3, V1_19_3),
         _ => {
-            return {
-                warn!("unknown protocol version: {}", version);
-                ignore
-            }
+            warn!("unknown protocol version: {}", version);
+            ignore
         }
     }
 }
@@ -249,9 +247,7 @@ impl<'x> Proxy<'x> {
         self.println_packet(&packet);
         match packet {
             Packet::Handshaking(p) => {
-                let x = match p {
-                    Handshaking::SetProtocolRequest(p) => p,
-                };
+                let Handshaking::SetProtocolRequest(x) = p;
                 match x.next_state {
                     1 => {
                         self.start_done = true;

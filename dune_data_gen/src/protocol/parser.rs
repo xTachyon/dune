@@ -91,8 +91,8 @@ impl<'x> Parser<'x> {
 
         let ty_position = bump.alloc(Ty::Position);
         let ty_slot = bump.alloc(Ty::Slot);
-        let ty_nbt = bump.alloc(Ty::NBT);
-        let ty_optional_nbt = bump.alloc(Ty::OptionNBT);
+        let ty_nbt = bump.alloc(Ty::Nbt);
+        let ty_optional_nbt = bump.alloc(Ty::OptionNbt);
         let ty_chunk_block_entity = bump.alloc(Ty::ChunkBlockEntity);
 
         Parser {
@@ -415,7 +415,7 @@ pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 4] {
     let content = fs::read_to_string(path).unwrap();
     let root: Root = serde_json::from_str(&content).unwrap();
 
-    let parser = Parser::new(&bump);
+    let parser = Parser::new(bump);
 
     [
         state(&parser, root.handshaking, ConnectionState::Handshaking),

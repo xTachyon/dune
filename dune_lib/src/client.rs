@@ -140,11 +140,8 @@ fn send_start(client: &mut ClientWriter, username: &str, server_host: (&str, u16
 }
 
 fn handle_packet(_client: &mut Client, _writer: &mut ClientWriter, packet: Packet) -> Result<()> {
-    match packet {
-        Packet::ChatResponse(x) => {
-            println!("{}", chat::parse_chat(x.message)?);
-        }
-        _ => {}
+    if let Packet::ChatResponse(x) = packet {
+        println!("{}", chat::parse_chat(x.message)?);
     }
 
     Ok(())
@@ -159,8 +156,9 @@ fn read_packet(
         &session.reader.buffer,
         &mut session.reader.tmp,
         client.compression,
-    )? else {
-         return Ok(false);
+    )?
+    else {
+        return Ok(false);
     };
     let mut data = packet_data.data;
     let packet = protocol::v1_18_2::deserialize(
