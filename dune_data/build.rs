@@ -3,6 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+fn c(p: PathBuf) -> String {
+    p.canonicalize().unwrap().to_str().unwrap().to_string()
+}
+
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let out_path = out_path.to_str().unwrap();
@@ -12,8 +16,9 @@ fn main() {
         .unwrap();
     dune_data_gen::run(out_path, &mc_data_path);
 
-    println!("cargo:rerun-if-changed=../dune_data_gen/minecraft-data/data/dataPaths.json");
+    let p = Path::new("../dune_data_gen/minecraft-data/data");
+    println!("cargo:rerun-if-changed={}", c(p.join("dataPaths.json")));
     for i in dune_data_gen::VERSIONS {
-        println!("cargo:rerun-if-changed=../dune_data_gen/minecraft-data/data/pc/{}", i);
+        println!("cargo:rerun-if-changed={}", c(p.join("pc").join(i)));
     }
 }
