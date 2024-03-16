@@ -3,7 +3,7 @@ mod writer;
 
 use bumpalo::Bump;
 use humansize::{format_size, BINARY};
-use std::{fmt::Debug, fs, process::Command};
+use std::{fmt::Debug, fs, path::Path, process::Command};
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyBitfield {
@@ -191,7 +191,7 @@ struct State<'x> {
     pub s2c: Direction<'x>,
 }
 
-pub(super) fn run(version: &str, path: &str, out_dir: &str) {
+pub(super) fn run(version: &str, path: &Path, out_dir: &str) {
     let bump = Bump::new();
     let states = parser::parse(path, &bump);
     let out = writer::write(states);

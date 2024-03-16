@@ -12,6 +12,7 @@ use serde_json::Value;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    path::Path,
 };
 
 #[derive(Debug, Deserialize)]
@@ -446,7 +447,7 @@ fn state<'x>(parser: &Parser<'x>, state: JsonState, kind: ConnectionState) -> St
     }
 }
 
-pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 1] {
+pub(super) fn parse<'x>(path: &Path, bump: &'x Bump) -> [State<'x>; 1] {
     let content = fs::read_to_string(path).unwrap();
     let root: Root = serde_json::from_str(&content).unwrap();
 

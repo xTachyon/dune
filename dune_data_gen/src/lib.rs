@@ -1,25 +1,27 @@
 mod protocol;
 
+use fs_err as fs;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::{collections::HashMap, fs};
 
 #[derive(Debug)]
 struct Version {
-    items_path: String,
-    enchants_path: String,
-    protocol_path: String,
+    items_path: PathBuf,
+    enchants_path: PathBuf,
+    protocol_path: PathBuf,
 }
 
-fn get_path(version_path: &str, name: &str) -> String {
-    format!(
-        "../dune_data_gen/minecraft-data/data/{}/{}.json",
-        version_path, name
-    )
+fn get_path(mc_data_path: &Path, version_path: &str, name: &str) -> PathBuf {
+    mc_data_path
+        .join("data")
+        .join(version_path)
+        .join(format!("{}.json", name))
 }
 
-fn new(name: &str) -> Version {
+fn new(name: &str, mc_data_path: &Path) -> Version {
     #[derive(Debug, Deserialize)]
     struct DataPathsVersion<'x> {
         items: Option<&'x str>,
@@ -32,13 +34,13 @@ fn new(name: &str) -> Version {
         pc: HashMap<&'x str, DataPathsVersion<'x>>,
     }
     // panic!("{}", std::env::current_dir().unwrap().display());
-    let content = fs::read("../dune_data_gen/minecraft-data/data/dataPaths.json").unwrap();
+    let content = fs::read(mc_data_path.join("data/dataPaths.json")).unwrap();
     let data: DataPathsJson = serde_json::from_slice(&content).unwrap();
 
     let v = data.pc.get(name).unwrap();
-    let items_path = get_path(v.items.unwrap(), "items");
-    let enchants_path = get_path(v.enchantments.unwrap(), "enchantments");
-    let protocol_path = get_path(v.protocol.unwrap(), "protocol");
+    let items_path = get_path(mc_data_path, v.items.unwrap(), "items");
+    let enchants_path = get_path(mc_data_path, v.enchantments.unwrap(), "enchantments");
+    let protocol_path = get_path(mc_data_path, v.protocol.unwrap(), "protocol");
     Version {
         items_path,
         enchants_path,
@@ -242,7 +244,7 @@ impl Enchantment {
     write_file_and_fmt(RS_PATH, out);
 }
 
-pub fn run(out_dir: &str) {
+pub fn run(out_dir: &str, mc_data_path: &Path) {
     const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
 
     Command::new("git")
@@ -252,7 +254,10 @@ pub fn run(out_dir: &str) {
         .wait()
         .unwrap();
 
-    let versions: HashMap<&str, Version> = VERSIONS.iter().map(|&x| (x, new(x))).collect();
+    let versions: HashMap<&str, Version> = VERSIONS
+        .iter()
+        .map(|&x| (x, new(x, mc_data_path)))
+        .collect();
 
     if false {
         process_items(&versions);
