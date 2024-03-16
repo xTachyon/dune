@@ -12,5 +12,5 @@ fn main() {
         .unwrap();
     dune_data_gen::run(out_path, &mc_data_path);
 
-    println!("cargo:rerun-if-changed=../dune_data_gen");
+    println!("cargo:rerun-if-changed=../dune_data_gen/minecraft-data/data");
 }

@@ -184,9 +184,6 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str)
                     sneaking,
                 })
             }
-            fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
-                unimplemented!()
-            }
         }
         "#;
         return;
