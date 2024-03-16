@@ -3,7 +3,7 @@ mod writer;
 
 use bumpalo::Bump;
 use humansize::{format_size, BINARY};
-use std::{fmt::Debug, fs, path::Path, process::Command};
+use std::{fmt::Debug, fs, path::Path};
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyBitfield {
@@ -196,10 +196,11 @@ pub(super) fn run(version: &str, path: &Path, out_dir: &str) {
     let states = parser::parse(path, &bump);
     let out = writer::write(states);
 
+    let syntax_tree = syn::parse_file(&out).unwrap();
+    let out = prettyplease::unparse(&syntax_tree);
+
     let path = format!("{}/v{}.rs", out_dir, version.replace('.', "_"));
     fs::write(&path, out).unwrap();
-
-    Command::new("rustfmt").arg(path).spawn().unwrap();
 
     let bytes = bump.allocated_bytes();
     println!(

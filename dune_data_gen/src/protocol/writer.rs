@@ -332,9 +332,6 @@ fn serialize_fn(out: &mut String, states: &[State]) {
     *out += "
             
 pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<()> {
-    use PacketDirection as D;
-    use ConnectionState as S;
-    
     match packet {
 ";
 
@@ -343,7 +340,7 @@ pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<(
             for packet in &direction.packets {
                 write!(
                     out,
-                    "Packet::{}(p) => {{ write_varint(&mut writer, {:#02x})?; ; p.serialize(writer) }}",
+                    "Packet::{}(p) => {{ write_varint(&mut writer, {:#02x})?; p.serialize(writer) }}",
                     packet.name,
                     packet.id,
                 );
