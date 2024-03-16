@@ -158,9 +158,9 @@ struct Direction<'x> {
 }
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum ConnectionState {
-    Handshaking,
-    Status,
-    Login,
+    // Handshaking,
+    // Status,
+    // Login,
     Play,
 }
 impl ConnectionState {
@@ -168,14 +168,14 @@ impl ConnectionState {
         use ConnectionState::*;
 
         match self {
-            Handshaking if title => "Handshaking",
-            Handshaking => "handshaking",
+            // Handshaking if title => "Handshaking",
+            // Handshaking => "handshaking",
 
-            Status if title => "Status",
-            Status => "status",
+            // Status if title => "Status",
+            // Status => "status",
 
-            Login if title => "Login",
-            Login => "login",
+            // Login if title => "Login",
+            // Login => "login",
 
             Play if title => "Play",
             Play => "play",

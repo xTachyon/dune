@@ -2,8 +2,8 @@ use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
 use crate::DiskPacket;
 use aes::cipher::NewCipher;
 use anyhow::{anyhow, Result};
-use dune_data::protocol::v1_18_2::handshaking::SetProtocolRequest;
-use dune_data::protocol::v1_18_2::login::{EncryptionBeginRequest, EncryptionBeginResponse};
+use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
+use dune_data::protocol::common_states::login::{EncryptionBeginRequest, EncryptionBeginResponse};
 use dune_data::protocol::{self, handshaking, login, Handshaking, Login};
 use dune_data::protocol::{ConnectionState, PacketData, PacketDirection};
 use flate2::write::ZlibEncoder;
@@ -26,6 +26,7 @@ pub struct AuthData {
     pub name: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum Packet<'x> {
     Handshaking(Handshaking<'x>),

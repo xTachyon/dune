@@ -314,7 +314,7 @@ fn state(out: &mut String, state: &State) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn write(states: [State; 4]) -> Result<String> {
+pub(super) fn write(states: [State; 1]) -> Result<String> {
     let mut out = String::with_capacity(4096);
 
     out += "

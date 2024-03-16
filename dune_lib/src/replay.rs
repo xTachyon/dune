@@ -38,17 +38,17 @@ impl TrafficPlayer {
 
         // println!("{:?}", packet);
         match packet {
-            Packet::SetProtocolRequest(p) => {
-                self.state = match p.next_state {
-                    1 => ConnectionState::Status,
-                    2 => ConnectionState::Login,
-                    _ => unimplemented!(),
-                };
-            }
-            Packet::SuccessResponse(p) => {
-                self.state = ConnectionState::Play;
-                self.handler.player_info(p.username, p.uuid)?;
-            }
+            // Packet::SetProtocolRequest(p) => {
+            //     self.state = match p.next_state {
+            //         1 => ConnectionState::Status,
+            //         2 => ConnectionState::Login,
+            //         _ => unimplemented!(),
+            //     };
+            // }
+            // Packet::SuccessResponse(p) => {
+            //     self.state = ConnectionState::Play;
+            //     self.handler.player_info(p.username, p.uuid)?;
+            // }
             Packet::PlayerChatResponse(_) => self.handler.on_chat("who knows")?, // ??
             Packet::PositionRequest(p) => self.handler.position(Position {
                 x: p.x,

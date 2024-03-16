@@ -1,10 +1,10 @@
-use crate::record::{crypt_reply, AuthData};
+use crate::record::AuthData;
 use crate::{chat, Buffer};
 use aes::cipher::AsyncStreamCipher;
 use anyhow::Result;
+use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
+use dune_data::protocol::common_states::login::LoginStartRequest;
 use dune_data::protocol::de::MD;
-use dune_data::protocol::v1_18_2::handshaking::SetProtocolRequest;
-use dune_data::protocol::v1_18_2::login::LoginStartRequest;
 use dune_data::protocol::v1_18_2::play::{ChatRequest, KeepAliveRequest};
 use dune_data::protocol::v1_18_2::Packet;
 use dune_data::protocol::varint::{write_varint, write_varint_serialize, VarintSerialized};
@@ -150,7 +150,7 @@ fn handle_packet(_client: &mut Client, _writer: &mut ClientWriter, packet: Packe
 fn read_packet(
     client: &mut Client,
     session: &mut Session,
-    auth_data: &mut AuthData,
+    _auth_data: &mut AuthData,
 ) -> Result<bool> {
     let Some(packet_data) = protocol::read_packet_info(
         &session.reader.buffer,
@@ -171,18 +171,18 @@ fn read_packet(
     // println!("{:?}", packet);
     // system packets
     match packet {
-        Packet::SuccessResponse(_) => {
-            client.state = ConnectionState::Play;
-        }
-        Packet::CompressResponse(x) => {
-            client.compression = x.threshold >= 0;
-            session.writer.compression_threshold = Some(x.threshold.try_into()?);
-        }
-        Packet::EncryptionBeginResponse(packet) => {
-            let (c1, c2) = crypt_reply(packet, auth_data, &mut session.writer)?;
-            session.reader.crypt = Some(c1);
-            session.writer.crypt = Some(c2);
-        }
+        // Packet::SuccessResponse(_) => {
+        //     client.state = ConnectionState::Play;
+        // }
+        // Packet::CompressResponse(x) => {
+        //     client.compression = x.threshold >= 0;
+        //     session.writer.compression_threshold = Some(x.threshold.try_into()?);
+        // }
+        // Packet::EncryptionBeginResponse(packet) => {
+        //     let (c1, c2) = crypt_reply(packet, auth_data, &mut session.writer)?;
+        //     session.reader.crypt = Some(c1);
+        //     session.writer.crypt = Some(c2);
+        // }
         Packet::KeepAliveResponse(x) => {
             let p = KeepAliveRequest {
                 keep_alive_id: x.keep_alive_id,

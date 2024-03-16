@@ -242,7 +242,7 @@ impl Enchantment {
 }
 
 fn main() {
-    const VERSIONS: &[&str] = &["1.18.2", "1.19.3"];
+    const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
 
     Command::new("git")
         .args(["submodule", "update", "--init"])

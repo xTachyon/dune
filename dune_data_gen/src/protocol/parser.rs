@@ -31,9 +31,9 @@ struct JsonState {
 
 #[derive(Debug, Deserialize)]
 struct Root {
-    handshaking: JsonState,
-    status: JsonState,
-    login: JsonState,
+    // handshaking: JsonState,
+    // status: JsonState,
+    // login: JsonState,
     play: JsonState,
 }
 
@@ -362,7 +362,7 @@ fn direction<'x>(
     kind: &str,
     state_kind: ConnectionState,
 ) -> Direction<'x> {
-    let raw_mappings = do_mapping(&direction.types.remove("packet").unwrap());
+    let raw_mappings = do_mapping(&direction.types.shift_remove("packet").unwrap());
     let mut packets = Vec::with_capacity(direction.types.len());
 
     for (name, value) in direction.types {
@@ -411,16 +411,16 @@ fn state<'x>(parser: &Parser<'x>, state: JsonState, kind: ConnectionState) -> St
     }
 }
 
-pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 4] {
+pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 1] {
     let content = fs::read_to_string(path).unwrap();
     let root: Root = serde_json::from_str(&content).unwrap();
 
     let parser = Parser::new(bump);
 
     [
-        state(&parser, root.handshaking, ConnectionState::Handshaking),
-        state(&parser, root.status, ConnectionState::Status),
-        state(&parser, root.login, ConnectionState::Login),
+        // state(&parser, root.handshaking, ConnectionState::Handshaking),
+        // state(&parser, root.status, ConnectionState::Status),
+        // state(&parser, root.login, ConnectionState::Login),
         state(&parser, root.play, ConnectionState::Play),
     ]
 }

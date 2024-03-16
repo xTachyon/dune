@@ -1,6 +1,8 @@
+pub mod common_states;
 pub mod de;
 pub mod v1_18_2;
 pub mod v1_19_3;
+pub mod v1_20_2;
 pub mod varint;
 
 use crate::protocol::de::MD;
@@ -165,7 +167,7 @@ fn has_enough_bytes(bytes: &[u8]) -> bool {
 
 #[derive(Debug)]
 pub enum Handshaking<'x> {
-    SetProtocolRequest(v1_18_2::handshaking::SetProtocolRequest<'x>),
+    SetProtocolRequest(common_states::handshaking::SetProtocolRequest<'x>),
 }
 pub fn handshaking<'r>(
     state: ConnectionState,
@@ -190,14 +192,14 @@ pub fn handshaking<'r>(
 
 #[derive(Debug)]
 pub enum Login<'x> {
-    LoginStartRequest(v1_18_2::login::LoginStartRequest<'x>),
-    EncryptionBeginRequest(v1_18_2::login::EncryptionBeginRequest<'x>),
-    LoginPluginResponse(v1_18_2::login::LoginPluginResponse<'x>),
-    DisconnectResponse(v1_18_2::login::DisconnectResponse<'x>),
-    EncryptionBeginResponse(v1_18_2::login::EncryptionBeginResponse<'x>),
-    SuccessResponse(v1_18_2::login::SuccessResponse<'x>),
-    CompressResponse(v1_18_2::login::CompressResponse),
-    LoginPluginRequest(v1_18_2::login::LoginPluginRequest<'x>),
+    LoginStartRequest(common_states::login::LoginStartRequest<'x>),
+    EncryptionBeginRequest(common_states::login::EncryptionBeginRequest<'x>),
+    LoginPluginResponse(common_states::login::LoginPluginResponse<'x>),
+    DisconnectResponse(common_states::login::DisconnectResponse<'x>),
+    EncryptionBeginResponse(common_states::login::EncryptionBeginResponse<'x>),
+    SuccessResponse(common_states::login::SuccessResponse<'x>),
+    CompressResponse(common_states::login::CompressResponse),
+    LoginPluginRequest(common_states::login::LoginPluginRequest<'x>),
 }
 pub fn login<'r>(
     state: ConnectionState,
