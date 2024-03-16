@@ -129,7 +129,10 @@ fn underscore(b: bool) -> &'static str {
     }
 }
 fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str, id: Option<u16>) {
-    assert_eq!(ty as *const _ as *const u8, ty_struct as *const _ as *const u8);
+    assert_eq!(
+        ty as *const _ as *const u8,
+        ty_struct as *const _ as *const u8
+    );
 
     // TODO:
     if name == "UseEntityRequest" {
@@ -314,6 +317,7 @@ pub(super) fn write(states: [State; 1]) -> String {
 // #![allow(unused_variables)]
 // // fix
 
+use crate::protocol::PacketId;
 use crate::protocol::de::Position;
 use crate::protocol::de::Vec3f64;
 use crate::protocol::de::MD;
@@ -356,11 +360,11 @@ use std::mem::size_of;
     out += "
 }
             
-pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: u32, reader: &mut &'r[u8]) -> Result<Packet<'r>> {
+pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: PacketId, reader: &mut &'r[u8]) -> Result<Packet<'r>> {
     use PacketDirection as D;
     use ConnectionState as S;
     
-    let packet = match (state, direction, id) {
+    let packet = match (state, direction, id.0) {
 ";
 
     for state in states {

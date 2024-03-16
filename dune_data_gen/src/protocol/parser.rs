@@ -5,6 +5,7 @@ use super::{
 use crate::protocol::{TyBuffer, TyBufferCountKind};
 use bumpalo::Bump;
 use convert_case::{Case, Casing};
+use fs_err as fs;
 use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
@@ -12,7 +13,6 @@ use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
 };
-use fs_err as fs;
 
 #[derive(Debug, Deserialize)]
 struct JsonDirection {

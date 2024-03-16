@@ -53,7 +53,7 @@ pub struct IndexedNbt<'x> {
 }
 
 pub struct PacketData<'x> {
-    pub id: u32,
+    pub id: PacketId,
     pub total_size: usize,
     pub data: &'x [u8],
 }
@@ -149,7 +149,7 @@ pub fn read_packet_info<'r>(
     let total_size = length as usize + length_size;
     let id = read_varint(&mut reader)? as u32;
     let result = PacketData {
-        id,
+        id: PacketId(id),
         total_size,
         data: reader,
     };
@@ -165,6 +165,14 @@ fn has_enough_bytes(bytes: &[u8]) -> bool {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct PacketId(pub u32);
+impl std::fmt::Display for PacketId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
 #[derive(Debug)]
 pub enum Handshaking<'x> {
     SetProtocolRequest(common_states::handshaking::SetProtocolRequest<'x>),
@@ -172,14 +180,14 @@ pub enum Handshaking<'x> {
 pub fn handshaking<'r>(
     state: ConnectionState,
     direction: PacketDirection,
-    id: u32,
+    id: PacketId,
     reader: &mut &'r [u8],
 ) -> Result<Handshaking<'r>> {
     use ConnectionState as S;
     use PacketDirection as D;
 
     let packet = match (state, direction, id) {
-        (S::Handshaking, D::C2S, 0x0) => {
+        (S::Handshaking, D::C2S, PacketId(0x0)) => {
             let p = MD::deserialize(reader)?;
             Handshaking::SetProtocolRequest(p)
         }
@@ -204,42 +212,42 @@ pub enum Login<'x> {
 pub fn login<'r>(
     state: ConnectionState,
     direction: PacketDirection,
-    id: u32,
+    id: PacketId,
     reader: &mut &'r [u8],
 ) -> Result<Login<'r>> {
     use ConnectionState as S;
     use PacketDirection as D;
 
     let packet = match (state, direction, id) {
-        (S::Login, D::C2S, 0x0) => {
+        (S::Login, D::C2S, PacketId(0x0)) => {
             let p = MD::deserialize(reader)?;
             Login::LoginStartRequest(p)
         }
-        (S::Login, D::C2S, 0x1) => {
+        (S::Login, D::C2S, PacketId(0x1)) => {
             let p = MD::deserialize(reader)?;
             Login::EncryptionBeginRequest(p)
         }
-        (S::Login, D::C2S, 0x2) => {
+        (S::Login, D::C2S, PacketId(0x2)) => {
             let p = MD::deserialize(reader)?;
             Login::LoginPluginResponse(p)
         }
-        (S::Login, D::S2C, 0x0) => {
+        (S::Login, D::S2C, PacketId(0x0)) => {
             let p = MD::deserialize(reader)?;
             Login::DisconnectResponse(p)
         }
-        (S::Login, D::S2C, 0x1) => {
+        (S::Login, D::S2C, PacketId(0x1)) => {
             let p = MD::deserialize(reader)?;
             Login::EncryptionBeginResponse(p)
         }
-        (S::Login, D::S2C, 0x2) => {
+        (S::Login, D::S2C, PacketId(0x2)) => {
             let p = MD::deserialize(reader)?;
             Login::SuccessResponse(p)
         }
-        (S::Login, D::S2C, 0x3) => {
+        (S::Login, D::S2C, PacketId(0x3)) => {
             let p = MD::deserialize(reader)?;
             Login::CompressResponse(p)
         }
-        (S::Login, D::S2C, 0x4) => {
+        (S::Login, D::S2C, PacketId(0x4)) => {
             let p = MD::deserialize(reader)?;
             Login::LoginPluginRequest(p)
         }

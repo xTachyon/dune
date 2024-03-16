@@ -1,8 +1,18 @@
+pub mod chat;
+pub mod client;
+pub mod events;
+pub mod record;
+pub mod replay;
+pub mod world;
+
 use anyhow::bail;
 use anyhow::Result;
+pub use dune_data::enchantments::Enchantment;
+pub use dune_data::items::Item;
 use dune_data::protocol::de::MemoryExt;
 use dune_data::protocol::de::MD;
 use dune_data::protocol::PacketDirection;
+use dune_data::protocol::PacketId;
 use slice_ring_buffer::SliceRingBuffer;
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -13,18 +23,8 @@ use std::io::Write;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
-pub mod chat;
-pub mod client;
-pub mod events;
-pub mod record;
-pub mod replay;
-pub mod world;
-
-pub use dune_data::enchantments::Enchantment;
-pub use dune_data::items::Item;
-
 struct DiskPacket<'p> {
-    pub id: u32,
+    pub id: PacketId,
     pub direction: PacketDirection,
     pub data: &'p [u8],
 }
@@ -35,7 +35,7 @@ impl<'p> DiskPacket<'p> {
         // id + direction + size
 
         writer.write_all(&size.to_be_bytes())?;
-        writer.write_all(&self.id.to_be_bytes())?;
+        writer.write_all(&self.id.0.to_be_bytes())?;
         writer.write_all(&[self.direction as u8])?;
         writer.write_all(self.data)?;
 
@@ -52,7 +52,7 @@ impl<'p> DiskPacket<'p> {
         let data = reader.read_mem(size as usize - 4 - 1)?;
 
         Ok(DiskPacket {
-            id,
+            id: PacketId(id),
             direction,
             data,
         })

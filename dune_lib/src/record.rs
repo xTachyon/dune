@@ -4,7 +4,7 @@ use aes::cipher::NewCipher;
 use anyhow::{anyhow, Result};
 use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
 use dune_data::protocol::common_states::login::{EncryptionBeginRequest, EncryptionBeginResponse};
-use dune_data::protocol::{self, handshaking, login, Handshaking, Login};
+use dune_data::protocol::{self, handshaking, login, Handshaking, Login, PacketId};
 use dune_data::protocol::{ConnectionState, PacketData, PacketDirection};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
@@ -38,7 +38,7 @@ enum Packet<'x> {
 }
 
 type DeserializeFn =
-    for<'r> fn(ConnectionState, PacketDirection, u32, &mut &'r [u8]) -> Result<Packet<'r>>;
+    for<'r> fn(ConnectionState, PacketDirection, PacketId, &mut &'r [u8]) -> Result<Packet<'r>>;
 
 struct Proxy<'x> {
     state: ConnectionState,
@@ -125,7 +125,7 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     fn handshaking_wrapper<'r>(
         state: ConnectionState,
         direction: PacketDirection,
-        id: u32,
+        id: PacketId,
         reader: &mut &'r [u8],
     ) -> Result<Packet<'r>> {
         Ok(Packet::Handshaking(handshaking(
@@ -135,7 +135,7 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     fn login_wrapper<'r>(
         state: ConnectionState,
         direction: PacketDirection,
-        id: u32,
+        id: PacketId,
         reader: &mut &'r [u8],
     ) -> Result<Packet<'r>> {
         Ok(Packet::Login(login(state, direction, id, reader)?))
@@ -143,7 +143,7 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     fn ignore<'r>(
         _state: ConnectionState,
         _direction: PacketDirection,
-        _id: u32,
+        _id: PacketId,
         reader: &mut &'r [u8],
     ) -> Result<Packet<'r>> {
         let b = *reader;
@@ -162,7 +162,7 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
             fn $module<'r>(
                 state: ConnectionState,
                 direction: PacketDirection,
-                id: u32,
+                id: PacketId,
                 reader: &mut &'r [u8],
             ) -> Result<Packet<'r>> {
                 let ret = protocol::$module::deserialize(state, direction, id, reader)?;
