@@ -1,16 +1,14 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    fs,
-};
-
+use crate::protocol::{TyBuffer, TyBufferCountKind};
 use bumpalo::Bump;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
-
-use crate::protocol::{TyBuffer, TyBufferCountKind};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    fs,
+};
 
 use super::{
     width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
@@ -37,11 +35,15 @@ struct Root {
     play: JsonState,
 }
 
+struct ParserMutData<'x> {
+    types: HashSet<&'x Ty<'x>>,
+    strs: HashSet<&'x str>,
+    unknown_types: HashMap<&'x str, Vec<&'x str>>,
+}
+
 struct Parser<'x> {
     bump: &'x Bump,
-    types: RefCell<HashSet<&'x Ty<'x>>>,
-    strs: RefCell<HashSet<&'x str>>,
-    unknown_types: RefCell<HashMap<&'x str, Vec<&'x str>>>,
+    mut_data: RefCell<ParserMutData<'x>>,
 
     ty_u8: &'x Ty<'x>,
     ty_u16: &'x Ty<'x>,
@@ -101,9 +103,11 @@ impl<'x> Parser<'x> {
 
         Parser {
             bump,
-            types: RefCell::new(HashSet::with_capacity(32)),
-            strs: RefCell::new(HashSet::with_capacity(32)),
-            unknown_types: RefCell::new(HashMap::with_capacity(32)),
+            mut_data: RefCell::new(ParserMutData {
+                types: HashSet::with_capacity(32),
+                strs: HashSet::with_capacity(32),
+                unknown_types: HashMap::with_capacity(32),
+            }),
 
             ty_u8,
             ty_u16,
@@ -134,24 +138,24 @@ impl<'x> Parser<'x> {
     }
 
     fn alloc_type<'a: 'x>(&self, ty: Ty<'a>) -> &'x Ty<'x> {
-        let mut types = self.types.borrow_mut();
-        match types.get(&ty) {
+        let mut mut_data = self.mut_data.borrow_mut();
+        match mut_data.types.get(&ty) {
             Some(x) => x,
             None => {
                 let r = self.bump.alloc(ty);
-                types.insert(r);
+                mut_data.types.insert(r);
                 r
             }
         }
     }
 
     fn alloc_str(&self, x: &str) -> &'x str {
-        let mut strs = self.strs.borrow_mut();
-        match strs.get(x) {
+        let mut mut_data = self.mut_data.borrow_mut();
+        match mut_data.strs.get(x) {
             Some(x) => x,
             None => {
                 let r = self.bump.alloc_str(x);
-                strs.insert(r);
+                mut_data.strs.insert(r);
                 r
             }
         }
@@ -159,8 +163,12 @@ impl<'x> Parser<'x> {
 
     fn add_unknown_type(&self, unk_ty: &str, packet_ty: &'x str) {
         let unk_ty = self.alloc_str(unk_ty);
-        let mut unknown_types = self.unknown_types.borrow_mut();
-        unknown_types.entry(unk_ty).or_default().push(packet_ty);
+        let mut mut_data = self.mut_data.borrow_mut();
+        mut_data
+            .unknown_types
+            .entry(unk_ty)
+            .or_default()
+            .push(packet_ty);
     }
 }
 
@@ -452,7 +460,12 @@ pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 1] {
         state(&parser, root.play, ConnectionState::Play),
     ];
 
-    let mut unknown_types: Vec<_> = parser.unknown_types.into_inner().into_iter().collect();
+    let mut unknown_types: Vec<_> = parser
+        .mut_data
+        .into_inner()
+        .unknown_types
+        .into_iter()
+        .collect();
     unknown_types.sort_by_key(|x| x.0);
 
     let width = unknown_types
