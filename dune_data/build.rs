@@ -12,5 +12,8 @@ fn main() {
         .unwrap();
     dune_data_gen::run(out_path, &mc_data_path);
 
-    println!("cargo:rerun-if-changed=../dune_data_gen/minecraft-data/data");
+    println!("cargo:rerun-if-changed=../dune_data_gen/minecraft-data/data/dataPaths.json");
+    for i in dune_data_gen::VERSIONS {
+        println!("cargo:rerun-if-changed=../dune_data_gen/minecraft-data/data/pc/{}", i);
+    }
 }

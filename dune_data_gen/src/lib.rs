@@ -244,8 +244,9 @@ impl Enchantment {
     write_file_and_fmt(RS_PATH, out);
 }
 
+pub const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
+
 pub fn run(out_dir: &str, mc_data_path: &Path) {
-    const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
 
     Command::new("git")
         .args(["submodule", "update", "--init"])
