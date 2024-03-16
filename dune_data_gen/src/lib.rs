@@ -21,7 +21,12 @@ fn get_path(mc_data_path: &Path, version_path: &str, name: &str) -> PathBuf {
         .join(format!("{}.json", name))
 }
 
-fn new(name: &str, mc_data_path: &Path) -> Version {
+fn read_file<P: AsRef<Path>>(path: P, depends: &mut Vec<PathBuf>) -> String {
+    depends.push(path.as_ref().to_owned());
+    fs::read_to_string(path).unwrap()
+}
+
+fn new(name: &str, mc_data_path: &Path, depends: &mut Vec<PathBuf>) -> Version {
     #[derive(Debug, Deserialize)]
     struct DataPathsVersion<'x> {
         items: Option<&'x str>,
@@ -33,9 +38,8 @@ fn new(name: &str, mc_data_path: &Path) -> Version {
         #[serde(borrow)]
         pc: HashMap<&'x str, DataPathsVersion<'x>>,
     }
-    // panic!("{}", std::env::current_dir().unwrap().display());
-    let content = fs::read(mc_data_path.join("data/dataPaths.json")).unwrap();
-    let data: DataPathsJson = serde_json::from_slice(&content).unwrap();
+    let content = read_file(mc_data_path.join("data/dataPaths.json"), depends);
+    let data: DataPathsJson = serde_json::from_str(&content).unwrap();
 
     let v = data.pc.get(name).unwrap();
     let items_path = get_path(mc_data_path, v.items.unwrap(), "items");
@@ -82,7 +86,7 @@ fn title_case(input: &str) -> String {
     res
 }
 
-fn process_items(versions: &HashMap<&str, Version>) {
+fn process_items(versions: &HashMap<&str, Version>, depends: &mut Vec<PathBuf>) {
     #[derive(Debug, Deserialize)]
     struct InItemsJson<'x> {
         name: String,
@@ -94,15 +98,15 @@ fn process_items(versions: &HashMap<&str, Version>) {
     const JSON_PATH: &str = "dune_data/src/items.json";
     const ITEMS_RS_PATH: &str = "dune_data/src/items.rs";
 
-    let original_items_data = fs::read(JSON_PATH).unwrap();
-    let mut items: Vec<OutItemsJson> = serde_json::from_slice(&original_items_data).unwrap();
+    let original_items_data = read_file(JSON_PATH, depends);
+    let mut items: Vec<OutItemsJson> = serde_json::from_str(&original_items_data).unwrap();
     let mut items_by_version = HashMap::new();
 
     for (name, version) in versions {
         let items_v: &mut HashMap<String, u16> = items_by_version.entry(name).or_default();
 
-        let json = fs::read(&version.items_path).unwrap();
-        let in_items: Vec<InItemsJson> = serde_json::from_slice(&json).unwrap();
+        let json = read_file(&version.items_path, depends);
+        let in_items: Vec<InItemsJson> = serde_json::from_str(&json).unwrap();
 
         for i in in_items {
             if !items.iter().any(|x| x.name == i.name) {
@@ -183,7 +187,7 @@ fn process_items(versions: &HashMap<&str, Version>) {
     write_file_and_fmt(ITEMS_RS_PATH, out);
 }
 
-fn process_enchants(versions: &HashMap<&str, Version>) {
+fn process_enchants(versions: &HashMap<&str, Version>, depends: &mut Vec<PathBuf>) {
     #[derive(Debug, Serialize, Deserialize)]
     struct EnchJson {
         name: String,
@@ -193,12 +197,12 @@ fn process_enchants(versions: &HashMap<&str, Version>) {
     const JSON_PATH: &str = "dune_data/src/enchantments.json";
     const RS_PATH: &str = "dune_data/src/enchantments.rs";
 
-    let original_items_data = fs::read(JSON_PATH).unwrap();
-    let mut enchants: Vec<EnchJson> = serde_json::from_slice(&original_items_data).unwrap();
+    let original_items_data = read_file(JSON_PATH, depends);
+    let mut enchants: Vec<EnchJson> = serde_json::from_str(&original_items_data).unwrap();
 
     for version in versions.values() {
-        let json = fs::read(&version.enchants_path).unwrap();
-        let in_items: Vec<EnchJson> = serde_json::from_slice(&json).unwrap();
+        let json = read_file(&version.enchants_path, depends);
+        let in_items: Vec<EnchJson> = serde_json::from_str(&json).unwrap();
 
         for i in in_items {
             if !enchants.iter().any(|x| x.name == i.name) {
@@ -244,9 +248,8 @@ impl Enchantment {
     write_file_and_fmt(RS_PATH, out);
 }
 
-pub const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
-
-pub fn run(out_dir: &str, mc_data_path: &Path) {
+pub fn run(out_dir: &str, mc_data_path: &Path) -> Vec<PathBuf> {
+    const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
 
     Command::new("git")
         .args(["submodule", "update", "--init"])
@@ -255,17 +258,21 @@ pub fn run(out_dir: &str, mc_data_path: &Path) {
         .wait()
         .unwrap();
 
+    let mut depends = Vec::new();
+
     let versions: HashMap<&str, Version> = VERSIONS
         .iter()
-        .map(|&x| (x, new(x, mc_data_path)))
+        .map(|&x| (x, new(x, mc_data_path, &mut depends)))
         .collect();
 
     if false {
-        process_items(&versions);
-        process_enchants(&versions);
+        process_items(&versions, &mut depends);
+        process_enchants(&versions, &mut depends);
     }
 
     for v in VERSIONS {
-        protocol::run(v, &versions[v].protocol_path, out_dir);
+        protocol::run(v, &versions[v].protocol_path, out_dir, &mut depends);
     }
+
+    depends
 }

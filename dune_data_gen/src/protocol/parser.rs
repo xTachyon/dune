@@ -2,17 +2,19 @@ use super::{
     width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
     TyOption, TyStruct,
 };
-use crate::protocol::{TyBuffer, TyBufferCountKind};
+use crate::{
+    protocol::{TyBuffer, TyBufferCountKind},
+    read_file,
+};
 use bumpalo::Bump;
 use convert_case::{Case, Casing};
-use fs_err as fs;
 use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Deserialize)]
@@ -447,8 +449,8 @@ fn state<'x>(parser: &Parser<'x>, state: JsonState, kind: ConnectionState) -> St
     }
 }
 
-pub(super) fn parse<'x>(path: &Path, bump: &'x Bump) -> [State<'x>; 1] {
-    let content = fs::read_to_string(path).unwrap();
+pub(super) fn parse<'x>(path: &Path, bump: &'x Bump, depends: &mut Vec<PathBuf>) -> [State<'x>; 1] {
+    let content = read_file(path, depends);
     let root: Root = serde_json::from_str(&content).unwrap();
 
     let parser = Parser::new(bump);

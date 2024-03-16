@@ -3,7 +3,11 @@ mod writer;
 
 use bumpalo::Bump;
 use humansize::{format_size, BINARY};
-use std::{fmt::Debug, fs, path::Path};
+use std::{
+    fmt::Debug,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyBitfield {
@@ -191,9 +195,9 @@ struct State<'x> {
     pub s2c: Direction<'x>,
 }
 
-pub(super) fn run(version: &str, path: &Path, out_dir: &str) {
+pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<PathBuf>) {
     let bump = Bump::new();
-    let states = parser::parse(path, &bump);
+    let states = parser::parse(path, &bump, depends);
     let out = writer::write(states);
 
     let syntax_tree = syn::parse_file(&out).unwrap();
