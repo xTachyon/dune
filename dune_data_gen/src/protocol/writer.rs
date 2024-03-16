@@ -315,6 +315,7 @@ pub(super) fn write(states: [State; 1]) -> String {
 // fix
 
 use crate::protocol::de::Position;
+use crate::protocol::de::Vec3f64;
 use crate::protocol::de::MD;
 use crate::protocol::de::cautious_size;
 use crate::protocol::varint::read_varint;

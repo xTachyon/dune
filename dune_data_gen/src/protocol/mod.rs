@@ -64,6 +64,7 @@ enum Ty<'x> {
     Nbt,
     OptionNbt,
     ChunkBlockEntity,
+    Vec3f64,
 
     Struct(TyStruct<'x>),
     Option(TyOption<'x>),
@@ -109,6 +110,7 @@ impl<'x> Ty<'x> {
             Nbt => "IndexedNbt<'p>",
             OptionNbt => "IndexedOptionNbt<'p>",
             ChunkBlockEntity => "ChunkBlockEntity",
+            Vec3f64 => "Vec3f64",
             Bitfield(x) => {
                 let size = width_for_bitfields(x.range_end - x.range_begin);
                 let base_type = match (size, x.unsigned) {

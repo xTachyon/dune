@@ -67,6 +67,7 @@ struct Parser<'x> {
     ty_nbt: &'x Ty<'x>,
     ty_optional_nbt: &'x Ty<'x>,
     ty_chunk_block_entity: &'x Ty<'x>,
+    ty_vec3f64: &'x Ty<'x>,
 }
 impl<'x> Parser<'x> {
     fn new(bump: &Bump) -> Parser {
@@ -96,6 +97,7 @@ impl<'x> Parser<'x> {
         let ty_nbt = bump.alloc(Ty::Nbt);
         let ty_optional_nbt = bump.alloc(Ty::OptionNbt);
         let ty_chunk_block_entity = bump.alloc(Ty::ChunkBlockEntity);
+        let ty_vec3f64 = bump.alloc(Ty::Vec3f64);
 
         Parser {
             bump,
@@ -127,6 +129,7 @@ impl<'x> Parser<'x> {
             ty_nbt,
             ty_optional_nbt,
             ty_chunk_block_entity,
+            ty_vec3f64,
         }
     }
 
@@ -329,6 +332,7 @@ fn parse_type_simple<'x>(
         "nbt" => parser.ty_nbt,
         "optionalNbt" => parser.ty_optional_nbt,
         "chunkBlockEntity" => parser.ty_chunk_block_entity,
+        "vec3f64" => parser.ty_vec3f64,
 
         _ => {
             parser.add_unknown_type(input, struct_name);
@@ -458,12 +462,13 @@ pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 1] {
         .unwrap_or_default();
 
     eprintln!();
-    for (key, mut value) in unknown_types {
+    for (index, (key, mut value)) in unknown_types.into_iter().enumerate() {
         value.sort();
 
         let width = width - key.len();
         eprintln!(
-            "unknown type `{0}` {1:2$}: {3}",
+            "{0:2}. unknown type `{1}` {2:3$}: {4}",
+            index + 1,
             key,
             "",
             width,
