@@ -1,5 +1,4 @@
 use super::Direction;
-use super::Packet;
 use super::State;
 use super::Ty;
 use super::TyBufferCountKind;
@@ -128,7 +127,7 @@ fn underscore(b: bool) -> &'static str {
         ""
     }
 }
-fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str, id: Option<u16>) {
+fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str) {
     assert_eq!(
         ty as *const _ as *const u8,
         ty_struct as *const _ as *const u8
@@ -249,9 +248,6 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str,
             "fn serialize<W: Write>(&self, mut {}writer: &mut W) -> IoResult<()> {{",
             underscore(!has_serialization)
         );
-        if let Some(id) = id {
-            write!(out, "write_varint(&mut writer, {:#02x})?;", id);
-        }
         for (name, ty) in &ty_struct.fields {
             serialize_one(out, &format!("self.{}", name), ty);
         }
@@ -260,19 +256,19 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str,
 
     *out += "}";
 }
-fn write_all_structs(out: &mut String, ty: &Ty, id: Option<u16>) {
+fn write_all_structs(out: &mut String, ty: &Ty) {
     match ty {
         Ty::Struct(x) => {
             for (_, ty_struct) in x.fields.iter() {
-                write_all_structs(out, ty_struct, None);
+                write_all_structs(out, ty_struct);
             }
-            serialize_struct(out, ty, x, &x.name, id);
+            serialize_struct(out, ty, x, &x.name);
         }
         Ty::Option(x) => {
-            write_all_structs(out, x.subtype, None);
+            write_all_structs(out, x.subtype);
         }
         Ty::Array(x) => {
-            write_all_structs(out, x.subtype, None);
+            write_all_structs(out, x.subtype);
         }
         _ => {}
     }
@@ -280,7 +276,7 @@ fn write_all_structs(out: &mut String, ty: &Ty, id: Option<u16>) {
 
 fn direction(out: &mut String, direction: &Direction) {
     for packet in &direction.packets {
-        write_all_structs(out, packet.ty, Some(packet.id));
+        write_all_structs(out, packet.ty);
     }
 }
 
@@ -301,7 +297,64 @@ fn state(out: &mut String, state: &State) {
     *out += "}";
 }
 
-pub(super) fn write(states: [State; 1]) -> String {
+fn deserialize_fn(out: &mut String, states: &[State]) {
+    *out += "
+}
+            
+pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: PacketId, reader: &mut &'r[u8]) -> Result<Packet<'r>> {
+    use PacketDirection as D;
+    use ConnectionState as S;
+    
+    let packet = match (state, direction, id.0) {
+";
+
+    for state in states {
+        for (direction, direction_string) in [(&state.c2s, "C2S"), (&state.s2c, "S2C")] {
+            for packet in &direction.packets {
+                write!(
+                    out,
+                    "(S::{}, D::{}, {:#x}) => {{ let p = {}::{}::deserialize(reader)?; Packet::{}(p) }}",
+                    state.kind.name(true),
+                    direction_string,
+                    packet.id,
+                    state.kind.name(false),
+                    packet.name,
+                    packet.name
+                );
+            }
+        }
+    }
+
+    *out += r#"_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }"#;
+}
+
+fn serialize_fn(out: &mut String, states: &[State]) {
+    *out += "
+            
+pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<()> {
+    use PacketDirection as D;
+    use ConnectionState as S;
+    
+    match packet {
+";
+
+    for state in states {
+        for direction in [&state.c2s, &state.s2c] {
+            for packet in &direction.packets {
+                write!(
+                    out,
+                    "Packet::{}(p) => {{ write_varint(&mut writer, {:#02x})?; ; p.serialize(writer) }}",
+                    packet.name,
+                    packet.id,
+                );
+            }
+        }
+    }
+
+    *out += r#"}}"#;
+}
+
+pub(super) fn write(mut states: [State; 1]) -> String {
     let mut out = String::with_capacity(4096);
 
     out += "
@@ -357,37 +410,13 @@ use std::mem::size_of;
             }
         }
     }
-    out += "
-}
-            
-pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: PacketId, reader: &mut &'r[u8]) -> Result<Packet<'r>> {
-    use PacketDirection as D;
-    use ConnectionState as S;
-    
-    let packet = match (state, direction, id.0) {
-";
 
-    for state in states {
-        for (direction, direction_string) in [(state.c2s, "C2S"), (state.s2c, "S2C")] {
-            let mut packets: Vec<Packet> = direction.packets;
-            packets.sort_unstable_by_key(|x| x.id);
-
-            for packet in packets {
-                write!(
-                    out,
-                    "(S::{}, D::{}, {:#x}) => {{ let p = {}::{}::deserialize(reader)?; Packet::{}(p) }}",
-                    state.kind.name(true),
-                    direction_string,
-                    packet.id,
-                    state.kind.name(false),
-                    packet.name,
-                    packet.name
-                );
-            }
-        }
+    for i in &mut states {
+        i.c2s.packets.sort_by_key(|x| x.id);
+        i.s2c.packets.sort_by_key(|x| x.id);
     }
-
-    out += r#"_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }"#;
+    deserialize_fn(&mut out, &states);
+    serialize_fn(&mut out, &states);
 
     out
 }

@@ -68,6 +68,7 @@ impl ClientWriter {
 
         let start_offset = self.buffer.len();
 
+        // TODO: use the serialize fn
         packet.borrow().serialize(&mut self.tmp)?;
 
         let (packet_buffer, data_length) = match self.compression_threshold {
