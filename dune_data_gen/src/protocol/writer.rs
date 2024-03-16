@@ -41,7 +41,7 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
                 format!("Vec<{}{}>", get_type_name(x.subtype), lifetime(x.subtype)).into()
             }
         }
-        Ty::Struct(x) => x.name.as_str().into(),
+        Ty::Struct(x) => x.name.into(),
         Ty::Buffer(x) => match x.kind {
             TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
             TyBufferCountKind::Varint => "&'p [u8]".into(),

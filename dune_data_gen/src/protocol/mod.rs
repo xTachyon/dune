@@ -23,7 +23,7 @@ struct TyBuffer {
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyStruct<'x> {
-    name: String,
+    name: &'x str,
     fields: Vec<(String, &'x Ty<'x>)>,
     base_type: Option<&'x Ty<'x>>, // only for bitfields
     failed: bool,
@@ -150,7 +150,7 @@ fn width_for_bitfields(size: u16) -> u16 {
 }
 
 struct Packet<'x> {
-    pub name: String,
+    pub name: &'x str,
     pub ty: &'x Ty<'x>,
     pub id: u16,
 }

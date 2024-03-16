@@ -40,6 +40,8 @@ struct Root {
 struct Parser<'x> {
     bump: &'x Bump,
     types: RefCell<HashSet<&'x Ty<'x>>>,
+    strs: RefCell<HashSet<&'x str>>,
+    unknown_types: RefCell<HashMap<&'x str, Vec<&'x str>>>,
 
     ty_u8: &'x Ty<'x>,
     ty_u16: &'x Ty<'x>,
@@ -97,7 +99,9 @@ impl<'x> Parser<'x> {
 
         Parser {
             bump,
-            types: RefCell::new(HashSet::new()),
+            types: RefCell::new(HashSet::with_capacity(32)),
+            strs: RefCell::new(HashSet::with_capacity(32)),
+            unknown_types: RefCell::new(HashMap::with_capacity(32)),
 
             ty_u8,
             ty_u16,
@@ -137,6 +141,24 @@ impl<'x> Parser<'x> {
             }
         }
     }
+
+    fn alloc_str(&self, x: &str) -> &'x str {
+        let mut strs = self.strs.borrow_mut();
+        match strs.get(x) {
+            Some(x) => x,
+            None => {
+                let r = self.bump.alloc_str(x);
+                strs.insert(r);
+                r
+            }
+        }
+    }
+
+    fn add_unknown_type(&self, unk_ty: &str, packet_ty: &'x str) {
+        let unk_ty = self.alloc_str(unk_ty);
+        let mut unknown_types = self.unknown_types.borrow_mut();
+        unknown_types.entry(unk_ty).or_default().push(packet_ty);
+    }
 }
 
 fn snake_to_pascal(input: &str) -> String {
@@ -160,7 +182,7 @@ fn snake_to_pascal(input: &str) -> String {
 fn parse_container<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &str,
+    struct_name: &'x str,
     parent_field: Option<&str>,
     is_bitfield: bool,
 ) -> Option<&'x Ty<'x>> {
@@ -221,6 +243,7 @@ fn parse_container<'x>(
         name += "_";
         name += &snake_to_pascal(parent_field);
     }
+    let name = parser.bump.alloc_str(&name);
 
     let t = Ty::Struct(TyStruct {
         name,
@@ -233,7 +256,7 @@ fn parse_container<'x>(
 fn parse_option<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &str,
+    struct_name: &'x str,
     parent_field: Option<&str>,
 ) -> Option<&'x Ty<'x>> {
     let subtype = parse_type(parser, input, struct_name, parent_field)?;
@@ -259,7 +282,7 @@ fn parse_buffer<'x>(parser: &Parser<'x>, input: &Value) -> &'x Ty<'x> {
 fn parse_array<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &str,
+    struct_name: &'x str,
     parent_field: Option<&str>,
 ) -> Option<&'x Ty<'x>> {
     let count_ty = &input["countType"];
@@ -280,7 +303,7 @@ fn parse_array<'x>(
 fn parse_type_simple<'x>(
     parser: &Parser<'x>,
     input: &str,
-    struct_name: &str,
+    struct_name: &'x str,
 ) -> Option<&'x Ty<'x>> {
     let r = match input {
         "u8" => parser.ty_u8,
@@ -308,7 +331,7 @@ fn parse_type_simple<'x>(
         "chunkBlockEntity" => parser.ty_chunk_block_entity,
 
         _ => {
-            eprintln!("unknown type `{}` in `{}`", input, struct_name);
+            parser.add_unknown_type(input, struct_name);
             return None;
         }
     };
@@ -317,7 +340,7 @@ fn parse_type_simple<'x>(
 fn parse_type<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &str,
+    struct_name: &'x str,
     parent_field: Option<&str>,
 ) -> Option<&'x Ty<'x>> {
     if let Some(x) = input.as_str() {
@@ -333,7 +356,7 @@ fn parse_type<'x>(
         "buffer" => Some(parse_buffer(parser, input)),
         "array" => parse_array(parser, arg1, struct_name, parent_field),
         _ => {
-            eprintln!("unknown type `{}` in `{}`", name, struct_name);
+            parser.add_unknown_type(name, struct_name);
             None
         }
     }
@@ -380,15 +403,16 @@ fn direction<'x>(
             name + kind
         };
         let name = snake_to_pascal(&name);
+        let name = parser.bump.alloc_str(&name);
         let ty = if is_ignored {
             parser.alloc_type(Ty::Struct(TyStruct {
-                name: name.clone(),
+                name,
                 fields: Vec::new(),
                 base_type: None,
                 failed: true,
             }))
         } else {
-            match parse_type(parser, &value, &name, None) {
+            match parse_type(parser, &value, name, None) {
                 Some(x) => x,
                 None => {
                     eprintln!("---\ncan't parse {}", name);
@@ -417,10 +441,35 @@ pub(super) fn parse<'x>(path: &str, bump: &'x Bump) -> [State<'x>; 1] {
 
     let parser = Parser::new(bump);
 
-    [
+    let result = [
         // state(&parser, root.handshaking, ConnectionState::Handshaking),
         // state(&parser, root.status, ConnectionState::Status),
         // state(&parser, root.login, ConnectionState::Login),
         state(&parser, root.play, ConnectionState::Play),
-    ]
+    ];
+
+    let mut unknown_types: Vec<_> = parser.unknown_types.into_inner().into_iter().collect();
+    unknown_types.sort_by_key(|x| x.0);
+
+    let width = unknown_types
+        .iter()
+        .map(|x| x.0.len())
+        .max()
+        .unwrap_or_default();
+
+    eprintln!();
+    for (key, mut value) in unknown_types {
+        value.sort();
+
+        let width = width - key.len();
+        eprintln!(
+            "unknown type `{0}` {1:2$}: {3}",
+            key,
+            "",
+            width,
+            value.join(", ")
+        );
+    }
+
+    result
 }
