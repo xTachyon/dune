@@ -1,3 +1,7 @@
+use super::{
+    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
+    TyOption, TyStruct,
+};
 use crate::protocol::{TyBuffer, TyBufferCountKind};
 use bumpalo::Bump;
 use convert_case::{Case, Casing};
@@ -8,11 +12,6 @@ use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     fs,
-};
-
-use super::{
-    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
-    TyOption, TyStruct,
 };
 
 #[derive(Debug, Deserialize)]

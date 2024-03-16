@@ -129,6 +129,8 @@ fn underscore(b: bool) -> &'static str {
     }
 }
 fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str, id: Option<u16>) {
+    assert_eq!(ty as *const _ as *const u8, ty_struct as *const _ as *const u8);
+
     // TODO:
     if name == "UseEntityRequest" {
         *out += r#"
@@ -237,25 +239,23 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str,
             .fields
             .iter()
             .any(|x| matches!(x.1, Ty::Array(_) | Ty::Struct(_)));
-    write!(
-        out,
-        "fn serialize<W: Write>(&self, mut {}writer: &mut W) -> IoResult<()> {{",
-        underscore(!has_serialization)
-    );
 
-    if has_serialization {
+    if has_serialization && !ty_struct.failed {
+        write!(
+            out,
+            "fn serialize<W: Write>(&self, mut {}writer: &mut W) -> IoResult<()> {{",
+            underscore(!has_serialization)
+        );
         if let Some(id) = id {
             write!(out, "write_varint(&mut writer, {:#02x})?;", id);
         }
         for (name, ty) in &ty_struct.fields {
             serialize_one(out, &format!("self.{}", name), ty);
         }
-        *out += "Ok(())";
-    } else {
-        *out += "unimplemented!();";
+        *out += "Ok(()) }";
     }
 
-    *out += "}}";
+    *out += "}";
 }
 fn write_all_structs(out: &mut String, ty: &Ty, id: Option<u16>) {
     match ty {
