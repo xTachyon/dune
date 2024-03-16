@@ -191,12 +191,12 @@ struct State<'x> {
     pub s2c: Direction<'x>,
 }
 
-pub(super) fn run(version: &str, path: &str) {
+pub(super) fn run(version: &str, path: &str, out_dir: &str) {
     let bump = Bump::new();
     let states = parser::parse(path, &bump);
     let out = writer::write(states);
 
-    let path = format!("dune_data/src/protocol/v{}.rs", version.replace('.', "_"));
+    let path = format!("{}/v{}.rs", out_dir, version.replace('.', "_"));
     fs::write(&path, out).unwrap();
 
     Command::new("rustfmt").arg(path).spawn().unwrap();

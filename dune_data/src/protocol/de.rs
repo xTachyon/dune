@@ -24,7 +24,9 @@ impl<'x> MemoryExt<'x> for &'x [u8] {
 }
 
 pub trait MD<'x> {
-    fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()>;
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
+    }
     fn deserialize(memory: &mut &'x [u8]) -> Result<Self>
     where
         Self: Sized;
@@ -280,6 +282,31 @@ impl<'x> MD<'x> for ChunkBlockEntity<'x> {
             nbt_data,
         })
     }
+    fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
+        unimplemented!()
+    }
+}
+
+#[allow(dead_code)] // remove?
+#[derive(Debug)]
+pub struct Vec3f64 {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl<'x> MD<'x> for Vec3f64 {
+    fn deserialize(memory: &mut &'x [u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let x = MD::deserialize(memory)?;
+        let y = MD::deserialize(memory)?;
+        let z = MD::deserialize(memory)?;
+
+        Ok(Vec3f64 { x, y, z })
+    }
+
     fn serialize<W: Write>(&self, _writer: &mut W) -> IoResult<()> {
         unimplemented!()
     }

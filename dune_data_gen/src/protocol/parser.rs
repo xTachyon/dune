@@ -11,8 +11,8 @@ use serde_json::Value;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    fs,
 };
+use fs_err as fs;
 
 #[derive(Debug, Deserialize)]
 struct JsonDirection {

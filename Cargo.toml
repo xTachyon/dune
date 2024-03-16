@@ -14,6 +14,7 @@ resolver = "2"
 dune_lib = { path = "dune_lib" }
 dune_common = { path = "dune_common"}
 dune_data = { path = "dune_data" }
+dune_data_gen = { path = "dune_data_gen" }
 
 anyhow = "1"
 ansi_term = "0.12.1"
@@ -33,6 +34,7 @@ polling = "2"
 rand = "0.8.5"
 slice-ring-buffer = "0.3.2"
 ureq = "2"
+fs-err = "2"
 
 serde = "1"
 serde_json = "1"

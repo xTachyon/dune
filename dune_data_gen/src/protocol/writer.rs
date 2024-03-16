@@ -302,17 +302,17 @@ pub(super) fn write(states: [State; 1]) -> String {
     let mut out = String::with_capacity(4096);
 
     out += "
-#![allow(unused_mut)]
-#![allow(dead_code)]
-#![allow(non_camel_case_types)]
-#![allow(unused_imports)]
-#![allow(clippy::needless_borrow)]
-#![allow(clippy::needless_borrows_for_generic_args)]
-#![allow(clippy::identity_op)]
-// fix
-#![allow(unreachable_code)]
-#![allow(unused_variables)]
-// fix
+// #![allow(unused_mut)]
+// #![allow(dead_code)]
+// #![allow(non_camel_case_types)]
+// #![allow(unused_imports)]
+// #![allow(clippy::needless_borrow)]
+// #![allow(clippy::needless_borrows_for_generic_args)]
+// #![allow(clippy::identity_op)]
+// // fix
+// #![allow(unreachable_code)]
+// #![allow(unused_variables)]
+// // fix
 
 use crate::protocol::de::Position;
 use crate::protocol::de::Vec3f64;

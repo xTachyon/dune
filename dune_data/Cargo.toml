@@ -10,3 +10,6 @@ anyhow.workspace = true
 bytemuck.workspace = true
 num_enum.workspace = true
 flate2.workspace = true
+
+[build-dependencies]
+dune_data_gen.workspace = true
