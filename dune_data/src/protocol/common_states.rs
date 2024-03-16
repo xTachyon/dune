@@ -1,6 +1,9 @@
+use crate::protocol::{
+    de::MD,
+    varint::{read_varint, write_varint},
+};
 use anyhow::Result;
 use std::io::{Result as IoResult, Write};
-use crate::protocol::{de::MD, varint::{read_varint, write_varint}};
 
 pub mod handshaking {
     use super::*;

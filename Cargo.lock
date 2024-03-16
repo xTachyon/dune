@@ -423,6 +423,7 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "convert_case",
+ "humansize",
  "indexmap",
  "serde",
  "serde_derive",

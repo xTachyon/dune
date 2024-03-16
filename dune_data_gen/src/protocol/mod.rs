@@ -2,7 +2,8 @@ mod parser;
 mod writer;
 
 use bumpalo::Bump;
-use std::{fs, process::Command};
+use humansize::{format_size, BINARY};
+use std::{fmt::Debug, fs, process::Command};
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyBitfield {
@@ -176,7 +177,6 @@ impl ConnectionState {
 
             // Login if title => "Login",
             // Login => "login",
-
             Play if title => "Play",
             Play => "play",
         }
@@ -197,4 +197,11 @@ pub(super) fn run(version: &str, path: &str) {
     fs::write(&path, out).unwrap();
 
     Command::new("rustfmt").arg(path).spawn().unwrap();
+
+    let bytes = bump.allocated_bytes();
+    println!(
+        "bump size: {} ({} bytes)",
+        format_size(bytes, BINARY),
+        bytes
+    );
 }
