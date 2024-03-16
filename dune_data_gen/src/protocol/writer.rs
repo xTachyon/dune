@@ -5,9 +5,16 @@ use super::Ty;
 use super::TyBufferCountKind;
 use super::TyStruct;
 use std::borrow::Cow;
-use std::fmt::Write;
+use std::fmt::Arguments;
 
-type Result<T> = std::result::Result<T, std::fmt::Error>;
+trait FmtWriteNoFail {
+    fn write_fmt(&mut self, args: Arguments);
+}
+impl FmtWriteNoFail for String {
+    fn write_fmt(&mut self, args: Arguments) {
+        std::fmt::Write::write_fmt(self, args).expect("write on string failed 😢");
+    }
+}
 
 fn lifetime(ty: &Ty) -> &'static str {
     let b = ty.needs_lifetime()
@@ -49,13 +56,7 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
         _ => ty.get_simple_type().into(),
     }
 }
-fn deserialize_one(
-    out: &mut String,
-    name: &str,
-    ty: &Ty,
-    bitfield_base_width: u16,
-    count: u32,
-) -> Result<()> {
+fn deserialize_one(out: &mut String, name: &str, ty: &Ty, bitfield_base_width: u16, count: u32) {
     if let Ty::Array(x) = ty {
         deserialize_one(
             out,
@@ -63,7 +64,7 @@ fn deserialize_one(
             x.count_ty,
             bitfield_base_width,
             count + 1,
-        )?;
+        );
         if x.subtype.is_rs_builtin() {
             write!(
                 out,
@@ -72,8 +73,8 @@ fn deserialize_one(
                 x.subtype.get_simple_type(),
                 name,
                 x.subtype.get_simple_type().to_uppercase(),
-            )?;
-            return Ok(());
+            );
+            return;
         }
 
         write!(
@@ -81,48 +82,44 @@ fn deserialize_one(
             "let mut {} = Vec::with_capacity(cautious_size(array_count as usize));
             for _ in 0..array_count {{",
             name
-        )?;
+        );
         let elem = if count == 1 {
             "x".to_string()
         } else {
             format!("x_{}", count)
         };
-        deserialize_one(out, &elem, x.subtype, bitfield_base_width, count + 1)?;
-        writeln!(out, "{}.push({}); }}", name, elem)?;
-        return Ok(());
+        deserialize_one(out, &elem, x.subtype, bitfield_base_width, count + 1);
+        writeln!(out, "{}.push({}); }}", name, elem);
+        return;
     }
-    write!(out, "let {}: {} = ", name, get_type_name(ty))?;
+    write!(out, "let {}: {} = ", name, get_type_name(ty));
     if let Ty::Bitfield(x) = ty {
         let left_shift = bitfield_base_width - x.range_end;
         let right_shift = bitfield_base_width - (x.range_end - x.range_begin);
-        write!(out, "(value << {} >> {}) as _;", left_shift, right_shift)?;
+        write!(out, "(value << {} >> {}) as _;", left_shift, right_shift);
 
-        return Ok(());
+        return;
     }
 
     match ty {
         Ty::VarInt => *out += "read_varint(&mut reader)?;",
         Ty::VarLong => *out += "read_varlong(&mut reader)?;",
         Ty::RestBuffer => *out += "&reader[..]; *reader = &[];",
-        Ty::Struct(x) => write!(out, "{}::deserialize(reader)?;", x.name)?,
+        Ty::Struct(x) => write!(out, "{}::deserialize(reader)?;", x.name),
         _ => *out += "MD::deserialize(reader)?;",
     }
-    writeln!(out)?;
-
-    Ok(())
+    writeln!(out);
 }
-fn serialize_one(out: &mut String, name: &str, ty: &Ty) -> Result<()> {
+fn serialize_one(out: &mut String, name: &str, ty: &Ty) {
     match ty {
-        Ty::VarInt => write!(out, "write_varint(&mut writer, {} as u32)?;", name)?,
-        Ty::VarLong => write!(out, "write_varlong(&mut writer, {} as u64)?;", name)?,
-        Ty::RestBuffer => write!(out, "writer.write_all({})?;", name)?,
+        Ty::VarInt => write!(out, "write_varint(&mut writer, {} as u32)?;", name),
+        Ty::VarLong => write!(out, "write_varlong(&mut writer, {} as u64)?;", name),
+        Ty::RestBuffer => write!(out, "writer.write_all({})?;", name),
         _ => {
-            write!(out, "{}.serialize(&mut writer)?;", name)?;
+            write!(out, "{}.serialize(&mut writer)?;", name);
         }
     }
-    writeln!(out)?;
-
-    Ok(())
+    writeln!(out);
 }
 fn underscore(b: bool) -> &'static str {
     if b {
@@ -131,13 +128,7 @@ fn underscore(b: bool) -> &'static str {
         ""
     }
 }
-fn serialize_struct(
-    out: &mut String,
-    ty: &Ty,
-    ty_struct: &TyStruct,
-    name: &str,
-    id: Option<u16>,
-) -> Result<()> {
+fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str, id: Option<u16>) {
     // TODO:
     if name == "UseEntityRequest" {
         *out += r#"
@@ -194,7 +185,7 @@ fn serialize_struct(
             }
         }
         "#;
-        return Ok(());
+        return;
     }
 
     let (lifetime, lifetime_simple) = if ty.needs_lifetime() {
@@ -202,41 +193,41 @@ fn serialize_struct(
     } else {
         ("", "")
     };
-    writeln!(out, "#[derive(Debug)] pub struct {}{} {{", name, lifetime)?;
+    writeln!(out, "#[derive(Debug)] pub struct {}{} {{", name, lifetime);
 
     for (name, ty) in &ty_struct.fields {
-        writeln!(out, "pub {}: {},", name, get_type_name(ty))?;
+        writeln!(out, "pub {}: {},", name, get_type_name(ty));
     }
 
     *out += "}";
 
-    write!(out, "impl<'p> MD<'p> for {}{lifetime} {{", ty_struct.name,)?;
+    write!(out, "impl<'p> MD<'p> for {}{lifetime} {{", ty_struct.name);
 
     writeln!(
         out,
         "fn deserialize(mut {}reader: &mut &{lifetime_simple}[u8]) -> Result<{}{lifetime}> {{",
         underscore(ty_struct.fields.is_empty()),
         ty_struct.name
-    )?;
+    );
 
     if ty_struct.failed {
         *out += "// failed\n";
     }
 
     let bitfield_base_width = if let Some(base_type) = ty_struct.base_type {
-        deserialize_one(out, "value", base_type, 0, 1)?;
+        deserialize_one(out, "value", base_type, 0, 1);
         base_type.width()
     } else {
         0
     };
     for (name, ty) in &ty_struct.fields {
-        deserialize_one(out, name, ty, bitfield_base_width, 1)?;
+        deserialize_one(out, name, ty, bitfield_base_width, 1);
     }
 
-    write!(out, "\nlet result = {} {{", ty_struct.name)?;
+    write!(out, "\nlet result = {} {{", ty_struct.name);
 
     for (name, _) in &ty_struct.fields {
-        writeln!(out, "{},", name)?;
+        writeln!(out, "{},", name);
     }
 
     *out += "}; Ok(result) }";
@@ -250,14 +241,14 @@ fn serialize_struct(
         out,
         "fn serialize<W: Write>(&self, mut {}writer: &mut W) -> IoResult<()> {{",
         underscore(!has_serialization)
-    )?;
+    );
 
     if has_serialization {
         if let Some(id) = id {
-            write!(out, "write_varint(&mut writer, {:#02x})?;", id)?;
+            write!(out, "write_varint(&mut writer, {:#02x})?;", id);
         }
         for (name, ty) in &ty_struct.fields {
-            serialize_one(out, &format!("self.{}", name), ty)?;
+            serialize_one(out, &format!("self.{}", name), ty);
         }
         *out += "Ok(())";
     } else {
@@ -265,37 +256,32 @@ fn serialize_struct(
     }
 
     *out += "}}";
-
-    Ok(())
 }
-fn write_all_structs(out: &mut String, ty: &Ty, id: Option<u16>) -> Result<()> {
+fn write_all_structs(out: &mut String, ty: &Ty, id: Option<u16>) {
     match ty {
         Ty::Struct(x) => {
             for (_, ty_struct) in x.fields.iter() {
-                write_all_structs(out, ty_struct, None)?;
+                write_all_structs(out, ty_struct, None);
             }
-            serialize_struct(out, ty, x, &x.name, id)?;
+            serialize_struct(out, ty, x, &x.name, id);
         }
         Ty::Option(x) => {
-            write_all_structs(out, x.subtype, None)?;
+            write_all_structs(out, x.subtype, None);
         }
         Ty::Array(x) => {
-            write_all_structs(out, x.subtype, None)?;
+            write_all_structs(out, x.subtype, None);
         }
         _ => {}
     }
-    Ok(())
 }
 
-fn direction(out: &mut String, direction: &Direction) -> Result<()> {
+fn direction(out: &mut String, direction: &Direction) {
     for packet in &direction.packets {
-        write_all_structs(out, packet.ty, Some(packet.id))?;
+        write_all_structs(out, packet.ty, Some(packet.id));
     }
-
-    Ok(())
 }
 
-fn state(out: &mut String, state: &State) -> Result<()> {
+fn state(out: &mut String, state: &State) {
     write!(
         out,
         "
@@ -304,17 +290,15 @@ fn state(out: &mut String, state: &State) -> Result<()> {
             
             ",
         state.kind.name(false)
-    )?;
+    );
 
-    direction(out, &state.c2s)?;
-    direction(out, &state.s2c)?;
+    direction(out, &state.c2s);
+    direction(out, &state.s2c);
 
     *out += "}";
-
-    Ok(())
 }
 
-pub(super) fn write(states: [State; 1]) -> Result<String> {
+pub(super) fn write(states: [State; 1]) -> String {
     let mut out = String::with_capacity(4096);
 
     out += "
@@ -351,7 +335,7 @@ use std::io::{Result as IoResult, Write};
 use std::mem::size_of;
     ";
     for i in states.iter() {
-        state(&mut out, i)?;
+        state(&mut out, i);
     }
 
     out += "#[derive(Debug)] pub enum Packet<'p> {";
@@ -364,7 +348,7 @@ use std::mem::size_of;
                     packet.name,
                     state.kind.name(false),
                     lifetime(packet.ty),
-                )?;
+                );
             }
         }
     }
@@ -393,12 +377,12 @@ pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: u
                     state.kind.name(false),
                     packet.name,
                     packet.name
-                )?;
+                );
             }
         }
     }
 
     out += r#"_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }"#;
 
-    Ok(out)
+    out
 }
