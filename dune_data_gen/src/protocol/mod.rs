@@ -33,6 +33,18 @@ struct TyStruct<'x> {
     failed: bool,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+enum Constant<'x> {
+    Bool(bool),
+    Int(u32),
+    String(&'x str),
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+struct TyEnum<'x> {
+    name: &'x str,
+    compare_to: &'x str,
+    variants: Vec<(Constant<'x>, &'x Ty<'x>)>,
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyOption<'x> {
     subtype: &'x Ty<'x>,
 }
@@ -71,6 +83,7 @@ enum Ty<'x> {
     Vec3f64,
 
     Struct(TyStruct<'x>),
+    Enum(TyEnum<'x>),
     Option(TyOption<'x>),
     Array(TyArray<'x>),
     Bitfield(TyBitfield),

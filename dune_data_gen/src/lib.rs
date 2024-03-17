@@ -249,7 +249,8 @@ impl Enchantment {
 }
 
 pub fn run(out_dir: &str, mc_data_path: &Path) -> Vec<PathBuf> {
-    const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
+    // const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
+    const VERSIONS: &[&str] = &["1.20.2"];
 
     Command::new("git")
         .args(["submodule", "update", "--init"])

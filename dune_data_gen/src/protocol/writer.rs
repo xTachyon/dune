@@ -2,6 +2,7 @@ use super::Direction;
 use super::State;
 use super::Ty;
 use super::TyBufferCountKind;
+use super::TyEnum;
 use super::TyStruct;
 use std::borrow::Cow;
 use std::fmt::Arguments;
@@ -48,6 +49,7 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
             }
         }
         Ty::Struct(x) => x.name.into(),
+        Ty::Enum(x) => x.name.into(),
         Ty::Buffer(x) => match x.kind {
             TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
             TyBufferCountKind::Varint => "&'p [u8]".into(),
@@ -128,11 +130,6 @@ fn underscore(b: bool) -> &'static str {
     }
 }
 fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str) {
-    assert_eq!(
-        ty as *const _ as *const u8,
-        ty_struct as *const _ as *const u8
-    );
-
     // TODO:
     if name == "UseEntityRequest" {
         *out += r#"
@@ -253,6 +250,22 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str)
 
     *out += "}";
 }
+fn serialize_enum(out: &mut String, ty: &Ty, ty_struct: &TyEnum, name: &str) {
+    let (lifetime, lifetime_simple) = if ty.needs_lifetime() {
+        ("<'p>", "'p")
+    } else {
+        ("", "")
+    };
+    writeln!(out, "#[derive(Debug)] pub enum {}{} {{", name, lifetime);
+
+    for (name, ty) in &ty_struct.variants {
+        // writeln!(out, "pub {}: {},", name, get_type_name(ty));
+    }
+
+    *out += "}";
+
+    // dbg!(ty);
+}
 fn write_all_structs(out: &mut String, ty: &Ty) {
     match ty {
         Ty::Struct(x) => {
@@ -260,6 +273,12 @@ fn write_all_structs(out: &mut String, ty: &Ty) {
                 write_all_structs(out, ty_struct);
             }
             serialize_struct(out, ty, x, &x.name);
+        }
+        Ty::Enum(x) => {
+            for (_, ty_struct) in x.variants.iter() {
+                write_all_structs(out, ty_struct);
+            }
+            serialize_enum(out, ty, x, &x.name);
         }
         Ty::Option(x) => {
             write_all_structs(out, x.subtype);

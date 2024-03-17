@@ -3,7 +3,7 @@ use super::{
     TyOption, TyStruct,
 };
 use crate::{
-    protocol::{TyBuffer, TyBufferCountKind},
+    protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum},
     read_file,
 };
 use bumpalo::Bump;
@@ -151,20 +151,25 @@ impl<'x> Parser<'x> {
         }
     }
 
-    fn alloc_str(&self, x: &str) -> &'x str {
-        let mut mut_data = self.mut_data.borrow_mut();
-        match mut_data.strs.get(x) {
-            Some(x) => x,
-            None => {
-                let r = self.bump.alloc_str(x);
-                mut_data.strs.insert(r);
-                r
+    fn alloc_str<S: AsRef<str>>(&self, x: S) -> &'x str {
+        fn inner<'x>(parser: &Parser<'x>, x: &str) -> &'x str {
+            let mut mut_data = parser.mut_data.borrow_mut();
+            match mut_data.strs.get(x) {
+                Some(x) => x,
+                None => {
+                    let r = parser.bump.alloc_str(x);
+                    mut_data.strs.insert(r);
+                    r
+                }
             }
         }
+        inner(self, x.as_ref())
     }
 
-    fn add_unknown_type(&self, unk_ty: &str, packet_ty: &'x str) {
+    fn add_unknown_type(&self, unk_ty: &str, packet_ty: &str) {
         let unk_ty = self.alloc_str(unk_ty);
+        let packet_ty = self.alloc_str(packet_ty);
+
         let mut mut_data = self.mut_data.borrow_mut();
         mut_data
             .unknown_types
@@ -192,11 +197,16 @@ fn snake_to_pascal(input: &str) -> String {
     result
 }
 
+struct ParentData<'x> {
+    parent_struct_name: &'x str,
+    parent_field: Option<&'x str>,
+    parent_last_ty: Option<&'x mut Ty<'x>>,
+}
+
 fn parse_container<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &'x str,
-    parent_field: Option<&str>,
+    parent: &ParentData,
     is_bitfield: bool,
 ) -> Option<&'x Ty<'x>> {
     let mut fields = Vec::new();
@@ -225,8 +235,13 @@ fn parse_container<'x>(
             parser.alloc_type(Ty::Bitfield(ty))
         } else {
             let ty = &i["type"];
+            let mut parent = ParentData {
+                parent_struct_name: parent.parent_struct_name,
+                parent_field: Some(&name),
+                parent_last_ty: None,
+            };
 
-            match parse_type(parser, ty, struct_name, Some(&name)) {
+            match parse_type(parser, ty, &mut parent) {
                 Some(x) => x,
                 None => {
                     failed = true;
@@ -251,8 +266,8 @@ fn parse_container<'x>(
         Some(ty)
     };
 
-    let mut name = struct_name.to_string();
-    if let Some(parent_field) = parent_field {
+    let mut name = parent.parent_struct_name.to_string();
+    if let Some(parent_field) = parent.parent_field {
         name += "_";
         name += &snake_to_pascal(parent_field);
     }
@@ -269,10 +284,9 @@ fn parse_container<'x>(
 fn parse_option<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &'x str,
-    parent_field: Option<&str>,
+    parent: &mut ParentData,
 ) -> Option<&'x Ty<'x>> {
-    let subtype = parse_type(parser, input, struct_name, parent_field)?;
+    let subtype = parse_type(parser, input, parent)?;
     let t = Ty::Option(TyOption { subtype });
     Some(parser.alloc_type(t))
 }
@@ -295,14 +309,13 @@ fn parse_buffer<'x>(parser: &Parser<'x>, input: &Value) -> &'x Ty<'x> {
 fn parse_array<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &'x str,
-    parent_field: Option<&str>,
+    parent: &mut ParentData,
 ) -> Option<&'x Ty<'x>> {
     let count_ty = &input["countType"];
-    let count_ty = parse_type(parser, count_ty, struct_name, parent_field)?;
+    let count_ty = parse_type(parser, count_ty, parent)?;
 
     let subtype = &input["type"];
-    let subtype = parse_type(parser, subtype, struct_name, parent_field)?;
+    let subtype = parse_type(parser, subtype, parent)?;
 
     let t = if *count_ty == Ty::VarInt && *subtype == Ty::U8 {
         parser.ty_buffer_with_varint
@@ -313,10 +326,52 @@ fn parse_array<'x>(
 
     Some(t)
 }
+fn parse_switch<'x>(
+    parser: &Parser<'x>,
+    input: &Value,
+    parent: &mut ParentData,
+) -> Option<&'x Ty<'x>> {
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SwitchJson {
+        compare_to: String,
+        // default: String,
+        fields: IndexMap<String, Value>,
+    }
+    if parent.parent_struct_name == "BossBarResponse" {
+        std::hint::black_box(5);
+        std::hint::black_box(5);
+        std::hint::black_box(5);
+    }
+
+    let switch: SwitchJson = serde_json::from_value(input.clone()).unwrap();
+
+    let mut variants = Vec::with_capacity(switch.fields.len());
+    for (k, v) in switch.fields {
+        let constant = match k.as_str() {
+            "true" => Constant::Bool(true),
+            "false" => Constant::Bool(false),
+            _ => match k.parse() {
+                Ok(x) => Constant::Int(x),
+                Err(_) => Constant::String(parser.alloc_str(k)),
+            },
+        };
+        let ty = parse_type(parser, &v, parent)?;
+
+        variants.push((constant, ty));
+    }
+
+    let t = TyEnum {
+        name: "hehe",
+        compare_to: parser.alloc_str(switch.compare_to),
+        variants: variants,
+    };
+    Some(parser.alloc_type(Ty::Enum(t)))
+}
 fn parse_type_simple<'x>(
     parser: &Parser<'x>,
     input: &str,
-    struct_name: &'x str,
+    struct_name: &str,
 ) -> Option<&'x Ty<'x>> {
     let r = match input {
         "u8" => parser.ty_u8,
@@ -354,23 +409,23 @@ fn parse_type_simple<'x>(
 fn parse_type<'x>(
     parser: &Parser<'x>,
     input: &Value,
-    struct_name: &'x str,
-    parent_field: Option<&str>,
+    parent: &mut ParentData,
 ) -> Option<&'x Ty<'x>> {
     if let Some(x) = input.as_str() {
-        return parse_type_simple(parser, x, struct_name);
+        return parse_type_simple(parser, x, parent.parent_struct_name);
     }
 
     let name = input[0].as_str().unwrap();
     let arg1 = &input[1];
     match name {
-        "container" => parse_container(parser, arg1, struct_name, parent_field, false),
-        "bitfield" => parse_container(parser, arg1, struct_name, parent_field, true),
-        "option" => parse_option(parser, arg1, struct_name, parent_field),
+        "container" => parse_container(parser, arg1, parent, false),
+        "bitfield" => parse_container(parser, arg1, parent, true),
+        "option" => parse_option(parser, arg1, parent),
         "buffer" => Some(parse_buffer(parser, input)),
-        "array" => parse_array(parser, arg1, struct_name, parent_field),
+        "array" => parse_array(parser, arg1, parent),
+        "switch" => parse_switch(parser, arg1, parent),
         _ => {
-            parser.add_unknown_type(name, struct_name);
+            parser.add_unknown_type(name, parent.parent_struct_name);
             None
         }
     }
@@ -426,7 +481,12 @@ fn direction<'x>(
                 failed: true,
             }))
         } else {
-            match parse_type(parser, &value, name, None) {
+            let mut parent = ParentData {
+                parent_struct_name: name,
+                parent_field: None,
+                parent_last_ty: None,
+            };
+            match parse_type(parser, &value, &mut parent) {
                 Some(x) => x,
                 None => {
                     eprintln!("---\ncan't parse {}", name);
