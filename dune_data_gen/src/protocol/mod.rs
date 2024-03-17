@@ -3,11 +3,18 @@ mod writer;
 
 use bumpalo::Bump;
 use humansize::{format_size, BINARY};
+use slotmap::{new_key_type, SlotMap};
 use std::{
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
 };
+
+new_key_type! {
+    struct TyKey;
+}
+
+type TypesMap = SlotMap<TyKey, Ty>;
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyBitfield {
@@ -26,35 +33,35 @@ struct TyBuffer {
     kind: TyBufferCountKind,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct TyStruct<'x> {
-    name: &'x str,
-    fields: Vec<(String, &'x Ty<'x>)>,
-    base_type: Option<&'x Ty<'x>>, // only for bitfields
+struct TyStruct {
+    name: String,
+    fields: Vec<(String, TyKey)>,
+    base_type: Option<TyKey>, // only for bitfields
     failed: bool,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-enum Constant<'x> {
+enum Constant {
     Bool(bool),
     Int(u32),
-    String(&'x str),
+    String(String),
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct TyEnum<'x> {
-    name: &'x str,
-    compare_to: &'x str,
-    variants: Vec<(Constant<'x>, &'x Ty<'x>)>,
+struct TyEnum {
+    name: String,
+    compare_to: String,
+    variants: Vec<(Constant, TyKey)>,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct TyOption<'x> {
-    subtype: &'x Ty<'x>,
+struct TyOption {
+    subtype: TyKey,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct TyArray<'x> {
-    count_ty: &'x Ty<'x>,
-    subtype: &'x Ty<'x>,
+struct TyArray {
+    count_ty: TyKey,
+    subtype: TyKey,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-enum Ty<'x> {
+enum Ty {
     U8,
     U16,
     U32,
@@ -82,21 +89,25 @@ enum Ty<'x> {
     ChunkBlockEntity,
     Vec3f64,
 
-    Struct(TyStruct<'x>),
-    Enum(TyEnum<'x>),
-    Option(TyOption<'x>),
-    Array(TyArray<'x>),
+    Struct(TyStruct),
+    Enum(TyEnum),
+    Option(TyOption),
+    Array(TyArray),
     Bitfield(TyBitfield),
 }
 
-impl<'x> Ty<'x> {
-    fn needs_lifetime(&self) -> bool {
+impl Ty {
+    fn needs_lifetime(&self, types: &TypesMap) -> bool {
         use Ty::*;
         match self {
             String | Buffer(_) | RestBuffer | Slot | Nbt | OptionNbt | ChunkBlockEntity => true,
-            Struct(x) => x.fields.iter().map(|x| x.1).any(Ty::needs_lifetime),
-            Option(x) => x.subtype.needs_lifetime(),
-            Array(x) => x.subtype.needs_lifetime() || x.subtype.is_rs_builtin(),
+            Struct(x) => x
+                .fields
+                .iter()
+                .map(|x| x.1)
+                .any(|x| types[x].needs_lifetime(types)),
+            Option(x) => types[x.subtype].needs_lifetime(types),
+            Array(x) => types[x.subtype].needs_lifetime(types) || types[x.subtype].is_rs_builtin(),
             _ => false,
         }
     }
@@ -168,13 +179,13 @@ fn width_for_bitfields(size: u16) -> u16 {
     }
 }
 
-struct Packet<'x> {
-    pub name: &'x str,
-    pub ty: &'x Ty<'x>,
+struct Packet {
+    pub name: String,
+    pub ty: TyKey,
     pub id: u16,
 }
-struct Direction<'x> {
-    pub packets: Vec<Packet<'x>>,
+struct Direction {
+    pub packets: Vec<Packet>,
 }
 #[allow(dead_code)]
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -202,16 +213,18 @@ impl ConnectionState {
         }
     }
 }
-struct State<'x> {
+struct State {
     pub kind: ConnectionState,
-    pub c2s: Direction<'x>,
-    pub s2c: Direction<'x>,
+    pub c2s: Direction,
+    pub s2c: Direction,
 }
 
 pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<PathBuf>) {
     let bump = Bump::new();
-    let states = parser::parse(path, &bump, depends);
-    let out = writer::write(states);
+    let mut types = TypesMap::with_capacity_and_key(32);
+
+    let states = parser::parse(&mut types, path, &bump, depends);
+    let out = writer::write(&types, states);
 
     let syntax_tree = syn::parse_file(&out).unwrap();
     let out = prettyplease::unparse(&syntax_tree);

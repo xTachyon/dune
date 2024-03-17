@@ -3,7 +3,9 @@ use super::State;
 use super::Ty;
 use super::TyBufferCountKind;
 use super::TyEnum;
+use super::TyKey;
 use super::TyStruct;
+use super::TypesMap;
 use std::borrow::Cow;
 use std::fmt::Arguments;
 
@@ -16,8 +18,9 @@ impl FmtWriteNoFail for String {
     }
 }
 
-fn lifetime(ty: &Ty) -> &'static str {
-    let b = ty.needs_lifetime()
+fn lifetime(ty: TyKey, types: &TypesMap) -> &'static str {
+    let ty = &types[ty];
+    let b = ty.needs_lifetime(types)
         && !matches!(
             ty,
             Ty::String | Ty::Buffer(_) | Ty::RestBuffer | Ty::Slot | Ty::Nbt | Ty::OptionNbt
@@ -28,28 +31,35 @@ fn lifetime(ty: &Ty) -> &'static str {
         ""
     }
 }
-fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
+fn get_type_name<'x>(ty_key: TyKey, types: &'x TypesMap) -> Cow<'x, str> {
+    let ty = &types[ty_key];
+
     match ty {
         Ty::Option(x) => format!(
             "Option<{}{}>",
-            get_type_name(x.subtype),
-            lifetime(x.subtype)
+            get_type_name(x.subtype, types),
+            lifetime(x.subtype, types)
         )
         .into(),
         Ty::Array(x) => {
-            if x.subtype.is_rs_builtin() {
+            if types[x.subtype].is_rs_builtin() {
                 // should've made a type with this..
                 format!(
                     "UnalignedSlice{}<'p>",
-                    x.subtype.get_simple_type().to_uppercase()
+                    types[x.subtype].get_simple_type().to_uppercase()
                 )
                 .into()
             } else {
-                format!("Vec<{}{}>", get_type_name(x.subtype), lifetime(x.subtype)).into()
+                format!(
+                    "Vec<{}{}>",
+                    get_type_name(x.subtype, types),
+                    lifetime(x.subtype, types)
+                )
+                .into()
             }
         }
-        Ty::Struct(x) => x.name.into(),
-        Ty::Enum(x) => x.name.into(),
+        Ty::Struct(x) => x.name.as_str().into(),
+        Ty::Enum(x) => x.name.as_str().into(),
         Ty::Buffer(x) => match x.kind {
             TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
             TyBufferCountKind::Varint => "&'p [u8]".into(),
@@ -57,23 +67,33 @@ fn get_type_name<'x>(ty: &'x Ty) -> Cow<'x, str> {
         _ => ty.get_simple_type().into(),
     }
 }
-fn deserialize_one(out: &mut String, name: &str, ty: &Ty, bitfield_base_width: u16, count: u32) {
+fn deserialize_one(
+    out: &mut String,
+    name: &str,
+    ty_key: TyKey,
+    types: &TypesMap,
+    bitfield_base_width: u16,
+    count: u32,
+) {
+    let ty = &types[ty_key];
     if let Ty::Array(x) = ty {
         deserialize_one(
             out,
             "array_count",
             x.count_ty,
+            types,
             bitfield_base_width,
             count + 1,
         );
-        if x.subtype.is_rs_builtin() {
+        let subtype = &types[x.subtype];
+        if subtype.is_rs_builtin() {
             write!(
                 out,
                 "let mem = reader.read_mem(array_count as usize * size_of::<{}>())?;
                 let {} = UnalignedSlice{}::new(mem);",
-                x.subtype.get_simple_type(),
+                subtype.get_simple_type(),
                 name,
-                x.subtype.get_simple_type().to_uppercase(),
+                subtype.get_simple_type().to_uppercase(),
             );
             return;
         }
@@ -89,11 +109,11 @@ fn deserialize_one(out: &mut String, name: &str, ty: &Ty, bitfield_base_width: u
         } else {
             format!("x_{}", count)
         };
-        deserialize_one(out, &elem, x.subtype, bitfield_base_width, count + 1);
+        deserialize_one(out, &elem, x.subtype, types, bitfield_base_width, count + 1);
         writeln!(out, "{}.push({}); }}", name, elem);
         return;
     }
-    write!(out, "let {}: {} = ", name, get_type_name(ty));
+    write!(out, "let {}: {} = ", name, get_type_name(ty_key, types));
     if let Ty::Bitfield(x) = ty {
         let left_shift = bitfield_base_width - x.range_end;
         let right_shift = bitfield_base_width - (x.range_end - x.range_begin);
@@ -111,7 +131,8 @@ fn deserialize_one(out: &mut String, name: &str, ty: &Ty, bitfield_base_width: u
     }
     writeln!(out);
 }
-fn serialize_one(out: &mut String, name: &str, ty: &Ty) {
+fn serialize_one(out: &mut String, name: &str, ty_key: TyKey, types: &TypesMap) {
+    let ty = &types[ty_key];
     match ty {
         Ty::VarInt => write!(out, "write_varint(&mut writer, {} as u32)?;", name),
         Ty::VarLong => write!(out, "write_varlong(&mut writer, {} as u64)?;", name),
@@ -129,7 +150,21 @@ fn underscore(b: bool) -> &'static str {
         ""
     }
 }
-fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str) {
+fn life(needs_lifetime: bool) -> (&'static str, &'static str) {
+    if needs_lifetime {
+        ("<'p>", "'p")
+    } else {
+        ("", "")
+    }
+}
+fn serialize_struct(
+    out: &mut String,
+    ty_key: TyKey,
+    types: &TypesMap,
+    ty_struct: &TyStruct,
+    name: &str,
+) {
+    let ty = &types[ty_key];
     // TODO:
     if name == "UseEntityRequest" {
         *out += r#"
@@ -186,15 +221,11 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str)
         return;
     }
 
-    let (lifetime, lifetime_simple) = if ty.needs_lifetime() {
-        ("<'p>", "'p")
-    } else {
-        ("", "")
-    };
+    let (lifetime, lifetime_simple) = life(ty.needs_lifetime(types));
     writeln!(out, "#[derive(Debug)] pub struct {}{} {{", name, lifetime);
 
     for (name, ty) in &ty_struct.fields {
-        writeln!(out, "pub {}: {},", name, get_type_name(ty));
+        writeln!(out, "pub {}: {},", name, get_type_name(*ty, types));
     }
 
     *out += "}";
@@ -213,13 +244,13 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str)
     }
 
     let bitfield_base_width = if let Some(base_type) = ty_struct.base_type {
-        deserialize_one(out, "value", base_type, 0, 1);
-        base_type.width()
+        deserialize_one(out, "value", base_type, types, 0, 1);
+        types[base_type].width()
     } else {
         0
     };
     for (name, ty) in &ty_struct.fields {
-        deserialize_one(out, name, ty, bitfield_base_width, 1);
+        deserialize_one(out, name, *ty, types, bitfield_base_width, 1);
     }
 
     write!(out, "\nlet result = {} {{", ty_struct.name);
@@ -231,10 +262,10 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str)
     *out += "}; Ok(result) }";
 
     let has_serialization = bitfield_base_width == 0
-        && !ty_struct
-            .fields
-            .iter()
-            .any(|x| matches!(x.1, Ty::Array(_) | Ty::Struct(_)));
+        && !ty_struct.fields.iter().any(|x| {
+            let ty = &types[x.1];
+            matches!(ty, Ty::Array(_) | Ty::Struct(_))
+        });
 
     if has_serialization && !ty_struct.failed {
         write!(
@@ -243,60 +274,58 @@ fn serialize_struct(out: &mut String, ty: &Ty, ty_struct: &TyStruct, name: &str)
             underscore(!has_serialization)
         );
         for (name, ty) in &ty_struct.fields {
-            serialize_one(out, &format!("self.{}", name), ty);
+            serialize_one(out, &format!("self.{}", name), *ty, types);
         }
         *out += "Ok(()) }";
     }
 
     *out += "}";
 }
-fn serialize_enum(out: &mut String, ty: &Ty, ty_struct: &TyEnum, name: &str) {
-    let (lifetime, lifetime_simple) = if ty.needs_lifetime() {
-        ("<'p>", "'p")
-    } else {
-        ("", "")
-    };
+fn serialize_enum(out: &mut String, ty_key: TyKey, types: &TypesMap, _ty_struct: &TyEnum, name: &str) {
+    let ty = &types[ty_key];
+    let (lifetime, _lifetime_simple) = life(ty.needs_lifetime(types));
     writeln!(out, "#[derive(Debug)] pub enum {}{} {{", name, lifetime);
 
-    for (name, ty) in &ty_struct.variants {
-        // writeln!(out, "pub {}: {},", name, get_type_name(ty));
-    }
+    // for (name, ty) in &ty_struct.variants {
+    //     // writeln!(out, "pub {}: {},", name, get_type_name(ty));
+    // }
 
     *out += "}";
 
     // dbg!(ty);
 }
-fn write_all_structs(out: &mut String, ty: &Ty) {
+fn write_all_structs(out: &mut String, ty_key: TyKey, types: &TypesMap) {
+    let ty = &types[ty_key];
     match ty {
         Ty::Struct(x) => {
             for (_, ty_struct) in x.fields.iter() {
-                write_all_structs(out, ty_struct);
+                write_all_structs(out, *ty_struct, types);
             }
-            serialize_struct(out, ty, x, &x.name);
+            serialize_struct(out, ty_key, types, x, &x.name);
         }
         Ty::Enum(x) => {
             for (_, ty_struct) in x.variants.iter() {
-                write_all_structs(out, ty_struct);
+                write_all_structs(out, *ty_struct, types);
             }
-            serialize_enum(out, ty, x, &x.name);
+            serialize_enum(out, ty_key, types, x, &x.name);
         }
         Ty::Option(x) => {
-            write_all_structs(out, x.subtype);
+            write_all_structs(out, x.subtype, types);
         }
         Ty::Array(x) => {
-            write_all_structs(out, x.subtype);
+            write_all_structs(out, x.subtype, types);
         }
         _ => {}
     }
 }
 
-fn direction(out: &mut String, direction: &Direction) {
+fn direction(out: &mut String, types: &TypesMap, direction: &Direction) {
     for packet in &direction.packets {
-        write_all_structs(out, packet.ty);
+        write_all_structs(out, packet.ty, types);
     }
 }
 
-fn state(out: &mut String, state: &State) {
+fn state(out: &mut String, types: &TypesMap, state: &State) {
     write!(
         out,
         "
@@ -307,8 +336,8 @@ fn state(out: &mut String, state: &State) {
         state.kind.name(false)
     );
 
-    direction(out, &state.c2s);
-    direction(out, &state.s2c);
+    direction(out, types, &state.c2s);
+    direction(out, types, &state.s2c);
 
     *out += "}";
 }
@@ -367,7 +396,7 @@ pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<(
     *out += r#"}}"#;
 }
 
-pub(super) fn write(mut states: [State; 1]) -> String {
+pub(super) fn write(types: &TypesMap, mut states: [State; 1]) -> String {
     let mut out = String::with_capacity(4096);
 
     out += "
@@ -406,7 +435,7 @@ use std::io::{Result as IoResult, Write};
 use std::mem::size_of;
     ";
     for i in states.iter() {
-        state(&mut out, i);
+        state(&mut out, types, i);
     }
 
     out += "#[derive(Debug)] pub enum Packet<'p> {";
@@ -418,7 +447,7 @@ use std::mem::size_of;
                     "{0}({1}::{0}{2}),",
                     packet.name,
                     state.kind.name(false),
-                    lifetime(packet.ty),
+                    lifetime(packet.ty, types),
                 );
             }
         }

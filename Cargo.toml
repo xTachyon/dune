@@ -1,12 +1,12 @@
 [workspace]
 members = [
-  "dune",
-  "dune_lib",
-  "dune_common",
-  "dune_data",
+  # "dune",
+  # "dune_lib",
+  # "dune_common",
+  # "dune_data",
   "dune_data_gen"
 ]
-default-members = ["dune"]
+# default-members = ["dune"]
 resolver = "2"
 
 # -------------------------------------------------------------------------------------------------
@@ -37,6 +37,7 @@ ureq = "2"
 fs-err = "2"
 syn = { version = "2", features = ["parsing"] }
 prettyplease = "=0.2.16"
+slotmap = "1"
 
 serde = "1"
 serde_json = "1"

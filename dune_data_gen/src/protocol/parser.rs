@@ -1,6 +1,6 @@
 use super::{
-    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield,
-    TyOption, TyStruct,
+    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield, TyKey,
+    TyOption, TyStruct, TypesMap,
 };
 use crate::{
     protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum},
@@ -12,7 +12,6 @@ use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
 use std::{
-    cell::RefCell,
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
@@ -38,78 +37,76 @@ struct Root {
 }
 
 struct ParserMutData<'x> {
-    types: HashSet<&'x Ty<'x>>,
     strs: HashSet<&'x str>,
     unknown_types: HashMap<&'x str, Vec<&'x str>>,
 }
 
 struct Parser<'x> {
-    bump: &'x Bump,
-    mut_data: RefCell<ParserMutData<'x>>,
+    mut_data: ParserMutData<'x>,
+    types: &'x mut TypesMap,
 
-    ty_u8: &'x Ty<'x>,
-    ty_u16: &'x Ty<'x>,
-    ty_u128: &'x Ty<'x>,
+    ty_u8: TyKey,
+    ty_u16: TyKey,
+    ty_u128: TyKey,
 
-    ty_i8: &'x Ty<'x>,
-    ty_i16: &'x Ty<'x>,
-    ty_i32: &'x Ty<'x>,
-    ty_i64: &'x Ty<'x>,
+    ty_i8: TyKey,
+    ty_i16: TyKey,
+    ty_i32: TyKey,
+    ty_i64: TyKey,
 
-    ty_f32: &'x Ty<'x>,
-    ty_f64: &'x Ty<'x>,
+    ty_f32: TyKey,
+    ty_f64: TyKey,
 
-    ty_bool: &'x Ty<'x>,
-    ty_varint: &'x Ty<'x>,
-    ty_varlong: &'x Ty<'x>,
-    ty_string: &'x Ty<'x>,
-    ty_buffer_with_varint: &'x Ty<'x>,
-    ty_rest_buffer: &'x Ty<'x>,
+    ty_bool: TyKey,
+    ty_varint: TyKey,
+    ty_varlong: TyKey,
+    ty_string: TyKey,
+    ty_buffer_with_varint: TyKey,
+    ty_rest_buffer: TyKey,
 
-    ty_position: &'x Ty<'x>,
-    ty_slot: &'x Ty<'x>,
-    ty_nbt: &'x Ty<'x>,
-    ty_optional_nbt: &'x Ty<'x>,
-    ty_chunk_block_entity: &'x Ty<'x>,
-    ty_vec3f64: &'x Ty<'x>,
+    ty_position: TyKey,
+    ty_slot: TyKey,
+    ty_nbt: TyKey,
+    ty_optional_nbt: TyKey,
+    ty_chunk_block_entity: TyKey,
+    ty_vec3f64: TyKey,
 }
 impl<'x> Parser<'x> {
-    fn new(bump: &Bump) -> Parser {
-        let ty_u8 = bump.alloc(Ty::U8);
-        let ty_u16 = bump.alloc(Ty::U16);
-        let ty_u128 = bump.alloc(Ty::U128);
+    fn new<'a>(types: &'a mut TypesMap) -> Parser<'a> {
+        let ty_u8 = types.insert(Ty::U8);
+        let ty_u16 = types.insert(Ty::U16);
+        let ty_u128 = types.insert(Ty::U128);
 
-        let ty_i8 = bump.alloc(Ty::I8);
-        let ty_i16 = bump.alloc(Ty::I16);
-        let ty_i32 = bump.alloc(Ty::I32);
-        let ty_i64 = bump.alloc(Ty::I64);
+        let ty_i8 = types.insert(Ty::I8);
+        let ty_i16 = types.insert(Ty::I16);
+        let ty_i32 = types.insert(Ty::I32);
+        let ty_i64 = types.insert(Ty::I64);
 
-        let ty_f32 = bump.alloc(Ty::F32);
-        let ty_f64 = bump.alloc(Ty::F64);
+        let ty_f32 = types.insert(Ty::F32);
+        let ty_f64 = types.insert(Ty::F64);
 
-        let ty_bool = bump.alloc(Ty::Bool);
-        let ty_varint = bump.alloc(Ty::VarInt);
-        let ty_varlong = bump.alloc(Ty::VarLong);
-        let ty_string = bump.alloc(Ty::String);
-        let ty_rest_buffer = bump.alloc(Ty::RestBuffer);
-        let ty_buffer_with_varint = bump.alloc(Ty::Buffer(TyBuffer {
+        let ty_bool = types.insert(Ty::Bool);
+        let ty_varint = types.insert(Ty::VarInt);
+        let ty_varlong = types.insert(Ty::VarLong);
+        let ty_string = types.insert(Ty::String);
+        let ty_rest_buffer = types.insert(Ty::RestBuffer);
+        let ty_buffer_with_varint = types.insert(Ty::Buffer(TyBuffer {
             kind: TyBufferCountKind::Varint,
         }));
 
-        let ty_position = bump.alloc(Ty::Position);
-        let ty_slot = bump.alloc(Ty::Slot);
-        let ty_nbt = bump.alloc(Ty::Nbt);
-        let ty_optional_nbt = bump.alloc(Ty::OptionNbt);
-        let ty_chunk_block_entity = bump.alloc(Ty::ChunkBlockEntity);
-        let ty_vec3f64 = bump.alloc(Ty::Vec3f64);
+        let ty_position = types.insert(Ty::Position);
+        let ty_slot = types.insert(Ty::Slot);
+        let ty_nbt = types.insert(Ty::Nbt);
+        let ty_optional_nbt = types.insert(Ty::OptionNbt);
+        let ty_chunk_block_entity = types.insert(Ty::ChunkBlockEntity);
+        let ty_vec3f64 = types.insert(Ty::Vec3f64);
 
         Parser {
-            bump,
-            mut_data: RefCell::new(ParserMutData {
-                types: HashSet::with_capacity(32),
+            mut_data: ParserMutData {
                 strs: HashSet::with_capacity(32),
                 unknown_types: HashMap::with_capacity(32),
-            }),
+            },
+            types,
 
             ty_u8,
             ty_u16,
@@ -139,39 +136,29 @@ impl<'x> Parser<'x> {
         }
     }
 
-    fn alloc_type<'a: 'x>(&self, ty: Ty<'a>) -> &'x Ty<'x> {
-        let mut mut_data = self.mut_data.borrow_mut();
-        match mut_data.types.get(&ty) {
-            Some(x) => x,
-            None => {
-                let r = self.bump.alloc(ty);
-                mut_data.types.insert(r);
-                r
-            }
-        }
+    fn alloc_type<'a: 'x>(&mut self, ty: Ty) -> TyKey {
+        self.types.insert(ty)
     }
 
-    fn alloc_str<S: AsRef<str>>(&self, x: S) -> &'x str {
-        fn inner<'x>(parser: &Parser<'x>, x: &str) -> &'x str {
-            let mut mut_data = parser.mut_data.borrow_mut();
-            match mut_data.strs.get(x) {
+    fn alloc_str<S: AsRef<str>>(&mut self, bump: &'x Bump, x: S) -> &'x str {
+        fn inner<'x>(parser: &mut Parser<'x>, bump: &'x Bump, x: &str) -> &'x str {
+            match parser.mut_data.strs.get(x) {
                 Some(x) => x,
                 None => {
-                    let r = parser.bump.alloc_str(x);
-                    mut_data.strs.insert(r);
+                    let r = bump.alloc_str(x);
+                    parser.mut_data.strs.insert(r);
                     r
                 }
             }
         }
-        inner(self, x.as_ref())
+        inner(self, bump, x.as_ref())
     }
 
-    fn add_unknown_type(&self, unk_ty: &str, packet_ty: &str) {
-        let unk_ty = self.alloc_str(unk_ty);
-        let packet_ty = self.alloc_str(packet_ty);
+    fn add_unknown_type(&mut self, bump: &'x Bump, unk_ty: &str, packet_ty: &str) {
+        let unk_ty = self.alloc_str(bump, unk_ty);
+        let packet_ty = self.alloc_str(bump, packet_ty);
 
-        let mut mut_data = self.mut_data.borrow_mut();
-        mut_data
+        self.mut_data
             .unknown_types
             .entry(unk_ty)
             .or_default()
@@ -200,15 +187,15 @@ fn snake_to_pascal(input: &str) -> String {
 struct ParentData<'x> {
     parent_struct_name: &'x str,
     parent_field: Option<&'x str>,
-    parent_last_ty: Option<&'x mut Ty<'x>>,
 }
 
 fn parse_container<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     input: &Value,
     parent: &ParentData,
     is_bitfield: bool,
-) -> Option<&'x Ty<'x>> {
+) -> Option<TyKey> {
     let mut fields = Vec::new();
     let mut failed = false;
     let mut bitfield_range = 0;
@@ -238,10 +225,9 @@ fn parse_container<'x>(
             let mut parent = ParentData {
                 parent_struct_name: parent.parent_struct_name,
                 parent_field: Some(&name),
-                parent_last_ty: None,
             };
 
-            match parse_type(parser, ty, &mut parent) {
+            match parse_type(parser, bump, ty, &mut parent) {
                 Some(x) => x,
                 None => {
                     failed = true;
@@ -271,7 +257,7 @@ fn parse_container<'x>(
         name += "_";
         name += &snake_to_pascal(parent_field);
     }
-    let name = parser.bump.alloc_str(&name);
+    // let name = bump.alloc_str(&name);
 
     let t = Ty::Struct(TyStruct {
         name,
@@ -282,15 +268,16 @@ fn parse_container<'x>(
     Some(parser.alloc_type(t))
 }
 fn parse_option<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
-) -> Option<&'x Ty<'x>> {
-    let subtype = parse_type(parser, input, parent)?;
+) -> Option<TyKey> {
+    let subtype = parse_type(parser, bump, input, parent)?;
     let t = Ty::Option(TyOption { subtype });
     Some(parser.alloc_type(t))
 }
-fn parse_buffer<'x>(parser: &Parser<'x>, input: &Value) -> &'x Ty<'x> {
+fn parse_buffer<'x>(parser: &mut Parser<'x>, input: &Value) -> TyKey {
     let arg1 = &input[1];
 
     let kind = if let Value::String(x) = &arg1["countType"] {
@@ -307,17 +294,21 @@ fn parse_buffer<'x>(parser: &Parser<'x>, input: &Value) -> &'x Ty<'x> {
     parser.alloc_type(t)
 }
 fn parse_array<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
-) -> Option<&'x Ty<'x>> {
+) -> Option<TyKey> {
     let count_ty = &input["countType"];
-    let count_ty = parse_type(parser, count_ty, parent)?;
+    let count_ty = parse_type(parser, bump, count_ty, parent)?;
 
     let subtype = &input["type"];
-    let subtype = parse_type(parser, subtype, parent)?;
+    let subtype = parse_type(parser, bump, subtype, parent)?;
 
-    let t = if *count_ty == Ty::VarInt && *subtype == Ty::U8 {
+    let count_ty_val = &parser.types[count_ty];
+    let subtype_val = &parser.types[subtype];
+
+    let t = if *count_ty_val == Ty::VarInt && *subtype_val == Ty::U8 {
         parser.ty_buffer_with_varint
     } else {
         let t = Ty::Array(TyArray { count_ty, subtype });
@@ -327,10 +318,11 @@ fn parse_array<'x>(
     Some(t)
 }
 fn parse_switch<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
-) -> Option<&'x Ty<'x>> {
+) -> Option<TyKey> {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct SwitchJson {
@@ -353,26 +345,27 @@ fn parse_switch<'x>(
             "false" => Constant::Bool(false),
             _ => match k.parse() {
                 Ok(x) => Constant::Int(x),
-                Err(_) => Constant::String(parser.alloc_str(k)),
+                Err(_) => Constant::String(k),
             },
         };
-        let ty = parse_type(parser, &v, parent)?;
+        let ty = parse_type(parser, bump, &v, parent)?;
 
         variants.push((constant, ty));
     }
 
     let t = TyEnum {
-        name: "hehe",
-        compare_to: parser.alloc_str(switch.compare_to),
+        name: "hehe".to_string(),
+        compare_to: switch.compare_to,
         variants: variants,
     };
     Some(parser.alloc_type(Ty::Enum(t)))
 }
 fn parse_type_simple<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     input: &str,
     struct_name: &str,
-) -> Option<&'x Ty<'x>> {
+) -> Option<TyKey> {
     let r = match input {
         "u8" => parser.ty_u8,
         "u16" => parser.ty_u16,
@@ -400,32 +393,33 @@ fn parse_type_simple<'x>(
         "vec3f64" => parser.ty_vec3f64,
 
         _ => {
-            parser.add_unknown_type(input, struct_name);
+            parser.add_unknown_type(bump, input, struct_name);
             return None;
         }
     };
     Some(r)
 }
 fn parse_type<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
-) -> Option<&'x Ty<'x>> {
+) -> Option<TyKey> {
     if let Some(x) = input.as_str() {
-        return parse_type_simple(parser, x, parent.parent_struct_name);
+        return parse_type_simple(parser, bump, x, parent.parent_struct_name);
     }
 
     let name = input[0].as_str().unwrap();
     let arg1 = &input[1];
     match name {
-        "container" => parse_container(parser, arg1, parent, false),
-        "bitfield" => parse_container(parser, arg1, parent, true),
-        "option" => parse_option(parser, arg1, parent),
+        "container" => parse_container(parser, bump, arg1, parent, false),
+        "bitfield" => parse_container(parser, bump, arg1, parent, true),
+        "option" => parse_option(parser, bump, arg1, parent),
         "buffer" => Some(parse_buffer(parser, input)),
-        "array" => parse_array(parser, arg1, parent),
-        "switch" => parse_switch(parser, arg1, parent),
+        "array" => parse_array(parser, bump, arg1, parent),
+        "switch" => parse_switch(parser, bump, arg1, parent),
         _ => {
-            parser.add_unknown_type(name, parent.parent_struct_name);
+            parser.add_unknown_type(bump, name, parent.parent_struct_name);
             None
         }
     }
@@ -449,11 +443,12 @@ fn do_mapping(input: &Value) -> HashMap<String, u16> {
     mappings
 }
 fn direction<'x>(
-    parser: &Parser<'x>,
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
     mut direction: JsonDirection,
     kind: &str,
     state_kind: ConnectionState,
-) -> Direction<'x> {
+) -> Direction {
     let raw_mappings = do_mapping(&direction.types.shift_remove("packet").unwrap());
     let mut packets = Vec::with_capacity(direction.types.len());
 
@@ -472,21 +467,22 @@ fn direction<'x>(
             name + kind
         };
         let name = snake_to_pascal(&name);
-        let name = parser.bump.alloc_str(&name);
+        // let name = bump.alloc_str(&name);
         let ty = if is_ignored {
-            parser.alloc_type(Ty::Struct(TyStruct {
-                name,
-                fields: Vec::new(),
-                base_type: None,
-                failed: true,
-            }))
+            parser.alloc_type(
+                Ty::Struct(TyStruct {
+                    name: name.clone(),
+                    fields: Vec::new(),
+                    base_type: None,
+                    failed: true,
+                }),
+            )
         } else {
             let mut parent = ParentData {
-                parent_struct_name: name,
+                parent_struct_name: &name,
                 parent_field: None,
-                parent_last_ty: None,
             };
-            match parse_type(parser, &value, &mut parent) {
+            match parse_type(parser, bump, &value, &mut parent) {
                 Some(x) => x,
                 None => {
                     eprintln!("---\ncan't parse {}", name);
@@ -501,33 +497,33 @@ fn direction<'x>(
     Direction { packets }
 }
 
-fn state<'x>(parser: &Parser<'x>, state: JsonState, kind: ConnectionState) -> State<'x> {
+fn state<'x>(
+    parser: &mut Parser<'x>,
+    bump: &'x Bump,
+    state: JsonState,
+    kind: ConnectionState,
+) -> State {
     State {
         kind,
-        c2s: direction(parser, state.to_server, "_request", kind),
-        s2c: direction(parser, state.to_client, "_response", kind),
+        c2s: direction(parser, bump, state.to_server, "_request", kind),
+        s2c: direction(parser, bump, state.to_client, "_response", kind),
     }
 }
 
-pub(super) fn parse<'x>(path: &Path, bump: &'x Bump, depends: &mut Vec<PathBuf>) -> [State<'x>; 1] {
+pub(super) fn parse<'x>(types: &mut TypesMap, path: &Path, bump: &Bump, depends: &mut Vec<PathBuf>) -> [State; 1] {
     let content = read_file(path, depends);
     let root: Root = serde_json::from_str(&content).unwrap();
 
-    let parser = Parser::new(bump);
+    let mut parser = Parser::new(types);
 
     let result = [
         // state(&parser, root.handshaking, ConnectionState::Handshaking),
         // state(&parser, root.status, ConnectionState::Status),
         // state(&parser, root.login, ConnectionState::Login),
-        state(&parser, root.play, ConnectionState::Play),
+        state(&mut parser, bump, root.play, ConnectionState::Play),
     ];
 
-    let mut unknown_types: Vec<_> = parser
-        .mut_data
-        .into_inner()
-        .unknown_types
-        .into_iter()
-        .collect();
+    let mut unknown_types: Vec<_> = parser.mut_data.unknown_types.into_iter().collect();
     unknown_types.sort_by_key(|x| x.0);
 
     let width = unknown_types
