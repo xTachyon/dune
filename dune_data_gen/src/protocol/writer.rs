@@ -1,3 +1,5 @@
+use crate::protocol::Constant;
+
 use super::Direction;
 use super::State;
 use super::Ty;
@@ -224,8 +226,13 @@ fn serialize_struct(
     let (lifetime, lifetime_simple) = life(ty.needs_lifetime(types));
     writeln!(out, "#[derive(Debug)] pub struct {}{} {{", name, lifetime);
 
-    for (name, ty) in &ty_struct.fields {
-        writeln!(out, "pub {}: {},", name, get_type_name(*ty, types));
+    for field in &ty_struct.fields {
+        writeln!(
+            out,
+            "pub {}: {},",
+            field.name,
+            get_type_name(field.ty, types)
+        );
     }
 
     *out += "}";
@@ -249,21 +256,21 @@ fn serialize_struct(
     } else {
         0
     };
-    for (name, ty) in &ty_struct.fields {
-        deserialize_one(out, name, *ty, types, bitfield_base_width, 1);
+    for field in &ty_struct.fields {
+        deserialize_one(out, field.name, field.ty, types, bitfield_base_width, 1);
     }
 
     write!(out, "\nlet result = {} {{", ty_struct.name);
 
-    for (name, _) in &ty_struct.fields {
-        writeln!(out, "{},", name);
+    for field in &ty_struct.fields {
+        writeln!(out, "{},", field.name);
     }
 
     *out += "}; Ok(result) }";
 
     let has_serialization = bitfield_base_width == 0
         && !ty_struct.fields.iter().any(|x| {
-            let ty = &types[x.1];
+            let ty = &types[x.ty];
             matches!(ty, Ty::Array(_) | Ty::Struct(_))
         });
 
@@ -273,28 +280,31 @@ fn serialize_struct(
             "fn serialize<W: Write>(&self, mut {}writer: &mut W) -> IoResult<()> {{",
             underscore(!has_serialization)
         );
-        for (name, ty) in &ty_struct.fields {
-            serialize_one(out, &format!("self.{}", name), *ty, types);
+        for field in &ty_struct.fields {
+            serialize_one(out, &format!("self.{}", field.name), field.ty, types);
         }
         *out += "Ok(()) }";
     }
 
     *out += "}";
 }
-fn serialize_enum(
-    out: &mut String,
-    ty_key: TyKey,
-    types: &TypesMap,
-    _ty_struct: &TyEnum,
-    name: &str,
-) {
+fn serialize_enum(out: &mut String, ty_key: TyKey, types: &TypesMap, ty_enum: &TyEnum, name: &str) {
     let ty = &types[ty_key];
     let (lifetime, _lifetime_simple) = life(ty.needs_lifetime(types));
     writeln!(out, "#[derive(Debug)] pub enum {}{} {{", name, lifetime);
 
-    // for (name, ty) in &ty_struct.variants {
-    //     // writeln!(out, "pub {}: {},", name, get_type_name(ty));
-    // }
+    for (constant, variants) in ty_enum.variants.iter() {
+        let name = match constant {
+            Constant::Int(x) => x.to_string(),
+            Constant::Bool(x) => x.to_string(),
+            _ => unreachable!("{:?}", constant),
+        };
+        writeln!(out, "Variant_{name} {{");
+        for i in variants {
+            writeln!(out, "{}: {},", i.name, get_type_name(i.ty, types));
+        }
+        writeln!(out, "}},");
+    }
 
     *out += "}";
 
@@ -304,14 +314,16 @@ fn write_all_structs(out: &mut String, ty_key: TyKey, types: &TypesMap) {
     let ty = &types[ty_key];
     match ty {
         Ty::Struct(x) => {
-            for (_, ty_struct) in x.fields.iter() {
-                write_all_structs(out, *ty_struct, types);
+            for field in x.fields.iter() {
+                write_all_structs(out, field.ty, types);
             }
             serialize_struct(out, ty_key, types, x, x.name);
         }
         Ty::Enum(x) => {
-            for (_, ty_struct) in x.variants.iter() {
-                write_all_structs(out, *ty_struct, types);
+            for (_, v) in x.variants.iter() {
+                for i in v {
+                    write_all_structs(out, i.ty, types);
+                }
             }
             serialize_enum(out, ty_key, types, x, x.name);
         }

@@ -1,9 +1,9 @@
 use super::{
     width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield, TyKey,
-    TyOption, TyStruct, TypesMap,
+    TyOption, TyStruct, TyStructField, TypesMap,
 };
 use crate::{
-    protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum},
+    protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum, Variant},
     read_file,
 };
 use bumpalo::Bump;
@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -177,9 +177,11 @@ fn snake_to_pascal(input: &str) -> String {
     result
 }
 
+#[derive(Debug)]
 struct ParentData<'x> {
     parent_struct_name: &'x str,
     parent_field: Option<&'x str>,
+    last_type: Option<TyKey>,
 }
 
 fn parse_container<'x>(
@@ -189,7 +191,7 @@ fn parse_container<'x>(
     parent: &ParentData,
     is_bitfield: bool,
 ) -> Option<TyKey> {
-    let mut fields = Vec::new();
+    let mut fields: Vec<TyStructField> = Vec::new();
     let mut failed = false;
     let mut bitfield_range = 0;
 
@@ -219,9 +221,11 @@ fn parse_container<'x>(
             let mut parent = ParentData {
                 parent_struct_name: parent.parent_struct_name,
                 parent_field: Some(name),
+                last_type: fields.last().map(|x| x.ty),
             };
 
             match parse_type(parser, bump, ty, &mut parent) {
+                Some(x) if parent.last_type == Some(x) => continue,
                 Some(x) => x,
                 None => {
                     failed = true;
@@ -230,7 +234,7 @@ fn parse_container<'x>(
             }
         };
 
-        fields.push((name, ty));
+        fields.push(TyStructField { name, ty });
     }
 
     if failed {
@@ -320,7 +324,7 @@ fn parse_switch<'x>(
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct SwitchJson {
-        compare_to: String,
+        // compare_to: String,
         // default: String,
         fields: IndexMap<String, Value>,
     }
@@ -328,31 +332,55 @@ fn parse_switch<'x>(
         std::hint::black_box(5);
         std::hint::black_box(5);
         std::hint::black_box(5);
+        dbg!(&parent);
     }
-
     let switch: SwitchJson = serde_json::from_value(input.clone()).unwrap();
 
-    let mut variants = Vec::with_capacity(switch.fields.len());
+    let mut variants: BTreeMap<Constant<'x>, Vec<Variant<'x>>> = BTreeMap::new();
     for (k, v) in switch.fields {
         let constant = match k.as_str() {
             "true" => Constant::Bool(true),
             "false" => Constant::Bool(false),
             _ => match k.parse() {
                 Ok(x) => Constant::Int(x),
-                Err(_) => Constant::String(parser.alloc_str(bump, k)),
+                Err(_) => Constant::String(bump.alloc_str(&k)),
             },
         };
         let ty = parse_type(parser, bump, &v, parent)?;
 
-        variants.push((constant, ty));
+        variants.entry(constant).or_default().push(Variant {
+            name: bump.alloc_str(parent.parent_field.unwrap()),
+            ty,
+        });
     }
 
-    let t = TyEnum {
-        name: "hehe",
-        compare_to: parser.alloc_str(bump, switch.compare_to),
-        variants,
+    let mut new_last_type = None;
+    let last_type = if let Some(last_type) = parent.last_type {
+        if let Ty::Enum(last_type) = &mut parser.types[last_type] {
+            Some(last_type)
+        } else {
+            None
+        }
+    } else {
+        None
     };
-    Some(parser.alloc_type(Ty::Enum(t)))
+    let ty_enum = last_type.unwrap_or_else(|| {
+        new_last_type = Some(TyEnum {
+            name: bump.alloc_str(&format!("{}_Enum", parent.parent_struct_name)),
+            compare_to: "",
+            variants: BTreeMap::new(),
+        });
+        new_last_type.as_mut().unwrap()
+    });
+
+    for (k, v) in variants {
+        ty_enum.variants.entry(k).or_default().extend(v);
+    }
+
+    match new_last_type {
+        Some(x) => Some(parser.alloc_type(Ty::Enum(x))),
+        None => parent.last_type,
+    }
 }
 fn parse_type_simple<'x>(
     parser: &mut Parser<'_, 'x>,
@@ -462,6 +490,7 @@ fn direction<'x>(
         };
         let name = snake_to_pascal(&name);
         let name = bump.alloc_str(&name);
+
         let ty = if is_ignored {
             parser.alloc_type(Ty::Struct(TyStruct {
                 name,
@@ -473,6 +502,7 @@ fn direction<'x>(
             let mut parent = ParentData {
                 parent_struct_name: name,
                 parent_field: None,
+                last_type: None,
             };
             match parse_type(parser, bump, &value, &mut parent) {
                 Some(x) => x,

@@ -5,6 +5,7 @@ use bumpalo::Bump;
 use humansize::{format_size, BINARY};
 use slotmap::{new_key_type, SlotMap};
 use std::{
+    collections::BTreeMap,
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
@@ -33,9 +34,14 @@ struct TyBuffer {
     kind: TyBufferCountKind,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+struct TyStructField<'x> {
+    name: &'x str,
+    ty: TyKey,
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyStruct<'x> {
     name: &'x str,
-    fields: Vec<(&'x str, TyKey)>,
+    fields: Vec<TyStructField<'x>>,
     base_type: Option<TyKey>, // only for bitfields
     failed: bool,
 }
@@ -46,10 +52,15 @@ enum Constant<'x> {
     String(&'x str),
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+struct Variant<'x> {
+    name: &'x str,
+    ty: TyKey,
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyEnum<'x> {
     name: &'x str,
     compare_to: &'x str,
-    variants: Vec<(Constant<'x>, TyKey)>,
+    variants: BTreeMap<Constant<'x>, Vec<Variant<'x>>>,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyOption {
@@ -104,10 +115,17 @@ impl<'x> Ty<'x> {
             Struct(x) => x
                 .fields
                 .iter()
-                .map(|x| x.1)
+                .map(|x| x.ty)
                 .any(|x| types[x].needs_lifetime(types)),
             Option(x) => types[x.subtype].needs_lifetime(types),
             Array(x) => types[x.subtype].needs_lifetime(types) || types[x.subtype].is_rs_builtin(),
+            Enum(x) => x
+                .variants
+                .iter()
+                .map(|x| x.1)
+                .map(|x| x.iter())
+                .flatten()
+                .any(|x| types[x.ty].needs_lifetime(types)),
             _ => false,
         }
     }
@@ -226,8 +244,13 @@ pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<P
     let states = parser::parse(&mut types, &bump, path, depends);
     let out = writer::write(&types, states);
 
-    let syntax_tree = syn::parse_file(&out).unwrap();
-    let out = prettyplease::unparse(&syntax_tree);
+    let out = match syn::parse_file(&out) {
+        Ok(syntax_tree) => prettyplease::unparse(&syntax_tree),
+        Err(e) => {
+            eprintln!("{:?}", e);
+            out
+        }
+    };
 
     let path = format!("{}/v{}.rs", out_dir, version.replace('.', "_"));
     fs::write(path, out).unwrap();
