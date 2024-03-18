@@ -7,7 +7,6 @@ use slotmap::{new_key_type, SlotMap};
 use std::{
     fmt::Debug,
     fs,
-    marker::PhantomData,
     path::{Path, PathBuf},
 };
 
@@ -36,21 +35,21 @@ struct TyBuffer {
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyStruct<'x> {
     name: &'x str,
-    fields: Vec<(String, TyKey)>,
+    fields: Vec<(&'x str, TyKey)>,
     base_type: Option<TyKey>, // only for bitfields
     failed: bool,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-enum Constant {
+enum Constant<'x> {
     Bool(bool),
     Int(u32),
-    String(String),
+    String(&'x str),
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct TyEnum {
-    name: String,
-    compare_to: String,
-    variants: Vec<(Constant, TyKey)>,
+struct TyEnum<'x> {
+    name: &'x str,
+    compare_to: &'x str,
+    variants: Vec<(Constant<'x>, TyKey)>,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyOption {
@@ -91,11 +90,10 @@ enum Ty<'x> {
     Vec3f64,
 
     Struct(TyStruct<'x>),
-    Enum(TyEnum),
+    Enum(TyEnum<'x>),
     Option(TyOption),
     Array(TyArray),
     Bitfield(TyBitfield),
-    Ph(PhantomData<&'x ()>),
 }
 
 impl<'x> Ty<'x> {
@@ -181,13 +179,13 @@ fn width_for_bitfields(size: u16) -> u16 {
     }
 }
 
-struct Packet {
-    pub name: String,
+struct Packet<'x> {
+    pub name: &'x str,
     pub ty: TyKey,
     pub id: u16,
 }
-struct Direction {
-    pub packets: Vec<Packet>,
+struct Direction<'x> {
+    pub packets: Vec<Packet<'x>>,
 }
 #[allow(dead_code)]
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -215,10 +213,10 @@ impl ConnectionState {
         }
     }
 }
-struct State {
+struct State<'x> {
     pub kind: ConnectionState,
-    pub c2s: Direction,
-    pub s2c: Direction,
+    pub c2s: Direction<'x>,
+    pub s2c: Direction<'x>,
 }
 
 pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<PathBuf>) {

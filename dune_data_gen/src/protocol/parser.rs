@@ -200,6 +200,7 @@ fn parse_container<'y, 'x>(
             "type" | "match" => name + "_",
             _ => name,
         };
+        let name = parser.alloc_str(bump, name);
 
         let ty = if is_bitfield {
             let signed = i["signed"].as_bool().unwrap();
@@ -338,7 +339,7 @@ fn parse_switch<'y, 'x>(
             "false" => Constant::Bool(false),
             _ => match k.parse() {
                 Ok(x) => Constant::Int(x),
-                Err(_) => Constant::String(k),
+                Err(_) => Constant::String(parser.alloc_str(bump, k)),
             },
         };
         let ty = parse_type(parser, bump, &v, parent)?;
@@ -347,8 +348,8 @@ fn parse_switch<'y, 'x>(
     }
 
     let t = TyEnum {
-        name: "hehe".to_string(),
-        compare_to: switch.compare_to,
+        name: "hehe",
+        compare_to: parser.alloc_str(bump, switch.compare_to),
         variants: variants,
     };
     Some(parser.alloc_type(Ty::Enum(t)))
@@ -441,7 +442,7 @@ fn direction<'y, 'x>(
     mut direction: JsonDirection,
     kind: &str,
     state_kind: ConnectionState,
-) -> Direction {
+) -> Direction<'x> {
     let raw_mappings = do_mapping(&direction.types.shift_remove("packet").unwrap());
     let mut packets = Vec::with_capacity(direction.types.len());
 
@@ -482,7 +483,7 @@ fn direction<'y, 'x>(
             }
         };
 
-        packets.push(Packet { ty, name: name.to_string(), id });
+        packets.push(Packet { ty, name: name, id });
     }
 
     Direction { packets }
@@ -493,7 +494,7 @@ fn state<'y, 'x>(
     bump: &'x Bump,
     state: JsonState,
     kind: ConnectionState,
-) -> State {
+) -> State<'x> {
     State {
         kind,
         c2s: direction(parser, bump, state.to_server, "_request", kind),
@@ -506,7 +507,7 @@ pub(super) fn parse<'x>(
     bump: &'x Bump,
     path: &Path,
     depends: &mut Vec<PathBuf>,
-) -> [State; 1] {
+) -> [State<'x>; 1] {
     let content = read_file(path, depends);
     let root: Root = serde_json::from_str(&content).unwrap();
 

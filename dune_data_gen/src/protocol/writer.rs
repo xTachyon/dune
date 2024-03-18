@@ -59,7 +59,7 @@ fn get_type_name<'x>(ty_key: TyKey, types: &'x TypesMap) -> Cow<'x, str> {
             }
         }
         Ty::Struct(x) => x.name.into(),
-        Ty::Enum(x) => x.name.as_str().into(),
+        Ty::Enum(x) => x.name.into(),
         Ty::Buffer(x) => match x.kind {
             TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
             TyBufferCountKind::Varint => "&'p [u8]".into(),
@@ -281,7 +281,13 @@ fn serialize_struct(
 
     *out += "}";
 }
-fn serialize_enum(out: &mut String, ty_key: TyKey, types: &TypesMap, _ty_struct: &TyEnum, name: &str) {
+fn serialize_enum(
+    out: &mut String,
+    ty_key: TyKey,
+    types: &TypesMap,
+    _ty_struct: &TyEnum,
+    name: &str,
+) {
     let ty = &types[ty_key];
     let (lifetime, _lifetime_simple) = life(ty.needs_lifetime(types));
     writeln!(out, "#[derive(Debug)] pub enum {}{} {{", name, lifetime);
