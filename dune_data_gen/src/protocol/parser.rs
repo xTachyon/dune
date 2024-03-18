@@ -223,7 +223,7 @@ fn parse_container<'x>(
                 parent_struct_name: parent.parent_struct_name,
                 parent_field: Some(name),
                 last_type: fields.last().map(|x| x.ty),
-                switch_updated: false
+                switch_updated: false,
             };
 
             match parse_type(parser, bump, ty, &mut parent) {

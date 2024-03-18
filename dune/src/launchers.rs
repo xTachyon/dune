@@ -32,17 +32,16 @@ struct PrismJson<'x> {
     accounts: Vec<PrismAccount<'x>>,
 }
 
-fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
+fn get_access_token_prism(profile: &str, _path: &str) -> Result<AuthDataExt> {
     let path: String = {
         cfg_if! {
             if #[cfg(target_os = "windows")] {
                 use std::env;
 
-                format!("{}/{}/accounts.json", env::var("appdata")?, path)
+                format!("{}/{}/accounts.json", env::var("appdata")?, _path)
             } else if #[cfg(target_os = "linux")] {
                 use std::env;
 
-                let _ = path;
                 let home = env::var("HOME")?;
                 format!("{}/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/accounts.json", home)
             } else if #[cfg(target_os = "macos")] {
@@ -56,12 +55,12 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
                         x.name()
                             .to_str()
                             .ok_or_else(|| anyhow!("Unkown characters in username"))?,
-                        path
+                            _path
                     ),
                     None => bail!("can't find the config of any supported launcher")
                 }
             } else {
-                panic!("Platform is not supported yet!")
+                bail!("Platform is not supported yet!")
             }
         }
     };
