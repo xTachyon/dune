@@ -70,16 +70,16 @@ impl<'p> DiskPacket<'p> {
 }
 
 pub trait HashMapExt<K, V> {
-    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
+    fn remove_err<Q>(&mut self, key: &Q) -> Result<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq + fmt::Display;
+        Q: Hash + Eq + fmt::Display + ?Sized;
 }
 impl<K: Eq + Hash, V> HashMapExt<K, V> for HashMap<K, V> {
-    fn remove_err<Q: ?Sized>(&mut self, key: &Q) -> Result<V>
+    fn remove_err<Q>(&mut self, key: &Q) -> Result<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq + fmt::Display,
+        Q: Hash + Eq + fmt::Display + ?Sized,
     {
         let key = key.borrow();
         match self.remove(key) {

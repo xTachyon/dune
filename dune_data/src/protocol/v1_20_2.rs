@@ -5,6 +5,7 @@
 #![allow(clippy::needless_borrow)]
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::identity_op)]
+#![allow(clippy::extra_unused_lifetimes)]
 // fix
 #![allow(unreachable_code)]
 #![allow(unused_variables)]

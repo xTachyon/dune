@@ -67,8 +67,8 @@ pub mod status {
             let result = PingStartRequest {};
             Ok(result)
         }
-        fn serialize<W: Write>(&self, mut writer: &mut W) -> IoResult<()> {
-            write_varint(&mut writer, 0x0)?;
+        fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
+            write_varint(writer, 0x0)?;
             Ok(())
         }
     }
@@ -256,8 +256,8 @@ pub mod login {
         pub threshold: i32,
     }
     impl<'p> MD<'p> for CompressResponse {
-        fn deserialize(mut reader: &mut &[u8]) -> Result<CompressResponse> {
-            let threshold: i32 = read_varint(&mut reader)?;
+        fn deserialize(reader: &mut &[u8]) -> Result<CompressResponse> {
+            let threshold: i32 = read_varint(reader)?;
 
             let result = CompressResponse { threshold };
             Ok(result)

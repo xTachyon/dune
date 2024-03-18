@@ -138,8 +138,7 @@ impl<'x> Ty<'x> {
                 .variants
                 .iter()
                 .map(|x| x.1)
-                .map(|x| x.fields.iter())
-                .flatten()
+                .flat_map(|x| x.fields.iter())
                 .any(|x| types[x.ty].needs_lifetime(types)),
             _ => false,
         }

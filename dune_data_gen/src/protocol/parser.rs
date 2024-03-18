@@ -332,11 +332,7 @@ fn parse_switch<'x>(
     }
     let switch: SwitchJson = serde_json::from_value(input.clone()).unwrap();
 
-    if !switch
-        .compare_to
-        .chars()
-        .all(|x| matches!(x, 'a'..='z' | 'A'..='Z'))
-    {
+    if !switch.compare_to.chars().all(|x| x.is_ascii_alphabetic()) {
         return None;
     }
     let compare_to = switch.compare_to.to_case(Case::Snake);
@@ -401,7 +397,6 @@ fn parse_switch<'x>(
             Some(x) => x.fields.extend(v.fields),
             None => {
                 ty_enum.variants.insert(k, v);
-                ()
             }
         }
     }
