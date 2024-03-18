@@ -33,7 +33,7 @@ struct PrismJson<'x> {
 }
 
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
-    let path = {
+    let path: String = {
         cfg_if! {
             if #[cfg(target_os = "windows")] {
                 use std::env;
