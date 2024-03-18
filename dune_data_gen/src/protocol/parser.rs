@@ -401,10 +401,12 @@ fn parse_switch<'x>(
         }
     }
 
-    parent.switch_updated = true;
     match new_last_type {
         Some(x) => Some(parser.alloc_type(Ty::Enum(x))),
-        None => parent.last_type,
+        None => {
+            parent.switch_updated = true;
+            parent.last_type
+        }
     }
 }
 fn parse_type_simple<'x>(
