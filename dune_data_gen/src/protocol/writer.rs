@@ -125,7 +125,6 @@ fn deserialize_one(
             x.name,
             x.compare_to
         );
-        std::hint::black_box(5);
         return;
     };
     write!(out, "let {}: {} = ", name, get_type_name(ty_key, types));

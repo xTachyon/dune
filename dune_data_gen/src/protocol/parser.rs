@@ -182,6 +182,7 @@ struct ParentData<'x> {
     parent_struct_name: &'x str,
     parent_field: Option<&'x str>,
     last_type: Option<TyKey>,
+    switch_updated: bool,
 }
 
 fn parse_container<'x>(
@@ -222,10 +223,11 @@ fn parse_container<'x>(
                 parent_struct_name: parent.parent_struct_name,
                 parent_field: Some(name),
                 last_type: fields.last().map(|x| x.ty),
+                switch_updated: false
             };
 
             match parse_type(parser, bump, ty, &mut parent) {
-                Some(x) if parent.last_type == Some(x) => continue,
+                Some(_) if parent.switch_updated => continue,
                 Some(x) => x,
                 None => {
                     failed = true;
@@ -404,6 +406,7 @@ fn parse_switch<'x>(
         }
     }
 
+    parent.switch_updated = true;
     match new_last_type {
         Some(x) => Some(parser.alloc_type(Ty::Enum(x))),
         None => parent.last_type,
@@ -530,6 +533,7 @@ fn direction<'x>(
                 parent_struct_name: name,
                 parent_field: None,
                 last_type: None,
+                switch_updated: false,
             };
             match parse_type(parser, bump, &value, &mut parent) {
                 Some(x) => x,
