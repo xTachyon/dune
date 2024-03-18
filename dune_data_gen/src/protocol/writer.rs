@@ -307,13 +307,13 @@ fn write_all_structs(out: &mut String, ty_key: TyKey, types: &TypesMap) {
             for (_, ty_struct) in x.fields.iter() {
                 write_all_structs(out, *ty_struct, types);
             }
-            serialize_struct(out, ty_key, types, x, &x.name);
+            serialize_struct(out, ty_key, types, x, x.name);
         }
         Ty::Enum(x) => {
             for (_, ty_struct) in x.variants.iter() {
                 write_all_structs(out, *ty_struct, types);
             }
-            serialize_enum(out, ty_key, types, x, &x.name);
+            serialize_enum(out, ty_key, types, x, x.name);
         }
         Ty::Option(x) => {
             write_all_structs(out, x.subtype, types);

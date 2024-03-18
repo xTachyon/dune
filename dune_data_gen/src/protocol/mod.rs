@@ -230,7 +230,7 @@ pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<P
     let out = prettyplease::unparse(&syntax_tree);
 
     let path = format!("{}/v{}.rs", out_dir, version.replace('.', "_"));
-    fs::write(&path, out).unwrap();
+    fs::write(path, out).unwrap();
 
     let bytes = bump.allocated_bytes();
     println!(

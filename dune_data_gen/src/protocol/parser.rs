@@ -135,7 +135,7 @@ impl<'y, 'x> Parser<'y, 'x> {
     }
 
     fn alloc_str<S: AsRef<str>>(&mut self, bump: &'x Bump, x: S) -> &'x str {
-        fn inner<'y, 'x>(parser: &mut Parser<'y, 'x>, bump: &'x Bump, x: &str) -> &'x str {
+        fn inner<'x>(parser: &mut Parser<'_, 'x>, bump: &'x Bump, x: &str) -> &'x str {
             match parser.strs.get(x) {
                 Some(x) => x,
                 None => {
@@ -182,8 +182,8 @@ struct ParentData<'x> {
     parent_field: Option<&'x str>,
 }
 
-fn parse_container<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn parse_container<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &ParentData,
@@ -218,7 +218,7 @@ fn parse_container<'y, 'x>(
             let ty = &i["type"];
             let mut parent = ParentData {
                 parent_struct_name: parent.parent_struct_name,
-                parent_field: Some(&name),
+                parent_field: Some(name),
             };
 
             match parse_type(parser, bump, ty, &mut parent) {
@@ -261,8 +261,8 @@ fn parse_container<'y, 'x>(
     });
     Some(parser.alloc_type(t))
 }
-fn parse_option<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn parse_option<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -271,7 +271,7 @@ fn parse_option<'y, 'x>(
     let t = Ty::Option(TyOption { subtype });
     Some(parser.alloc_type(t))
 }
-fn parse_buffer<'y, 'x>(parser: &mut Parser<'y, 'x>, input: &Value) -> TyKey {
+fn parse_buffer(parser: &mut Parser<'_, '_>, input: &Value) -> TyKey {
     let arg1 = &input[1];
 
     let kind = if let Value::String(x) = &arg1["countType"] {
@@ -287,8 +287,8 @@ fn parse_buffer<'y, 'x>(parser: &mut Parser<'y, 'x>, input: &Value) -> TyKey {
     let t = Ty::Buffer(TyBuffer { kind });
     parser.alloc_type(t)
 }
-fn parse_array<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn parse_array<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -311,8 +311,8 @@ fn parse_array<'y, 'x>(
 
     Some(t)
 }
-fn parse_switch<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn parse_switch<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -350,12 +350,12 @@ fn parse_switch<'y, 'x>(
     let t = TyEnum {
         name: "hehe",
         compare_to: parser.alloc_str(bump, switch.compare_to),
-        variants: variants,
+        variants,
     };
     Some(parser.alloc_type(Ty::Enum(t)))
 }
-fn parse_type_simple<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn parse_type_simple<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     input: &str,
     struct_name: &str,
@@ -393,8 +393,8 @@ fn parse_type_simple<'y, 'x>(
     };
     Some(r)
 }
-fn parse_type<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn parse_type<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -436,8 +436,8 @@ fn do_mapping(input: &Value) -> HashMap<String, u16> {
     }
     mappings
 }
-fn direction<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn direction<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     mut direction: JsonDirection,
     kind: &str,
@@ -471,7 +471,7 @@ fn direction<'y, 'x>(
             }))
         } else {
             let mut parent = ParentData {
-                parent_struct_name: &name,
+                parent_struct_name: name,
                 parent_field: None,
             };
             match parse_type(parser, bump, &value, &mut parent) {
@@ -483,14 +483,14 @@ fn direction<'y, 'x>(
             }
         };
 
-        packets.push(Packet { ty, name: name, id });
+        packets.push(Packet { ty, name, id });
     }
 
     Direction { packets }
 }
 
-fn state<'y, 'x>(
-    parser: &mut Parser<'y, 'x>,
+fn state<'x>(
+    parser: &mut Parser<'_, 'x>,
     bump: &'x Bump,
     state: JsonState,
     kind: ConnectionState,
