@@ -58,7 +58,7 @@ fn get_type_name<'x>(ty_key: TyKey, types: &'x TypesMap) -> Cow<'x, str> {
                 .into()
             }
         }
-        Ty::Struct(x) => x.name.as_str().into(),
+        Ty::Struct(x) => x.name.into(),
         Ty::Enum(x) => x.name.as_str().into(),
         Ty::Buffer(x) => match x.kind {
             TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),

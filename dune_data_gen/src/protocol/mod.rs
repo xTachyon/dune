@@ -7,6 +7,7 @@ use slotmap::{new_key_type, SlotMap};
 use std::{
     fmt::Debug,
     fs,
+    marker::PhantomData,
     path::{Path, PathBuf},
 };
 
@@ -14,7 +15,7 @@ new_key_type! {
     struct TyKey;
 }
 
-type TypesMap = SlotMap<TyKey, Ty>;
+type TypesMap<'x> = SlotMap<TyKey, Ty<'x>>;
 
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyBitfield {
@@ -33,8 +34,8 @@ struct TyBuffer {
     kind: TyBufferCountKind,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct TyStruct {
-    name: String,
+struct TyStruct<'x> {
+    name: &'x str,
     fields: Vec<(String, TyKey)>,
     base_type: Option<TyKey>, // only for bitfields
     failed: bool,
@@ -61,7 +62,7 @@ struct TyArray {
     subtype: TyKey,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-enum Ty {
+enum Ty<'x> {
     U8,
     U16,
     U32,
@@ -89,14 +90,15 @@ enum Ty {
     ChunkBlockEntity,
     Vec3f64,
 
-    Struct(TyStruct),
+    Struct(TyStruct<'x>),
     Enum(TyEnum),
     Option(TyOption),
     Array(TyArray),
     Bitfield(TyBitfield),
+    Ph(PhantomData<&'x ()>),
 }
 
-impl Ty {
+impl<'x> Ty<'x> {
     fn needs_lifetime(&self, types: &TypesMap) -> bool {
         use Ty::*;
         match self {
@@ -223,7 +225,7 @@ pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<P
     let bump = Bump::new();
     let mut types = TypesMap::with_capacity_and_key(32);
 
-    let states = parser::parse(&mut types, path, &bump, depends);
+    let states = parser::parse(&mut types, &bump, path, depends);
     let out = writer::write(&types, states);
 
     let syntax_tree = syn::parse_file(&out).unwrap();

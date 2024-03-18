@@ -36,14 +36,10 @@ struct Root {
     play: JsonState,
 }
 
-struct ParserMutData<'x> {
-    strs: HashSet<&'x str>,
+struct Parser<'y, 'x> {
+    types: &'y mut TypesMap<'x>,
     unknown_types: HashMap<&'x str, Vec<&'x str>>,
-}
-
-struct Parser<'x> {
-    mut_data: ParserMutData<'x>,
-    types: &'x mut TypesMap,
+    strs: HashSet<&'x str>,
 
     ty_u8: TyKey,
     ty_u16: TyKey,
@@ -71,8 +67,8 @@ struct Parser<'x> {
     ty_chunk_block_entity: TyKey,
     ty_vec3f64: TyKey,
 }
-impl<'x> Parser<'x> {
-    fn new<'a>(types: &'a mut TypesMap) -> Parser<'a> {
+impl<'y, 'x> Parser<'y, 'x> {
+    fn new(types: &'y mut TypesMap<'x>) -> Parser<'y, 'x> {
         let ty_u8 = types.insert(Ty::U8);
         let ty_u16 = types.insert(Ty::U16);
         let ty_u128 = types.insert(Ty::U128);
@@ -102,11 +98,9 @@ impl<'x> Parser<'x> {
         let ty_vec3f64 = types.insert(Ty::Vec3f64);
 
         Parser {
-            mut_data: ParserMutData {
-                strs: HashSet::with_capacity(32),
-                unknown_types: HashMap::with_capacity(32),
-            },
             types,
+            unknown_types: HashMap::with_capacity(32),
+            strs: HashSet::with_capacity(32),
 
             ty_u8,
             ty_u16,
@@ -136,17 +130,17 @@ impl<'x> Parser<'x> {
         }
     }
 
-    fn alloc_type<'a: 'x>(&mut self, ty: Ty) -> TyKey {
+    fn alloc_type<'a: 'x>(&mut self, ty: Ty<'a>) -> TyKey {
         self.types.insert(ty)
     }
 
     fn alloc_str<S: AsRef<str>>(&mut self, bump: &'x Bump, x: S) -> &'x str {
-        fn inner<'x>(parser: &mut Parser<'x>, bump: &'x Bump, x: &str) -> &'x str {
-            match parser.mut_data.strs.get(x) {
+        fn inner<'y, 'x>(parser: &mut Parser<'y, 'x>, bump: &'x Bump, x: &str) -> &'x str {
+            match parser.strs.get(x) {
                 Some(x) => x,
                 None => {
                     let r = bump.alloc_str(x);
-                    parser.mut_data.strs.insert(r);
+                    parser.strs.insert(r);
                     r
                 }
             }
@@ -158,8 +152,7 @@ impl<'x> Parser<'x> {
         let unk_ty = self.alloc_str(bump, unk_ty);
         let packet_ty = self.alloc_str(bump, packet_ty);
 
-        self.mut_data
-            .unknown_types
+        self.unknown_types
             .entry(unk_ty)
             .or_default()
             .push(packet_ty);
@@ -189,8 +182,8 @@ struct ParentData<'x> {
     parent_field: Option<&'x str>,
 }
 
-fn parse_container<'x>(
-    parser: &mut Parser<'x>,
+fn parse_container<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &ParentData,
@@ -257,7 +250,7 @@ fn parse_container<'x>(
         name += "_";
         name += &snake_to_pascal(parent_field);
     }
-    // let name = bump.alloc_str(&name);
+    let name = bump.alloc_str(&name);
 
     let t = Ty::Struct(TyStruct {
         name,
@@ -267,8 +260,8 @@ fn parse_container<'x>(
     });
     Some(parser.alloc_type(t))
 }
-fn parse_option<'x>(
-    parser: &mut Parser<'x>,
+fn parse_option<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -277,7 +270,7 @@ fn parse_option<'x>(
     let t = Ty::Option(TyOption { subtype });
     Some(parser.alloc_type(t))
 }
-fn parse_buffer<'x>(parser: &mut Parser<'x>, input: &Value) -> TyKey {
+fn parse_buffer<'y, 'x>(parser: &mut Parser<'y, 'x>, input: &Value) -> TyKey {
     let arg1 = &input[1];
 
     let kind = if let Value::String(x) = &arg1["countType"] {
@@ -293,8 +286,8 @@ fn parse_buffer<'x>(parser: &mut Parser<'x>, input: &Value) -> TyKey {
     let t = Ty::Buffer(TyBuffer { kind });
     parser.alloc_type(t)
 }
-fn parse_array<'x>(
-    parser: &mut Parser<'x>,
+fn parse_array<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -317,8 +310,8 @@ fn parse_array<'x>(
 
     Some(t)
 }
-fn parse_switch<'x>(
-    parser: &mut Parser<'x>,
+fn parse_switch<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -360,8 +353,8 @@ fn parse_switch<'x>(
     };
     Some(parser.alloc_type(Ty::Enum(t)))
 }
-fn parse_type_simple<'x>(
-    parser: &mut Parser<'x>,
+fn parse_type_simple<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     input: &str,
     struct_name: &str,
@@ -399,8 +392,8 @@ fn parse_type_simple<'x>(
     };
     Some(r)
 }
-fn parse_type<'x>(
-    parser: &mut Parser<'x>,
+fn parse_type<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     input: &Value,
     parent: &mut ParentData,
@@ -442,8 +435,8 @@ fn do_mapping(input: &Value) -> HashMap<String, u16> {
     }
     mappings
 }
-fn direction<'x>(
-    parser: &mut Parser<'x>,
+fn direction<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     mut direction: JsonDirection,
     kind: &str,
@@ -467,16 +460,14 @@ fn direction<'x>(
             name + kind
         };
         let name = snake_to_pascal(&name);
-        // let name = bump.alloc_str(&name);
+        let name = bump.alloc_str(&name);
         let ty = if is_ignored {
-            parser.alloc_type(
-                Ty::Struct(TyStruct {
-                    name: name.clone(),
-                    fields: Vec::new(),
-                    base_type: None,
-                    failed: true,
-                }),
-            )
+            parser.alloc_type(Ty::Struct(TyStruct {
+                name,
+                fields: Vec::new(),
+                base_type: None,
+                failed: true,
+            }))
         } else {
             let mut parent = ParentData {
                 parent_struct_name: &name,
@@ -491,14 +482,14 @@ fn direction<'x>(
             }
         };
 
-        packets.push(Packet { ty, name, id });
+        packets.push(Packet { ty, name: name.to_string(), id });
     }
 
     Direction { packets }
 }
 
-fn state<'x>(
-    parser: &mut Parser<'x>,
+fn state<'y, 'x>(
+    parser: &mut Parser<'y, 'x>,
     bump: &'x Bump,
     state: JsonState,
     kind: ConnectionState,
@@ -510,7 +501,12 @@ fn state<'x>(
     }
 }
 
-pub(super) fn parse<'x>(types: &mut TypesMap, path: &Path, bump: &Bump, depends: &mut Vec<PathBuf>) -> [State; 1] {
+pub(super) fn parse<'x>(
+    types: &mut TypesMap<'x>,
+    bump: &'x Bump,
+    path: &Path,
+    depends: &mut Vec<PathBuf>,
+) -> [State; 1] {
     let content = read_file(path, depends);
     let root: Root = serde_json::from_str(&content).unwrap();
 
@@ -523,7 +519,7 @@ pub(super) fn parse<'x>(types: &mut TypesMap, path: &Path, bump: &Bump, depends:
         state(&mut parser, bump, root.play, ConnectionState::Play),
     ];
 
-    let mut unknown_types: Vec<_> = parser.mut_data.unknown_types.into_iter().collect();
+    let mut unknown_types: Vec<_> = parser.unknown_types.into_iter().collect();
     unknown_types.sort_by_key(|x| x.0);
 
     let width = unknown_types
