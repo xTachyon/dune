@@ -61,7 +61,7 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
                     None => bail!("can't find the config of any supported launcher")
                 }
             } else {
-                bail!("Platform is not supported yet!")
+                panic!("Platform is not supported yet!")
             }
         }
     };
