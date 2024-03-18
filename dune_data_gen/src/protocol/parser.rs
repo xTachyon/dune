@@ -3,7 +3,7 @@ use super::{
     TyOption, TyStruct, TyStructField, TypesMap,
 };
 use crate::{
-    protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum, Variant},
+    protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum, VariantField, Variants},
     read_file,
 };
 use bumpalo::Bump;
@@ -324,19 +324,23 @@ fn parse_switch<'x>(
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct SwitchJson {
-        // compare_to: String,
+        compare_to: String,
         // default: String,
         fields: IndexMap<String, Value>,
     }
-    if parent.parent_struct_name == "BossBarResponse" {
-        std::hint::black_box(5);
-        std::hint::black_box(5);
-        std::hint::black_box(5);
-        dbg!(&parent);
-    }
     let switch: SwitchJson = serde_json::from_value(input.clone()).unwrap();
 
-    let mut variants: BTreeMap<Constant<'x>, Vec<Variant<'x>>> = BTreeMap::new();
+    if !switch
+        .compare_to
+        .chars()
+        .all(|x| matches!(x, 'a'..='z' | 'A'..='Z'))
+    {
+        return None;
+    }
+    let compare_to = switch.compare_to.to_case(Case::Snake);
+
+    let mut first_constant = None;
+    let mut variants: BTreeMap<Constant<'x>, Variants<'x>> = BTreeMap::new();
     for (k, v) in switch.fields {
         let constant = match k.as_str() {
             "true" => Constant::Bool(true),
@@ -346,12 +350,23 @@ fn parse_switch<'x>(
                 Err(_) => Constant::String(bump.alloc_str(&k)),
             },
         };
+        if first_constant.is_none() {
+            first_constant = Some(constant);
+        }
         let ty = parse_type(parser, bump, &v, parent)?;
 
-        variants.entry(constant).or_default().push(Variant {
-            name: bump.alloc_str(parent.parent_field.unwrap()),
-            ty,
-        });
+        let variant_name = bump.alloc_str(&format!("Variant_{}", constant));
+        variants
+            .entry(constant)
+            .or_insert_with(|| Variants {
+                name: variant_name,
+                fields: Vec::new(),
+            })
+            .fields
+            .push(VariantField {
+                name: bump.alloc_str(parent.parent_field.unwrap()),
+                ty,
+            });
     }
 
     let mut new_last_type = None;
@@ -364,17 +379,29 @@ fn parse_switch<'x>(
     } else {
         None
     };
+    let discriminator_type = match first_constant.unwrap() {
+        Constant::Bool(_) => "bool",
+        Constant::Int(_) => "i32",
+        Constant::String(_) => "&str",
+    };
     let ty_enum = last_type.unwrap_or_else(|| {
         new_last_type = Some(TyEnum {
             name: bump.alloc_str(&format!("{}_Enum", parent.parent_struct_name)),
-            compare_to: "",
+            compare_to: bump.alloc_str(&compare_to),
             variants: BTreeMap::new(),
+            discriminator_type,
         });
         new_last_type.as_mut().unwrap()
     });
 
     for (k, v) in variants {
-        ty_enum.variants.entry(k).or_default().extend(v);
+        match ty_enum.variants.get_mut(&k) {
+            Some(x) => x.fields.extend(v.fields),
+            None => {
+                ty_enum.variants.insert(k, v);
+                ()
+            }
+        }
     }
 
     match new_last_type {

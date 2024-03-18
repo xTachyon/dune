@@ -45,22 +45,37 @@ struct TyStruct<'x> {
     base_type: Option<TyKey>, // only for bitfields
     failed: bool,
 }
-#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 enum Constant<'x> {
     Bool(bool),
     Int(u32),
     String(&'x str),
 }
+impl<'x> std::fmt::Display for Constant<'x> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Constant::Bool(x) => std::fmt::Display::fmt(x, f),
+            Constant::Int(x) => std::fmt::Display::fmt(x, f),
+            Constant::String(x) => std::fmt::Display::fmt(x, f),
+        }
+    }
+}
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct Variant<'x> {
+struct VariantField<'x> {
     name: &'x str,
     ty: TyKey,
+}
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord, Default)]
+struct Variants<'x> {
+    name: &'x str,
+    fields: Vec<VariantField<'x>>,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyEnum<'x> {
     name: &'x str,
     compare_to: &'x str,
-    variants: BTreeMap<Constant<'x>, Vec<Variant<'x>>>,
+    discriminator_type: &'static str,
+    variants: BTreeMap<Constant<'x>, Variants<'x>>,
 }
 #[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct TyOption {
@@ -123,7 +138,7 @@ impl<'x> Ty<'x> {
                 .variants
                 .iter()
                 .map(|x| x.1)
-                .map(|x| x.iter())
+                .map(|x| x.fields.iter())
                 .flatten()
                 .any(|x| types[x.ty].needs_lifetime(types)),
             _ => false,

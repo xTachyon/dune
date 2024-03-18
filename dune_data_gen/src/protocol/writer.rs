@@ -61,7 +61,7 @@ fn get_type_name<'x>(ty_key: TyKey, types: &'x TypesMap) -> Cow<'x, str> {
             }
         }
         Ty::Struct(x) => x.name.into(),
-        Ty::Enum(x) => x.name.into(),
+        Ty::Enum(x) => format!("{}{}", x.name, lifetime(ty_key, types)).into(),
         Ty::Buffer(x) => match x.kind {
             TyBufferCountKind::Fixed(count) => format!("&'p [u8; {}]", count).into(),
             TyBufferCountKind::Varint => "&'p [u8]".into(),
@@ -115,6 +115,19 @@ fn deserialize_one(
         writeln!(out, "{}.push({}); }}", name, elem);
         return;
     }
+    if let Ty::Enum(x) = ty {
+        // TODO: get the correct type in parser so not do .into()
+        write!(
+            out,
+            "let {}: {} = {}::deserialize(&mut reader, {}.into())?;",
+            name,
+            get_type_name(ty_key, types),
+            x.name,
+            x.compare_to
+        );
+        std::hint::black_box(5);
+        return;
+    };
     write!(out, "let {}: {} = ", name, get_type_name(ty_key, types));
     if let Ty::Bitfield(x) = ty {
         let left_shift = bitfield_base_width - x.range_end;
@@ -271,7 +284,7 @@ fn serialize_struct(
     let has_serialization = bitfield_base_width == 0
         && !ty_struct.fields.iter().any(|x| {
             let ty = &types[x.ty];
-            matches!(ty, Ty::Array(_) | Ty::Struct(_))
+            matches!(ty, Ty::Array(_) | Ty::Struct(_) | Ty::Enum(_))
         });
 
     if has_serialization && !ty_struct.failed {
@@ -290,25 +303,49 @@ fn serialize_struct(
 }
 fn serialize_enum(out: &mut String, ty_key: TyKey, types: &TypesMap, ty_enum: &TyEnum, name: &str) {
     let ty = &types[ty_key];
-    let (lifetime, _lifetime_simple) = life(ty.needs_lifetime(types));
+    let (lifetime, lifetime_simple) = life(ty.needs_lifetime(types));
     writeln!(out, "#[derive(Debug)] pub enum {}{} {{", name, lifetime);
 
-    for (constant, variants) in ty_enum.variants.iter() {
-        let name = match constant {
-            Constant::Int(x) => x.to_string(),
-            Constant::Bool(x) => x.to_string(),
-            _ => unreachable!("{:?}", constant),
-        };
-        writeln!(out, "Variant_{name} {{");
-        for i in variants {
+    for (_, variants) in ty_enum.variants.iter() {
+        writeln!(out, "{} {{", variants.name);
+        for i in variants.fields.iter() {
             writeln!(out, "{}: {},", i.name, get_type_name(i.ty, types));
         }
         writeln!(out, "}},");
     }
 
-    *out += "}";
+    let discriminator_type = ty_enum.discriminator_type;
+    write!(out, "}} impl{lifetime} {name}{lifetime} {{
+            fn deserialize(mut reader: &mut &{lifetime_simple} [u8], discriminator: {discriminator_type})
+                     -> Result<{name}{lifetime}> {{
+                let r = match discriminator {{
+            ");
 
-    // dbg!(ty);
+    for (constant, variants) in ty_enum.variants.iter() {
+        match constant {
+            Constant::Bool(x) => write!(out, "{}", x),
+            Constant::Int(x) => write!(out, "{}", x),
+            Constant::String(x) => write!(out, r#""{}""#, x),
+        }
+        writeln!(out, "=> {{");
+
+        for i in variants.fields.iter() {
+            deserialize_one(out, i.name, i.ty, types, 0, 1);
+        }
+
+        write!(out, "\n{}::{} {{", ty_enum.name, variants.name);
+
+        for field in variants.fields.iter() {
+            writeln!(out, "{},", field.name);
+        }
+
+        *out += "}}";
+    }
+    *out += "
+    _ => todo!()
+";
+
+    *out += "}; Ok(r) }}";
 }
 fn write_all_structs(out: &mut String, ty_key: TyKey, types: &TypesMap) {
     let ty = &types[ty_key];
@@ -321,7 +358,7 @@ fn write_all_structs(out: &mut String, ty_key: TyKey, types: &TypesMap) {
         }
         Ty::Enum(x) => {
             for (_, v) in x.variants.iter() {
-                for i in v {
+                for i in v.fields.iter() {
                     write_all_structs(out, i.ty, types);
                 }
             }
