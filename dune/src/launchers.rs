@@ -32,7 +32,7 @@ struct PrismJson<'x> {
     accounts: Vec<PrismAccount<'x>>,
 }
 
-fn get_access_token_prism(profile: &str, _path: &str) -> Result<AuthDataExt> {
+fn get_access_token_prism(_profile: &str, _path: &str) -> Result<AuthDataExt> {
     let path: String = {
         cfg_if! {
             if #[cfg(target_os = "windows")] {
@@ -67,7 +67,7 @@ fn get_access_token_prism(profile: &str, _path: &str) -> Result<AuthDataExt> {
 
     let content = std::fs::read_to_string(path)?;
     let value: PrismJson = serde_json::from_str(&content)?;
-    let acc = value.accounts.iter().find(|x| x.profile.name == profile);
+    let acc = value.accounts.iter().find(|x| x.profile.name == _profile);
     let acc = match acc {
         Some(x) => x,
         None => bail!("there should be at least an account"),
