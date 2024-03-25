@@ -1,7 +1,9 @@
 use anyhow::{bail, Result};
 use cfg_if::cfg_if;
 use dune_lib::record::AuthData;
+use fs_err as fs;
 use serde_derive::Deserialize;
+use std::path::PathBuf;
 
 pub struct AuthDataExt {
     pub data: AuthData,
@@ -32,17 +34,21 @@ struct PrismJson<'x> {
     accounts: Vec<PrismAccount<'x>>,
 }
 
-fn get_access_token_prism_path(_path: &str) -> Result<String> {
+fn get_access_token_prism_path(_path: &str) -> Result<PathBuf> {
     cfg_if! {
         if #[cfg(target_os = "windows")] {
             use std::env;
+            let mut path = PathBuf::new();
+            path.push(env::var("appdata")?);
+            path.push(_path);
+            path.push("accounts.json");
 
-            Ok(format!("{}/{}/accounts.json", env::var("appdata")?, _path))
+            Ok(path)
         } else if #[cfg(target_os = "linux")] {
             use std::env;
 
             let home = env::var("HOME")?;
-            Ok(format!("{}/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/accounts.json", home))
+            Ok(format!("{}/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/accounts.json", home).into())
         } else if #[cfg(target_os = "macos")] {
             use users::{get_current_uid, get_user_by_uid};
             use anyhow::anyhow;
@@ -53,9 +59,9 @@ fn get_access_token_prism_path(_path: &str) -> Result<String> {
                     "/Users/{}/Library/Application Support/{}/accounts.json",
                     x.name()
                         .to_str()
-                        .ok_or_else(|| anyhow!("Unkown characters in username"))?,
+                        .ok_or_else(|| anyhow!("Unknown characters in username"))?,
                         _path
-                )),
+                ).into()),
                 None => bail!("can't find the config of any supported launcher")
             }
         } else {
@@ -65,13 +71,13 @@ fn get_access_token_prism_path(_path: &str) -> Result<String> {
 }
 
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
-    let path: String = get_access_token_prism_path(path)?;
-    let content = std::fs::read_to_string(path)?;
+    let path = get_access_token_prism_path(path)?;
+    let content = fs::read_to_string(path)?;
     let value: PrismJson = serde_json::from_str(&content)?;
     let acc = value.accounts.iter().find(|x| x.profile.name == profile);
     let acc = match acc {
         Some(x) => x,
-        None => bail!("there should be at least an account"),
+        None => bail!("account with name `{}` not found", profile),
     };
     let online = match acc.ty {
         "Mojang" | "MSA" => true,
@@ -90,11 +96,19 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
 }
 
 pub fn get_access_token(profile: &str) -> Result<AuthDataExt> {
-    if let Ok(x) = get_access_token_prism(profile, "PrismLauncher") {
-        return Ok(x);
+    let prism;
+    match get_access_token_prism(profile, "PrismLauncher") {
+        Ok(x) => return Ok(x),
+        Err(e) => prism = e,
     }
-    if let Ok(x) = get_access_token_prism(profile, "PolyMC") {
-        return Ok(x);
+    let poly;
+    match get_access_token_prism(profile, "PolyMC") {
+        Ok(x) => return Ok(x),
+        Err(e) => poly = e,
     }
-    anyhow::bail!("can't find the config of any supported launcher")
+    anyhow::bail!(
+        "can't find the config of any supported launcher
+PrismLauncher: {prism}
+PolyMC       : {poly}",
+    )
 }

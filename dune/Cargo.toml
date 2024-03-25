@@ -15,6 +15,7 @@ bumpalo.workspace = true
 chrono.workspace = true
 cfg-if.workspace = true
 humansize.workspace = true
+fs-err.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true

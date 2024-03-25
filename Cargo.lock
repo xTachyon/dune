@@ -386,6 +386,7 @@ dependencies = [
  "dune_common",
  "dune_data",
  "dune_lib",
+ "fs-err",
  "humansize",
  "log",
  "serde",

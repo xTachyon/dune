@@ -16,13 +16,13 @@ use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, 
 use dune_lib::record::record_to_file;
 use dune_lib::replay::play;
 use dune_lib::{client, Enchantment, Item};
+use fs_err as fs;
 use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
-use std::fs::{self};
 use std::io::ErrorKind;
 use std::time::Instant;
 
