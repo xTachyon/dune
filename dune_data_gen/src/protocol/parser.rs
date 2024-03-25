@@ -200,10 +200,10 @@ fn parse_container<'x>(
         let name = i["name"].as_str().unwrap();
         let name = name.to_case(Case::Snake);
         let name = match name.as_str() {
-            "type" | "match" => name + "_",
-            _ => name,
+            "type" => "type_",
+            "match" => "match_",
+            _ => parser.alloc_str(bump, name),
         };
-        let name = parser.alloc_str(bump, name);
 
         let ty = if is_bitfield {
             let signed = i["signed"].as_bool().unwrap();
@@ -257,7 +257,7 @@ fn parse_container<'x>(
         name += "_";
         name += &snake_to_pascal(parent_field);
     }
-    let name = bump.alloc_str(&name);
+    let name = parser.alloc_str(bump, &name);
 
     let t = Ty::Struct(TyStruct {
         name,
@@ -345,7 +345,7 @@ fn parse_switch<'x>(
             "false" => Constant::Bool(false),
             _ => match k.parse() {
                 Ok(x) => Constant::Int(x),
-                Err(_) => Constant::String(bump.alloc_str(&k)),
+                Err(_) => Constant::String(parser.alloc_str(bump, k)),
             },
         };
         if first_constant.is_none() {
@@ -353,7 +353,7 @@ fn parse_switch<'x>(
         }
         let ty = parse_type(parser, bump, &v, parent)?;
 
-        let variant_name = bump.alloc_str(&format!("Variant_{}", constant));
+        let variant_name = parser.alloc_str(bump, format!("Variant_{}", constant));
         variants
             .entry(constant)
             .or_insert_with(|| Variants {
@@ -362,7 +362,7 @@ fn parse_switch<'x>(
             })
             .fields
             .push(VariantField {
-                name: bump.alloc_str(parent.parent_field.unwrap()),
+                name: parser.alloc_str(bump, parent.parent_field.unwrap()),
                 ty,
             });
     }
@@ -516,7 +516,7 @@ fn direction<'x>(
             name + kind
         };
         let name = snake_to_pascal(&name);
-        let name = bump.alloc_str(&name);
+        let name = parser.alloc_str(bump, &name);
 
         let ty = if is_ignored {
             parser.alloc_type(Ty::Struct(TyStruct {
