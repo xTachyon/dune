@@ -1,5 +1,4 @@
 use anyhow::{bail, Result};
-use cfg_if::cfg_if;
 use dune_lib::record::AuthData;
 use fs_err as fs;
 use serde_derive::Deserialize;
@@ -35,39 +34,46 @@ struct PrismJson<'x> {
 }
 
 fn get_access_token_prism_path(_path: &str) -> Result<PathBuf> {
-    cfg_if! {
-        if #[cfg(target_os = "windows")] {
-            use std::env;
-            let mut path = PathBuf::new();
-            path.push(env::var("appdata")?);
-            path.push(_path);
-            path.push("accounts.json");
+    if cfg!(target_os = "windows") {
+        use std::env;
 
-            Ok(path)
-        } else if #[cfg(target_os = "linux")] {
-            use std::env;
+        let mut path = PathBuf::new();
+        path.push(env::var("appdata")?);
+        path.push(_path);
+        path.push("accounts.json");
 
-            let home = env::var("HOME")?;
-            Ok(format!("{}/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/accounts.json", home).into())
-        } else if #[cfg(target_os = "macos")] {
-            use users::{get_current_uid, get_user_by_uid};
-            use anyhow::anyhow;
-
-            let user = get_user_by_uid(get_current_uid());
-            match user {
-                Some(x) => Ok(format!(
-                    "/Users/{}/Library/Application Support/{}/accounts.json",
-                    x.name()
-                        .to_str()
-                        .ok_or_else(|| anyhow!("Unknown characters in username"))?,
-                        _path
-                ).into()),
-                None => bail!("can't find the config of any supported launcher")
-            }
-        } else {
-            bail!("Platform is not supported yet!")
-        }
+        return Ok(path);
     }
+    if cfg!(target_os = "linux") {
+        use std::env;
+
+        let mut path = PathBuf::new();
+        path.push(env::var("HOME")?);
+        path.push("/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/accounts.json");
+
+        return Ok(path);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use anyhow::anyhow;
+        use users::{get_current_uid, get_user_by_uid};
+
+        let Some(user) = get_user_by_uid(get_current_uid()) else {
+            bail!("couldn't get current user");
+        };
+        let mut path = PathBuf::new();
+
+        path.push("/Users");
+        path.push(user.name());
+        path.push("Library/Application Support");
+        path.push(_path);
+        path.push("accounts.json");
+
+        return Ok(path);
+    }
+
+    bail!("Platform is not supported!")
 }
 
 fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
@@ -106,7 +112,7 @@ pub fn get_access_token(profile: &str) -> Result<AuthDataExt> {
         Ok(x) => return Ok(x),
         Err(e) => poly = e,
     }
-    anyhow::bail!(
+    bail!(
         "can't find the config of any supported launcher
 PrismLauncher: {prism}
 PolyMC       : {poly}",

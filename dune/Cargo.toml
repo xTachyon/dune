@@ -13,7 +13,6 @@ anyhow.workspace = true
 ansi_term.workspace = true
 bumpalo.workspace = true
 chrono.workspace = true
-cfg-if.workspace = true
 humansize.workspace = true
 fs-err.workspace = true
 

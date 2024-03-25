@@ -380,7 +380,6 @@ dependencies = [
  "ansi_term",
  "anyhow",
  "bumpalo",
- "cfg-if",
  "chrono",
  "clap",
  "dune_common",
