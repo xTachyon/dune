@@ -252,8 +252,8 @@ impl Enchantment {
 
 pub fn run(out_dir: &str, mc_data_path: &Path) -> Vec<PathBuf> {
     const VERSIONS: &[VersionInfo] = &[
-        VersionInfo::new("1.18.2", false),
-        VersionInfo::new("1.19.3", false),
+        // VersionInfo::new("1.18.2", false),
+        // VersionInfo::new("1.19.3", false),
         VersionInfo::new("1.20.2", true),
     ];
 

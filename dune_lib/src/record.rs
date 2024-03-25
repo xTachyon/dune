@@ -32,8 +32,6 @@ enum Packet<'x> {
     Handshaking(Handshaking<'x>),
     Status(Status<'x>),
     Login(Login<'x>),
-    V1_18_2(protocol::v1_18_2::Packet<'x>),
-    V1_19_3(protocol::v1_19_3::Packet<'x>),
     V1_20_2(protocol::v1_20_2::Packet<'x>),
     PlayUnknown(&'x [u8]),
 }
@@ -187,8 +185,8 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     }
 
     match version {
-        758 => d!(v1_18_2, V1_18_2),
-        761 => d!(v1_19_3, V1_19_3),
+        // 758 => d!(v1_18_2, V1_18_2),
+        // 761 => d!(v1_19_3, V1_19_3),
         764 => d!(v1_20_2, V1_20_2),
         _ => {
             warn!("unknown protocol version: {}", version);

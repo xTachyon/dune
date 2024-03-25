@@ -1,12 +1,12 @@
 use crate::record::AuthData;
-use crate::{chat, Buffer};
+use crate::Buffer;
 use aes::cipher::AsyncStreamCipher;
 use anyhow::Result;
 use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
 use dune_data::protocol::common_states::login::LoginStartRequest;
 use dune_data::protocol::de::MD;
-use dune_data::protocol::v1_18_2::play::{ChatRequest, KeepAliveRequest};
-use dune_data::protocol::v1_18_2::Packet;
+use dune_data::protocol::v1_20_2::play::KeepAliveRequest;
+use dune_data::protocol::v1_20_2::Packet;
 use dune_data::protocol::varint::{write_varint, write_varint_serialize, VarintSerialized};
 use dune_data::protocol::{self, ConnectionState, PacketDirection};
 use flate2::write::ZlibEncoder;
@@ -140,10 +140,10 @@ fn send_start(client: &mut ClientWriter, username: &str, server_host: (&str, u16
     Ok(())
 }
 
-fn handle_packet(_client: &mut Client, _writer: &mut ClientWriter, packet: Packet) -> Result<()> {
-    if let Packet::ChatResponse(x) = packet {
-        println!("{}", chat::parse_chat(x.message)?);
-    }
+fn handle_packet(_client: &mut Client, _writer: &mut ClientWriter, _packet: Packet) -> Result<()> {
+    // if let Packet::PlayerChatResponse(x) = packet {
+    // println!("{}", chat::parse_chat(x.message)?);
+    // }
 
     Ok(())
 }
@@ -162,7 +162,7 @@ fn read_packet(
         return Ok(false);
     };
     let mut data = packet_data.data;
-    let packet = protocol::v1_18_2::deserialize(
+    let packet = protocol::v1_20_2::deserialize(
         client.state,
         PacketDirection::S2C,
         packet_data.id,
@@ -197,11 +197,11 @@ fn read_packet(
     Ok(true)
 }
 
-fn on_stdin_line(writer: &mut ClientWriter, line: String) -> Result<()> {
-    let line = line.trim();
-    if !line.is_empty() {
-        writer.send_packet(ChatRequest { message: line })?;
-    }
+fn on_stdin_line(_writer: &mut ClientWriter, _line: String) -> Result<()> {
+    // let line = line.trim();
+    // if !line.is_empty() {
+    //     writer.send_packet(ChatRequest { message: line })?;
+    // }
 
     Ok(())
 }

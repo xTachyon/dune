@@ -102,16 +102,14 @@ fn get_access_token_prism(profile: &str, path: &str) -> Result<AuthDataExt> {
 }
 
 pub fn get_access_token(profile: &str) -> Result<AuthDataExt> {
-    let prism;
-    match get_access_token_prism(profile, "PrismLauncher") {
+    let prism = match get_access_token_prism(profile, "PrismLauncher") {
         Ok(x) => return Ok(x),
-        Err(e) => prism = e,
-    }
-    let poly;
-    match get_access_token_prism(profile, "PolyMC") {
+        Err(e) => e,
+    };
+    let poly = match get_access_token_prism(profile, "PolyMC") {
         Ok(x) => return Ok(x),
-        Err(e) => poly = e,
-    }
+        Err(e) => e,
+    };
     bail!(
         "can't find the config of any supported launcher
 PrismLauncher: {prism}

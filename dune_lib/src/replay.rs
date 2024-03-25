@@ -2,7 +2,7 @@ use crate::events::{EventSubscriber, Position, UseEntity};
 use crate::{Buffer, DiskPacket};
 use anyhow::Result;
 use dune_data::protocol;
-use dune_data::protocol::v1_19_3::Packet;
+use dune_data::protocol::v1_20_2::Packet;
 use dune_data::protocol::ConnectionState;
 use flate2::read::ZlibDecoder;
 use log::warn;
@@ -29,7 +29,7 @@ impl TrafficPlayer {
 
     fn do_packet(&mut self, disk_packet: DiskPacket) -> Result<()> {
         let mut data = disk_packet.data;
-        let packet = protocol::v1_19_3::deserialize(
+        let packet = protocol::v1_20_2::deserialize(
             self.state,
             disk_packet.direction,
             disk_packet.id,
