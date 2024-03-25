@@ -7,6 +7,8 @@ use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::protocol::VersionInfo;
+
 #[derive(Debug)]
 struct Version {
     items_path: PathBuf,
@@ -249,8 +251,11 @@ impl Enchantment {
 }
 
 pub fn run(out_dir: &str, mc_data_path: &Path) -> Vec<PathBuf> {
-    const VERSIONS: &[&str] = &["1.18.2", "1.19.3", "1.20.2"];
-    // const VERSIONS: &[&str] = &["1.20.2"];
+    const VERSIONS: &[VersionInfo] = &[
+        VersionInfo::new("1.18.2", false),
+        VersionInfo::new("1.19.3", false),
+        VersionInfo::new("1.20.2", true),
+    ];
 
     Command::new("git")
         .args(["submodule", "update", "--init"])
@@ -263,7 +268,7 @@ pub fn run(out_dir: &str, mc_data_path: &Path) -> Vec<PathBuf> {
 
     let versions: HashMap<&str, Version> = VERSIONS
         .iter()
-        .map(|&x| (x, new(x, mc_data_path, &mut depends)))
+        .map(|x| (x.name, new(x.name, mc_data_path, &mut depends)))
         .collect();
 
     if false {
@@ -272,7 +277,7 @@ pub fn run(out_dir: &str, mc_data_path: &Path) -> Vec<PathBuf> {
     }
 
     for v in VERSIONS {
-        protocol::run(v, &versions[v].protocol_path, out_dir, &mut depends);
+        protocol::run(*v, &versions[v.name].protocol_path, out_dir, &mut depends);
     }
 
     depends

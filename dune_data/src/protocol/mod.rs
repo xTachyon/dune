@@ -192,7 +192,48 @@ pub fn handshaking<'r>(
             Handshaking::SetProtocolRequest(p)
         }
         _ => {
-            return Err(anyhow!("unknown packet id={}", id));
+            return Err(anyhow!("unknown handshaking packet id={}", id));
+        }
+    };
+    Ok(packet)
+}
+
+#[derive(Debug)]
+pub enum Status<'x> {
+    PingStartRequest(common_states::status::PingStartRequest),
+    PingRequest(common_states::status::PingRequest),
+    ServerInfoResponse(common_states::status::ServerInfoResponse<'x>),
+    PingResponse(common_states::status::PingResponse),
+}
+
+pub fn status<'r>(
+    state: ConnectionState,
+    direction: PacketDirection,
+    id: PacketId,
+    reader: &mut &'r [u8],
+) -> Result<Status<'r>> {
+    use ConnectionState as S;
+    use PacketDirection as D;
+
+    let packet = match (state, direction, id) {
+        (S::Status, D::C2S, PacketId(0x0)) => {
+            let p = MD::deserialize(reader)?;
+            Status::PingStartRequest(p)
+        }
+        (S::Status, D::C2S, PacketId(0x1)) => {
+            let p = MD::deserialize(reader)?;
+            Status::PingRequest(p)
+        }
+        (S::Status, D::S2C, PacketId(0x0)) => {
+            let p = MD::deserialize(reader)?;
+            Status::ServerInfoResponse(p)
+        }
+        (S::Status, D::S2C, PacketId(0x1)) => {
+            let p = MD::deserialize(reader)?;
+            Status::PingResponse(p)
+        }
+        _ => {
+            return Err(anyhow!("unknown status packet id={}", id));
         }
     };
     Ok(packet)
@@ -252,7 +293,11 @@ pub fn login<'r>(
             Login::LoginPluginRequest(p)
         }
         _ => {
-            return Err(anyhow!("unknown packet id={}", id));
+            return Err(anyhow!(
+                "unknown login packet id={},direction={:?}",
+                id,
+                direction
+            ));
         }
     };
     Ok(packet)

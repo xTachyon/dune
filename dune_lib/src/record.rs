@@ -4,7 +4,7 @@ use aes::cipher::NewCipher;
 use anyhow::{anyhow, Result};
 use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
 use dune_data::protocol::common_states::login::{EncryptionBeginRequest, EncryptionBeginResponse};
-use dune_data::protocol::{self, handshaking, login, Handshaking, Login, PacketId};
+use dune_data::protocol::{self, handshaking, login, status, Handshaking, Login, PacketId, Status};
 use dune_data::protocol::{ConnectionState, PacketData, PacketDirection};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
@@ -30,10 +30,11 @@ pub struct AuthData {
 #[derive(Debug)]
 enum Packet<'x> {
     Handshaking(Handshaking<'x>),
-    // Status,
+    Status(Status<'x>),
     Login(Login<'x>),
     V1_18_2(protocol::v1_18_2::Packet<'x>),
     V1_19_3(protocol::v1_19_3::Packet<'x>),
+    V1_20_2(protocol::v1_20_2::Packet<'x>),
     PlayUnknown(&'x [u8]),
 }
 
@@ -50,6 +51,7 @@ struct Proxy<'x> {
     deserialize: DeserializeFn,
     out_file: ZlibEncoder<File>,
     tmp_string: String,
+    print_packets: bool,
 }
 
 struct OnStartResult<'x> {
@@ -140,6 +142,14 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     ) -> Result<Packet<'r>> {
         Ok(Packet::Login(login(state, direction, id, reader)?))
     }
+    fn status_wrapper<'r>(
+        state: ConnectionState,
+        direction: PacketDirection,
+        id: PacketId,
+        reader: &mut &'r [u8],
+    ) -> Result<Packet<'r>> {
+        Ok(Packet::Status(status(state, direction, id, reader)?))
+    }
     fn ignore<'r>(
         _state: ConnectionState,
         _direction: PacketDirection,
@@ -154,7 +164,7 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     match state {
         ConnectionState::Handshaking => return handshaking_wrapper,
         ConnectionState::Login => return login_wrapper,
-        ConnectionState::Status => {}
+        ConnectionState::Status => return status_wrapper,
         ConnectionState::Play => {}
     }
     macro_rules! d {
@@ -179,6 +189,7 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
     match version {
         758 => d!(v1_18_2, V1_18_2),
         761 => d!(v1_19_3, V1_19_3),
+        764 => d!(v1_20_2, V1_20_2),
         _ => {
             warn!("unknown protocol version: {}", version);
             ignore
@@ -187,7 +198,12 @@ fn get_deserializer(state: ConnectionState, version: i32, ignore_play: bool) -> 
 }
 
 impl<'x> Proxy<'x> {
-    fn new(auth_data: AuthData, server_host: (&'x str, u16), out_path: &str) -> Result<Proxy<'x>> {
+    fn new(
+        auth_data: AuthData,
+        server_host: (&'x str, u16),
+        out_path: &str,
+        print_packets: bool,
+    ) -> Result<Proxy<'x>> {
         let file = File::create(out_path)?;
         Ok(Proxy {
             state: ConnectionState::Handshaking,
@@ -199,25 +215,26 @@ impl<'x> Proxy<'x> {
             deserialize: get_deserializer(ConnectionState::Handshaking, 0, false),
             out_file: ZlibEncoder::new(file, Compression::best()),
             tmp_string: String::new(),
+            print_packets,
         })
     }
 
     fn println_packet(&mut self, p: &Packet) {
-        if true {
+        if !self.print_packets {
             return;
         }
 
         let tmp = &mut self.tmp_string;
         tmp.clear();
-        writeln!(tmp, "{:?}", p).unwrap();
+        write!(tmp, "{:?}", p).unwrap();
 
         let out = if tmp.len() > 256 {
-            let index = tmp.find('{').unwrap_or(256);
+            let index = tmp.find('{').unwrap_or(64);
             &tmp[..index]
         } else {
             tmp
         };
-        print!("{}", out);
+        println!("{}", out);
     }
 
     fn on_start<'p>(
@@ -280,7 +297,7 @@ impl<'x> Proxy<'x> {
                 Login::SuccessResponse(_) => {
                     self.start_done = true;
                     self.state = ConnectionState::Play;
-                    self.deserialize = get_deserializer(self.state, self.protocol_version, true);
+                    self.deserialize = get_deserializer(self.state, self.protocol_version, false);
                 }
                 Login::CompressResponse(x) => {
                     self.compression = x.threshold >= 0;
@@ -357,6 +374,7 @@ fn run(
     auth_data: AuthData,
     server_host: (&str, u16),
     out_path: &str,
+    print_packets: bool,
 ) -> Result<()> {
     const CLIENT_KEY: usize = 0;
     const SERVER_KEY: usize = 1;
@@ -366,7 +384,7 @@ fn run(
     let mut server_reader = ClientReader::default();
     let mut server_writer = ClientWriter::default();
 
-    let mut proxy = Proxy::new(auth_data, server_host, out_path)?;
+    let mut proxy = Proxy::new(auth_data, server_host, out_path, print_packets)?;
 
     let poller = Poller::new()?;
 
@@ -437,6 +455,7 @@ pub fn record_to_file(
     auth_data: AuthData,
     server_host: (&str, u16),
     out_path: &str,
+    print_packets: bool,
 ) -> Result<()> {
     let (client, client_addr) = {
         let incoming = TcpListener::bind(listen_addr)?;
@@ -449,7 +468,14 @@ pub fn record_to_file(
     let server = TcpStream::connect(server_host)?;
     println!("connected to server");
 
-    let res = run(client, server, auth_data, server_host, out_path);
+    let res = run(
+        client,
+        server,
+        auth_data,
+        server_host,
+        out_path,
+        print_packets,
+    );
     println!("{:?}", res);
     Ok(())
 }

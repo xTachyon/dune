@@ -396,7 +396,7 @@ fn state(out: &mut String, types: &TypesMap, state: &State) {
     *out += "}";
 }
 
-fn deserialize_fn(out: &mut String, states: &[State]) {
+fn deserialize_fn(out: &mut String, states: &[State], has_bundle_delimiter: bool) {
     *out += "
 }
             
@@ -406,6 +406,14 @@ pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: P
     
     let packet = match (state, direction, id.0) {
 ";
+
+    if has_bundle_delimiter {
+        *out += "
+        (S::Play, D::S2C, 0x0) => {
+            Packet::BundleDelimiter
+        }
+        ";
+    }
 
     for state in states {
         for (direction, direction_string) in [(&state.c2s, "C2S"), (&state.s2c, "S2C")] {
@@ -424,15 +432,19 @@ pub fn deserialize<'r>(state: ConnectionState, direction: PacketDirection, id: P
         }
     }
 
-    *out += r#"_ => { return Err(anyhow!("unknown packet id={}", id)); } }; Ok(packet) }"#;
+    *out += r#"_ => { return Err(anyhow!("unknown play packet id={},direction={:?}", id, direction)); } }; Ok(packet) }"#;
 }
 
-fn serialize_fn(out: &mut String, states: &[State]) {
+fn serialize_fn(out: &mut String, states: &[State], has_bundle_delimiter: bool) {
     *out += "
             
 pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<()> {
     match packet {
 ";
+
+    if has_bundle_delimiter {
+        *out += "Packet::BundleDelimiter => Ok(()),";
+    }
 
     for state in states {
         for direction in [&state.c2s, &state.s2c] {
@@ -450,7 +462,11 @@ pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<(
     *out += r#"}}"#;
 }
 
-pub(super) fn write(types: &TypesMap, mut states: [State; 1]) -> String {
+pub(super) fn write(
+    types: &TypesMap,
+    mut states: [State; 1],
+    has_bundle_delimiter: bool,
+) -> String {
     let mut out = String::with_capacity(4096);
 
     out += "
@@ -493,6 +509,10 @@ use std::mem::size_of;
     }
 
     out += "#[derive(Debug)] pub enum Packet<'p> {";
+    if has_bundle_delimiter {
+        out += "BundleDelimiter,";
+    }
+
     for state in &states {
         for direction in [&state.c2s, &state.s2c] {
             for packet in &direction.packets {
@@ -511,8 +531,8 @@ use std::mem::size_of;
         i.c2s.packets.sort_by_key(|x| x.id);
         i.s2c.packets.sort_by_key(|x| x.id);
     }
-    deserialize_fn(&mut out, &states);
-    serialize_fn(&mut out, &states);
+    deserialize_fn(&mut out, &states, has_bundle_delimiter);
+    serialize_fn(&mut out, &states, has_bundle_delimiter);
 
     out
 }

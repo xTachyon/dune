@@ -35,11 +35,19 @@ struct Args {
 }
 #[derive(clap::Subcommand)]
 enum Action {
-    Record { option: Option<String> },
+    Record(RecordCommand),
     Replay { option: String },
     Client { option: Option<String> },
     Signs { path: String },
 }
+#[derive(Parser)]
+struct RecordCommand {
+    #[arg(short, long)]
+    server: Option<String>,
+    #[arg(short, long, default_value_t = false)]
+    print_packets: bool,
+}
+
 struct EventHandler {
     player_name: String,
     player_uuid: u128,
@@ -252,8 +260,8 @@ impl EventSubscriber for EventHandler {
 fn to_str_tuple(x: &(String, u16)) -> (&str, u16) {
     (&x.0, x.1)
 }
-fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) -> Result<()> {
-    let server = match server {
+fn record(config: Config, auth_data_ext: AuthDataExt, args: RecordCommand) -> Result<()> {
+    let server = match args.server {
         Some(name) => match config.servers.iter().find(|x| x.name == name) {
             Some(x) => x,
             None => bail!("unknown server {}", name),
@@ -297,6 +305,7 @@ fn record(config: Config, auth_data_ext: AuthDataExt, server: Option<String>) ->
             auth_data_ext.data.clone(),
             to_str_tuple(&server.addr),
             &packet_file,
+            args.print_packets,
         ) {
             eprintln!("{:?}", e);
         }
@@ -405,7 +414,7 @@ fn main_impl() -> Result<()> {
     let auth_data_ext = get_access_token(&config.servers[config.default_server].profile)?;
 
     match arguments.action {
-        Action::Record { option } => record(config, auth_data_ext, option),
+        Action::Record(args) => record(config, auth_data_ext, args),
         Action::Replay { mut option } => {
             let handler = Box::new(EventHandler::new());
             if option == "last" {

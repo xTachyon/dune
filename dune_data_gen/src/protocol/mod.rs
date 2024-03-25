@@ -251,12 +251,26 @@ struct State<'x> {
     pub s2c: Direction<'x>,
 }
 
-pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<PathBuf>) {
+#[derive(Copy, Clone)]
+pub struct VersionInfo {
+    pub name: &'static str,
+    pub has_bundle_delimiter: bool,
+}
+impl VersionInfo {
+    pub const fn new(name: &'static str, has_bundle_delimiter: bool) -> VersionInfo {
+        VersionInfo {
+            name,
+            has_bundle_delimiter,
+        }
+    }
+}
+
+pub(super) fn run(version: VersionInfo, path: &Path, out_dir: &str, depends: &mut Vec<PathBuf>) {
     let bump = Bump::new();
     let mut types = TypesMap::with_capacity_and_key(32);
 
     let states = parser::parse(&mut types, &bump, path, depends);
-    let out = writer::write(&types, states);
+    let out = writer::write(&types, states, version.has_bundle_delimiter);
 
     let out = match syn::parse_file(&out) {
         Ok(syntax_tree) => prettyplease::unparse(&syntax_tree),
@@ -266,7 +280,7 @@ pub(super) fn run(version: &str, path: &Path, out_dir: &str, depends: &mut Vec<P
         }
     };
 
-    let path = format!("{}/v{}.rs", out_dir, version.replace('.', "_"));
+    let path = format!("{}/v{}.rs", out_dir, version.name.replace('.', "_"));
     fs::write(path, out).unwrap();
 
     let bytes = bump.allocated_bytes();

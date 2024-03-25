@@ -16,7 +16,7 @@ impl<R: ReadSkip> ReadSkip for &mut R {
 fn unexpected_eof() -> IoResult<()> {
     Err(io::Error::new(
         io::ErrorKind::UnexpectedEof,
-        "failed to fill whole buffer",
+        "failed to fill whole buffer :(",
     ))
 }
 impl ReadSkip for &[u8] {
