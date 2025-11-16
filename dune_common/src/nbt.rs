@@ -158,7 +158,7 @@ fn read_impl<'n, R: Read>(mut reader: &mut R, tag: u8, bump: &'n Bump) -> Result
     Ok(result)
 }
 
-fn read_start<R: Read>(mut reader: R, tag: u8, bump: &Bump) -> Result<RootTag> {
+fn read_start<R: Read>(mut reader: R, tag: u8, bump: &Bump) -> Result<RootTag<'_>> {
     let reader = &mut reader;
     if tag != 10 {
         return Err(anyhow!(
@@ -171,7 +171,7 @@ fn read_start<R: Read>(mut reader: R, tag: u8, bump: &Bump) -> Result<RootTag> {
     Ok(RootTag { name, tag })
 }
 
-pub fn read_option<R: Read>(mut reader: R, bump: &Bump) -> Result<Option<RootTag>> {
+pub fn read_option<R: Read>(mut reader: R, bump: &Bump) -> Result<Option<RootTag<'_>>> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     if tag == 0 {
@@ -182,7 +182,7 @@ pub fn read_option<R: Read>(mut reader: R, bump: &Bump) -> Result<Option<RootTag
     }
 }
 
-pub fn read<R: Read>(mut reader: R, bump: &Bump) -> Result<RootTag> {
+pub fn read<R: Read>(mut reader: R, bump: &Bump) -> Result<RootTag<'_>> {
     let reader = &mut reader;
     let tag = reader.read_u8()?;
     read_start(reader, tag, bump)
