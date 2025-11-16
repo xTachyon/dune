@@ -1,6 +1,5 @@
 use std::io;
-use std::io::Read;
-use std::io::Result as IoResult;
+use std::io::{Read, Result as IoResult};
 
 pub mod nbt;
 

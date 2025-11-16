@@ -1,7 +1,8 @@
-use super::de::read_u8;
-use anyhow::anyhow;
-use anyhow::Result;
 use std::io::{Read, Result as IoResult, Write};
+
+use anyhow::{anyhow, Result};
+
+use super::de::read_u8;
 
 pub(crate) fn read_varint_with_size<R: Read>(mut reader: R) -> Result<(i32, usize)> {
     let mut result = 0;

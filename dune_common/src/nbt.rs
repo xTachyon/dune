@@ -1,12 +1,14 @@
-use crate::ReadSkip;
-use anyhow::{anyhow, Result};
-use bumpalo::collections::Vec as BVec;
-use bumpalo::Bump;
-use byteorder::{ReadBytesExt, BE};
 use std::collections::HashMap;
 use std::fmt::{Display, Write};
 use std::io::Read;
 use std::str;
+
+use anyhow::{anyhow, Result};
+use bumpalo::collections::Vec as BVec;
+use bumpalo::Bump;
+use byteorder::{ReadBytesExt, BE};
+
+use crate::ReadSkip;
 
 #[derive(Debug)]
 pub enum Tag<'n> {
@@ -361,8 +363,9 @@ fn pretty_print(root: &RootTag) -> FmtResult<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::nbt::{read, read_option};
     use bumpalo::Bump;
+
+    use crate::nbt::{read, read_option};
 
     #[test]
     fn hello_world() {

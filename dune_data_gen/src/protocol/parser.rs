@@ -1,20 +1,18 @@
-use super::{
-    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield, TyKey,
-    TyOption, TyStruct, TyStructField, TypesMap,
-};
-use crate::{
-    protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum, VariantField, Variants},
-    read_file,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::{Path, PathBuf};
+
 use bumpalo::Bump;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use serde_derive::Deserialize;
 use serde_json::Value;
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    path::{Path, PathBuf},
+
+use super::{
+    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield, TyKey,
+    TyOption, TyStruct, TyStructField, TypesMap,
 };
+use crate::protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum, VariantField, Variants};
+use crate::read_file;
 
 #[derive(Debug, Deserialize)]
 struct JsonDirection {

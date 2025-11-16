@@ -1,11 +1,12 @@
 mod protocol;
 
-use fs_err as fs;
-use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use fs_err as fs;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::protocol::VersionInfo;
 

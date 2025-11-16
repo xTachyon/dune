@@ -1,13 +1,8 @@
 use std::fs::File;
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
-use std::io::Write;
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use anyhow::bail;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bitvec::vec::BitVec;
 use flate2::write::ZlibDecoder;
 

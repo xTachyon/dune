@@ -3,15 +3,16 @@ pub mod de;
 pub mod v1_20_2;
 pub mod varint;
 
-use crate::protocol::de::MD;
-use crate::protocol::varint::{read_varint, read_varint_with_size};
-use anyhow::anyhow;
-use anyhow::Result;
-use flate2::read::ZlibDecoder;
-use num_enum::TryFromPrimitive;
 use std::fmt::Debug;
 use std::io::Read;
 use std::mem::size_of;
+
+use anyhow::{anyhow, Result};
+use flate2::read::ZlibDecoder;
+use num_enum::TryFromPrimitive;
+
+use crate::protocol::de::MD;
+use crate::protocol::varint::{read_varint, read_varint_with_size};
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -181,8 +182,7 @@ pub fn handshaking<'r>(
     id: PacketId,
     reader: &mut &'r [u8],
 ) -> Result<Handshaking<'r>> {
-    use ConnectionState as S;
-    use PacketDirection as D;
+    use {ConnectionState as S, PacketDirection as D};
 
     let packet = match (state, direction, id) {
         (S::Handshaking, D::C2S, PacketId(0x0)) => {
@@ -210,8 +210,7 @@ pub fn status<'r>(
     id: PacketId,
     reader: &mut &'r [u8],
 ) -> Result<Status<'r>> {
-    use ConnectionState as S;
-    use PacketDirection as D;
+    use {ConnectionState as S, PacketDirection as D};
 
     let packet = match (state, direction, id) {
         (S::Status, D::C2S, PacketId(0x0)) => {
@@ -254,8 +253,7 @@ pub fn login<'r>(
     id: PacketId,
     reader: &mut &'r [u8],
 ) -> Result<Login<'r>> {
-    use ConnectionState as S;
-    use PacketDirection as D;
+    use {ConnectionState as S, PacketDirection as D};
 
     let packet = match (state, direction, id) {
         (S::Login, D::C2S, PacketId(0x0)) => {

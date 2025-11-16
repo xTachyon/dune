@@ -1,8 +1,9 @@
+use std::path::PathBuf;
+
 use anyhow::{bail, Result};
 use dune_lib::record::AuthData;
 use fs_err as fs;
 use serde_derive::Deserialize;
-use std::path::PathBuf;
 
 pub struct AuthDataExt {
     pub data: AuthData,

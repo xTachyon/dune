@@ -1,10 +1,11 @@
-use crate::protocol::varint::read_varint;
+use std::io::{self, Read, Result as IoResult, Write};
+
 use anyhow::Result;
 use dune_common::nbt;
-use std::io::{self, Read, Result as IoResult, Write};
 
 use super::varint::write_varint;
 use super::{ChunkBlockEntity, IndexedNbt, IndexedOptionNbt, InventorySlot, InventorySlotData};
+use crate::protocol::varint::read_varint;
 
 pub trait MemoryExt<'x> {
     fn read_mem(&mut self, size: usize) -> IoResult<&'x [u8]>;

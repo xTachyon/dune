@@ -1,15 +1,8 @@
-use crate::protocol::Constant;
-
-use super::Direction;
-use super::State;
-use super::Ty;
-use super::TyBufferCountKind;
-use super::TyEnum;
-use super::TyKey;
-use super::TyStruct;
-use super::TypesMap;
 use std::borrow::Cow;
 use std::fmt::Arguments;
+
+use super::{Direction, State, Ty, TyBufferCountKind, TyEnum, TyKey, TyStruct, TypesMap};
+use crate::protocol::Constant;
 
 trait FmtWriteNoFail {
     fn write_fmt(&mut self, args: Arguments);

@@ -1,4 +1,5 @@
-use std::{path::Path, time::Instant};
+use std::path::Path;
+use std::time::Instant;
 
 fn main() {
     let start = Instant::now();

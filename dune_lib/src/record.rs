@@ -1,11 +1,16 @@
-use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
-use crate::DiskPacket;
+use std::fmt::Write as FmtWrite;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+
 use aes::cipher::NewCipher;
 use anyhow::{anyhow, Result};
 use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
 use dune_data::protocol::common_states::login::{EncryptionBeginRequest, EncryptionBeginResponse};
-use dune_data::protocol::{self, handshaking, login, status, Handshaking, Login, PacketId, Status};
-use dune_data::protocol::{ConnectionState, PacketData, PacketDirection};
+use dune_data::protocol::{
+    self, handshaking, login, status, ConnectionState, Handshaking, Login, PacketData,
+    PacketDirection, PacketId, Status,
+};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use log::warn;
@@ -14,10 +19,9 @@ use rsa::pkcs8::DecodePublicKey;
 use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::{Digest, Sha1};
-use std::fmt::Write as FmtWrite;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+
+use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
+use crate::DiskPacket;
 
 #[derive(Clone)]
 pub struct AuthData {

@@ -5,23 +5,19 @@ pub mod record;
 pub mod replay;
 pub mod world;
 
-use anyhow::bail;
-use anyhow::Result;
-pub use dune_data::enchantments::Enchantment;
-pub use dune_data::items::Item;
-use dune_data::protocol::de::MemoryExt;
-use dune_data::protocol::de::MD;
-use dune_data::protocol::PacketDirection;
-use dune_data::protocol::PacketId;
-use slice_ring_buffer::SliceRingBuffer;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::fmt;
 use std::hash::Hash;
-use std::io;
 use std::io::Write;
-use std::ops::Deref;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
+use std::{fmt, io};
+
+use anyhow::{bail, Result};
+pub use dune_data::enchantments::Enchantment;
+pub use dune_data::items::Item;
+use dune_data::protocol::de::{MemoryExt, MD};
+use dune_data::protocol::{PacketDirection, PacketId};
+use slice_ring_buffer::SliceRingBuffer;
 
 struct DiskPacket<'p> {
     pub id: PacketId,

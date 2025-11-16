@@ -1,11 +1,14 @@
 mod launchers;
 mod signs;
 
+use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
+use std::io::ErrorKind;
+use std::time::Instant;
+
 use ansi_term::Color::{Cyan, Green, Purple};
-use anyhow::anyhow;
-use anyhow::{bail, Result};
-use bumpalo::collections::String as BString;
-use bumpalo::collections::Vec as BVec;
+use anyhow::{anyhow, bail, Result};
+use bumpalo::collections::{String as BString, Vec as BVec};
 use bumpalo::Bump;
 use chrono::Local;
 use clap::Parser;
@@ -21,10 +24,6 @@ use launchers::{get_access_token, AuthDataExt};
 use log::{info, warn, LevelFilter};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
-use std::collections::HashMap;
-use std::fmt::Write as FmtWrite;
-use std::io::ErrorKind;
-use std::time::Instant;
 
 ///Tool for replaying saves with game input
 #[derive(Parser)]

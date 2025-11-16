@@ -1,7 +1,5 @@
 use anyhow::Result;
-
-pub use dune_data::protocol::v1_20_2::play::TradeListResponse;
-pub use dune_data::protocol::v1_20_2::play::UseEntityKind;
+pub use dune_data::protocol::v1_20_2::play::{TradeListResponse, UseEntityKind};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct PositionInt {

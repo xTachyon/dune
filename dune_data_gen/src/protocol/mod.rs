@@ -1,15 +1,14 @@
 mod parser;
 mod writer;
 
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use bumpalo::Bump;
 use humansize::{format_size, BINARY};
 use slotmap::{new_key_type, SlotMap};
-use std::{
-    collections::BTreeMap,
-    fmt::Debug,
-    fs,
-    path::{Path, PathBuf},
-};
 
 new_key_type! {
     struct TyKey;

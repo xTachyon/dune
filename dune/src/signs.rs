@@ -1,18 +1,14 @@
+use std::ffi::OsStr;
+use std::fs::{self, DirEntry, File};
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+
 use ansi_term::Color::{Green, Purple, Red};
 use anyhow::Result;
 use bumpalo::Bump;
-use dune_lib::world::{
-    anvil::{Region, CHUNKS_PER_REGION},
-    chunk::{read_chunk, BlockEntityKind, Chunk},
-};
-use std::{
-    ffi::OsStr,
-    fs::{self, DirEntry, File},
-    io::BufWriter,
-    path::Path,
-    time::Instant,
-};
-use std::{io::Write, path::PathBuf};
+use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
+use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
 
 struct SignsPrinter {
     out: BufWriter<File>,
