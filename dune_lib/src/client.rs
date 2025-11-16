@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
-use std::io::{stdin, BufRead, Read, Write};
+use std::io::{BufRead, Read, Write, stdin};
 use std::net::TcpStream;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
 use aes::cipher::AsyncStreamCipher;
@@ -10,17 +10,17 @@ use anyhow::Result;
 use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
 use dune_data::protocol::common_states::login::LoginStartRequest;
 use dune_data::protocol::de::MD;
-use dune_data::protocol::v1_20_2::play::KeepAliveRequest;
 use dune_data::protocol::v1_20_2::Packet;
-use dune_data::protocol::varint::{write_varint, write_varint_serialize, VarintSerialized};
+use dune_data::protocol::v1_20_2::play::KeepAliveRequest;
+use dune_data::protocol::varint::{VarintSerialized, write_varint, write_varint_serialize};
 use dune_data::protocol::{self, ConnectionState, PacketDirection};
-use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use flate2::write::ZlibEncoder;
 use log::warn;
 use polling::{Event, Poller};
 
-use crate::record::AuthData;
 use crate::Buffer;
+use crate::record::AuthData;
 
 pub(crate) type Aes128Cfb8 = cfb8::Cfb8<aes::Aes128>;
 

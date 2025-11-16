@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::io::Read;
 use std::mem::size_of;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use flate2::read::ZlibDecoder;
 use num_enum::TryFromPrimitive;
 

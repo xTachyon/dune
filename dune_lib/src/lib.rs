@@ -12,10 +12,10 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::{fmt, io};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 pub use dune_data::enchantments::Enchantment;
 pub use dune_data::items::Item;
-use dune_data::protocol::de::{MemoryExt, MD};
+use dune_data::protocol::de::{MD, MemoryExt};
 use dune_data::protocol::{PacketDirection, PacketId};
 use slice_ring_buffer::SliceRingBuffer;
 

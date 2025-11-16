@@ -7,8 +7,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use bumpalo::Bump;
-use humansize::{format_size, BINARY};
-use slotmap::{new_key_type, SlotMap};
+use humansize::{BINARY, format_size};
+use slotmap::{SlotMap, new_key_type};
 
 new_key_type! {
     struct TyKey;

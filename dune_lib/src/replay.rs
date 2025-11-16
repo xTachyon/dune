@@ -3,8 +3,8 @@ use std::io::Read;
 
 use anyhow::Result;
 use dune_data::protocol;
-use dune_data::protocol::v1_20_2::Packet;
 use dune_data::protocol::ConnectionState;
+use dune_data::protocol::v1_20_2::Packet;
 use flate2::read::ZlibDecoder;
 use log::warn;
 

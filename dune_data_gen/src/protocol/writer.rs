@@ -20,11 +20,7 @@ fn lifetime(ty: TyKey, types: &TypesMap) -> &'static str {
             ty,
             Ty::String | Ty::Buffer(_) | Ty::RestBuffer | Ty::Slot | Ty::Nbt | Ty::OptionNbt
         );
-    if b {
-        "<'p>"
-    } else {
-        ""
-    }
+    if b { "<'p>" } else { "" }
 }
 fn get_type_name<'x>(ty_key: TyKey, types: &'x TypesMap) -> Cow<'x, str> {
     let ty = &types[ty_key];
@@ -151,11 +147,7 @@ fn serialize_one(out: &mut String, name: &str, ty_key: TyKey, types: &TypesMap) 
     writeln!(out);
 }
 fn underscore(b: bool) -> &'static str {
-    if b {
-        "_"
-    } else {
-        ""
-    }
+    if b { "_" } else { "" }
 }
 fn life(needs_lifetime: bool) -> (&'static str, &'static str) {
     if needs_lifetime {
@@ -445,8 +437,7 @@ pub fn serialize<'r, W: Write>(mut writer: &mut W, packet: Packet) -> IoResult<(
                 write!(
                     out,
                     "Packet::{}(p) => {{ write_varint(&mut writer, {:#02x})?; p.serialize(writer) }}",
-                    packet.name,
-                    packet.id,
+                    packet.name, packet.id,
                 );
             }
         }

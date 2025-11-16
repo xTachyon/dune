@@ -2,7 +2,7 @@
 name = "dune"
 version = "0.1.0"
 authors = ["Damian Andrei <andreidaamian@gmail.com>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 dune_lib.workspace = true

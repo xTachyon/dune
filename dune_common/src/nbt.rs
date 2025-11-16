@@ -3,10 +3,10 @@ use std::fmt::{Display, Write};
 use std::io::Read;
 use std::str;
 
-use anyhow::{anyhow, Result};
-use bumpalo::collections::Vec as BVec;
+use anyhow::{Result, anyhow};
 use bumpalo::Bump;
-use byteorder::{ReadBytesExt, BE};
+use bumpalo::collections::Vec as BVec;
+use byteorder::{BE, ReadBytesExt};
 
 use crate::ReadSkip;
 

@@ -4,15 +4,15 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 use aes::cipher::NewCipher;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use dune_data::protocol::common_states::handshaking::SetProtocolRequest;
 use dune_data::protocol::common_states::login::{EncryptionBeginRequest, EncryptionBeginResponse};
 use dune_data::protocol::{
-    self, handshaking, login, status, ConnectionState, Handshaking, Login, PacketData,
-    PacketDirection, PacketId, Status,
+    self, ConnectionState, Handshaking, Login, PacketData, PacketDirection, PacketId, Status,
+    handshaking, login, status,
 };
-use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use flate2::write::ZlibEncoder;
 use log::warn;
 use polling::{Event, Poller};
 use rsa::pkcs8::DecodePublicKey;
@@ -20,8 +20,8 @@ use rsa::{PaddingScheme, PublicKey, RsaPublicKey};
 use serde_derive::Serialize;
 use sha1::{Digest, Sha1};
 
-use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
 use crate::DiskPacket;
+use crate::client::{Aes128Cfb8, ClientReader, ClientWriter};
 
 #[derive(Clone)]
 pub struct AuthData {

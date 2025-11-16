@@ -7,9 +7,9 @@ use std::io::ErrorKind;
 use std::time::Instant;
 
 use ansi_term::Color::{Cyan, Green, Purple};
-use anyhow::{anyhow, bail, Result};
-use bumpalo::collections::{String as BString, Vec as BVec};
+use anyhow::{Result, anyhow, bail};
 use bumpalo::Bump;
+use bumpalo::collections::{String as BString, Vec as BVec};
 use chrono::Local;
 use clap::Parser;
 use dune_common::nbt::{self, Tag};
@@ -18,10 +18,10 @@ use dune_lib::chat::parse_chat;
 use dune_lib::events::{EventSubscriber, Position, TradeListResponse, UseEntity, UseEntityKind};
 use dune_lib::record::record_to_file;
 use dune_lib::replay::play;
-use dune_lib::{client, Enchantment, Item};
+use dune_lib::{Enchantment, Item, client};
 use fs_err as fs;
-use launchers::{get_access_token, AuthDataExt};
-use log::{info, warn, LevelFilter};
+use launchers::{AuthDataExt, get_access_token};
+use log::{LevelFilter, info, warn};
 use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 
@@ -238,7 +238,10 @@ impl EventSubscriber for EventHandler {
 
             writeln!(out)?;
         }
-        writeln!(out, "------------------------------------------------------------------------------------------------------------")?;
+        writeln!(
+            out,
+            "------------------------------------------------------------------------------------------------------------"
+        )?;
 
         info!("{}", out);
         Ok(())

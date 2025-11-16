@@ -7,8 +7,8 @@ use std::time::Instant;
 use ansi_term::Color::{Green, Purple, Red};
 use anyhow::Result;
 use bumpalo::Bump;
-use dune_lib::world::anvil::{Region, CHUNKS_PER_REGION};
-use dune_lib::world::chunk::{read_chunk, BlockEntityKind, Chunk};
+use dune_lib::world::anvil::{CHUNKS_PER_REGION, Region};
+use dune_lib::world::chunk::{BlockEntityKind, Chunk, read_chunk};
 
 struct SignsPrinter {
     out: BufWriter<File>,

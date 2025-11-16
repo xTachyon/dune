@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
+use bumpalo::collections::Vec as BVec;
 use dune_common::nbt::{self, Tag};
 
 use crate::chat::parse_chat;

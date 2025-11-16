@@ -1,6 +1,6 @@
 use std::io::{Read, Result as IoResult, Write};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use super::de::read_u8;
 

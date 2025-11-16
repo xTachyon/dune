@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use bitvec::vec::BitVec;
 use flate2::write::ZlibDecoder;
 

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use dune_lib::record::AuthData;
 use fs_err as fs;
 use serde_derive::Deserialize;

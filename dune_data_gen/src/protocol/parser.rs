@@ -8,8 +8,8 @@ use serde_derive::Deserialize;
 use serde_json::Value;
 
 use super::{
-    width_for_bitfields, ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield, TyKey,
-    TyOption, TyStruct, TyStructField, TypesMap,
+    ConnectionState, Direction, Packet, State, Ty, TyArray, TyBitfield, TyKey, TyOption, TyStruct,
+    TyStructField, TypesMap, width_for_bitfields,
 };
 use crate::protocol::{Constant, TyBuffer, TyBufferCountKind, TyEnum, VariantField, Variants};
 use crate::read_file;
