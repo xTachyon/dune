@@ -30,4 +30,4 @@ clap.workspace = true
 winresource.workspace = true
 
 [target.'cfg(target_family = "unix")'.dependencies]
-users = { version = "0.11", default-features = false }
+uzers = { version = "0.12.1", default-features = false }
