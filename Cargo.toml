@@ -32,7 +32,7 @@ bitvec = "1"
 num-bigint = "0.4.3"
 polling = "2"
 rand = "0.8.5"
-slice-ring-buffer = "0.3.2"
+slice-ring-buffer = "0.3.4"
 ureq = "2"
 fs-err = "3"
 syn = { version = "2", features = ["parsing"] }
