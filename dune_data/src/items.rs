@@ -4831,7 +4831,7 @@ impl Item {
         Ok(result)
     }
 }
-const DATA: [(&str, Item); 1255] = [
+static DATA: [(&str, Item); 1255] = [
     ("air", Air),
     ("stone", Stone),
     ("granite", Granite),

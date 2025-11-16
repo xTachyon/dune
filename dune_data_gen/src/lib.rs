@@ -172,7 +172,7 @@ fn process_items(versions: &HashMap<&str, Version>, depends: &mut Vec<PathBuf>) 
     }
     *out += "}";
 
-    writeln!(out, "const DATA: [(&str, Item); {}] = [", items.len()).unwrap();
+    writeln!(out, "static DATA: [(&str, Item); {}] = [", items.len()).unwrap();
     for item in items.iter() {
         write!(out, r#"("{}", {}),"#, item.name, title_case(&item.name)).unwrap();
     }
