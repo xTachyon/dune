@@ -34,15 +34,15 @@ polling = "2"
 rand = "0.8.5"
 slice-ring-buffer = "0.3.2"
 ureq = "2"
-fs-err = "2"
+fs-err = "3"
 syn = { version = "2", features = ["parsing"] }
-prettyplease = "=0.2.16"
+prettyplease = "0.2.37"
 slotmap = "1"
 
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
-toml = "0.8.8"
+toml = "0.9.8"
 
 aes = "0.7.2"
 cfb8 = "0.7.1"
@@ -51,7 +51,7 @@ rsa = "0.6.1"
 sha1 = "0.10.5"
 
 log = "0.4"
-simple_logger = { version = "4", features = ["colors", "stderr"], default-features = false}
+simple_logger = { version = "5", features = ["colors", "stderr"], default-features = false}
 
 clap = { version = "4", features = ["derive"] }
 
